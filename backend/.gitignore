@@ -1,0 +1,25 @@
+# Backend specific .gitignore
+
+# ===== VARIABLES D'ENVIRONNEMENT =====
+.env
+.env.local
+.env.*.local
+
+# ===== NODE_MODULES =====
+node_modules/
+
+# ===== LOGS PM2 =====
+logs/
+*.log
+
+# ===== BUILD =====
+dist/
+build/
+
+# ===== TESTS =====
+test-imgbb.js
+test-*.js
+
+# ===== FICHIERS TEMPORAIRES =====
+*.tmp
+*.temp

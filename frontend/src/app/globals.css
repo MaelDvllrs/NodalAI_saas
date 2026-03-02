@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #ffffff;
+  --surface: #fafafa;
+  --border: #eaeaea;
+  --text: #000000;
+  --text-muted: #666666;
+  --primary: #000000;
+  --primary-foreground: #ffffff;
+  --accent: #0070f3;
+  --accent-hover: #0060df;
+  --success: #0070f3;
+  --error: #ee0000;
+  --font-sans: 'Inter';
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000;
+    --surface: #0a0a0a;
+    --border: #333333;
+    --text: #ffffff;
+    --text-muted: #888888;
+    --primary: #ffffff;
+    --primary-foreground: #000000;
+    --accent: #ffffff;
+    --accent-hover: #eaeaea;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/70 dark:bg-black/70 backdrop-blur-md border-b border-border sticky top-0 z-50;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-3.5 py-1.5 rounded-md text-sm font-medium tracking-tight transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-sm;
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-3.5 py-1.5 rounded-md text-sm border font-medium tracking-tight transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none shadow-sm;
+    border-color: var(--border);
+    background-color: var(--surface);
+    color: var(--text);
+  }
+  .btn-secondary:hover {
+    background-color: color-mix(in srgb, var(--border) 50%, transparent);
+  }
+
+  .input-base {
+    @apply w-full rounded-md px-3 py-1.5 text-sm focus:outline-none transition-all;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .input-base::placeholder {
+    color: var(--text-muted);
+  }
+  .input-base:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}

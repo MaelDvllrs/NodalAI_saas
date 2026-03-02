@@ -1,0 +1,131 @@
+# ===== FICHIERS SENSIBLES =====
+# Variables d'environnement (IMPORTANT : ne jamais commiter)
+.env
+.env*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ===== NODE.JS =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# ===== LOGS =====
+logs/
+*.log
+
+# ===== SYSTEME D'EXPLOITATION =====
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ===== EDITEURS / IDE =====
+# VSCode
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+*.code-workspace
+
+# JetBrains (WebStorm, IntelliJ, etc.)
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# ===== BUILD / DIST =====
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# ===== CACHE =====
+.cache/
+.temp/
+.tmp/
+*.cache
+
+# ===== TESTS =====
+coverage/
+*.lcov
+.nyc_output/
+
+# ===== PM2 =====
+.pm2/
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# ===== CERTIFICATS SSL =====
+*.pem
+*.key
+*.crt
+*.cert
+
+# ===== BACKUP =====
+*.bak
+*.backup
+*.old
+*.orig
+
+# ===== AUTRES =====
+# Archives
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Fichiers temporaires
+*.tmp
+*.swp
+*.swo
+
+# Lock files (garder package-lock.json mais ignorer les autres)
+# yarn.lock (décommentez si vous utilisez npm uniquement)
+
+# Next.js
+.next/
+out/
+
+# Vercel
+.vercel
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+
+# Optional: Ignorer des fichiers de test locaux
+test-*.js
+test-*.ts
