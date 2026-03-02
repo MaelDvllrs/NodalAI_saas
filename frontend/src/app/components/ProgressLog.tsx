@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Terminal, CheckCircle2, AlertCircle, Copy, ExternalLink, ChevronDown, ChevronUp, Code2, Eye, Info } from 'lucide-react';
+import { Terminal, CheckCircle2, AlertCircle, Copy, ExternalLink, ChevronDown, ChevronUp, Code2, Eye, Info, BarChart2, Target } from 'lucide-react';
 import { cn } from '../utils/cn';
 
 export type LogEvent =
@@ -9,6 +9,7 @@ export type LogEvent =
   | { type: 'data'; key: string; value: unknown }
   | { type: 'preview'; data: { titleTag: string; h1: string; metaDescription: string } }
   | { type: 'embeds'; data: { faqEmbed: string | null; schemas: { position: string; code: string }[] } }
+  | { type: 'coverage'; data: { totalScore: number; topicCoverage: number; entityCoverage: number; wordScore: number; faqScore: number; intentScore: number }; message: string }
   | { type: 'done'; data: { itemId: string; itemName: string; collectionId: string } }
   | { type: 'error'; message: string }
   | { type: 'debug'; label: string; [key: string]: unknown };
@@ -34,6 +35,8 @@ export default function ProgressLog({ events }: Props) {
 
   const mainKeyword = (events.find((e) => e.type === 'data' && (e as { key: string }).key === 'mainKeyword') as { value: string } | undefined)?.value;
   const secondaryKeywords = (events.find((e) => e.type === 'data' && (e as { key: string }).key === 'secondaryKeywords') as { value: string[] } | undefined)?.value;
+  const serpModelData = (events.find((e) => e.type === 'data' && (e as { key: string }).key === 'serpModel') as { value: { dominantSubtopics: string[]; recurringEntities: string[]; intent: string; contentFormat: string; avgWordCount: number; faqQuestions: string[] } } | undefined)?.value;
+  const coverageEvent = events.find((e) => e.type === 'coverage') as Extract<LogEvent, { type: 'coverage' }> | undefined;
 
   return (
     <div className="space-y-6">
@@ -88,6 +91,98 @@ export default function ProgressLog({ events }: Props) {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* SERP Semantic Model */}
+      {serpModelData && (
+        <div className="bg-surface border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <div className="flex items-center gap-2 text-text-muted mb-2">
+            <Target size={14} />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Modèle SERP Concurrent</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="bg-background rounded-lg p-3 border border-border">
+              <p className="text-[10px] text-text-muted uppercase tracking-wider mb-1">Intention</p>
+              <p className="font-semibold capitalize">{serpModelData.intent}</p>
+            </div>
+            <div className="bg-background rounded-lg p-3 border border-border">
+              <p className="text-[10px] text-text-muted uppercase tracking-wider mb-1">Format dominant</p>
+              <p className="font-semibold capitalize">{serpModelData.contentFormat}</p>
+            </div>
+            <div className="bg-background rounded-lg p-3 border border-border">
+              <p className="text-[10px] text-text-muted uppercase tracking-wider mb-1">Mots cibles</p>
+              <p className="font-semibold">{Math.round(serpModelData.avgWordCount * 1.1).toLocaleString('fr-FR')} mots</p>
+            </div>
+            <div className="bg-background rounded-lg p-3 border border-border">
+              <p className="text-[10px] text-text-muted uppercase tracking-wider mb-1">Sous-thèmes SERP</p>
+              <p className="font-semibold">{serpModelData.dominantSubtopics.length} détectés</p>
+            </div>
+          </div>
+          {serpModelData.dominantSubtopics.length > 0 && (
+            <div>
+              <p className="text-[10px] text-text-muted uppercase tracking-wider mb-2">Sous-thèmes à couvrir</p>
+              <div className="flex flex-wrap gap-1.5">
+                {serpModelData.dominantSubtopics.map((t, i) => (
+                  <span key={i} className="px-2 py-0.5 rounded-full bg-accent/10 text-accent text-[10px] font-medium border border-accent/20">{t}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          {serpModelData.recurringEntities.length > 0 && (
+            <div className="border-t border-border pt-3">
+              <p className="text-[10px] text-text-muted uppercase tracking-wider mb-2">Entités clés</p>
+              <div className="flex flex-wrap gap-1.5">
+                {serpModelData.recurringEntities.map((e, i) => (
+                  <span key={i} className="px-2 py-0.5 rounded-full bg-border text-text-muted text-[10px] font-medium">{e}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SEO Coverage Score */}
+      {coverageEvent && (
+        <div className="bg-surface border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 text-text-muted">
+              <BarChart2 size={14} />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Score Couverture SEO</span>
+            </div>
+            <span className={cn(
+              'text-2xl font-bold',
+              coverageEvent.data.totalScore >= 80 ? 'text-green-500' :
+              coverageEvent.data.totalScore >= 60 ? 'text-amber-500' : 'text-error'
+            )}>
+              {coverageEvent.data.totalScore}/100
+            </span>
+          </div>
+          <div className="space-y-2.5">
+            {([
+              { label: 'Sous-thèmes couverts', value: coverageEvent.data.topicCoverage, weight: '35%' },
+              { label: 'Entités intégrées', value: coverageEvent.data.entityCoverage, weight: '20%' },
+              { label: 'Volume de contenu', value: coverageEvent.data.wordScore, weight: '20%' },
+              { label: 'Section FAQ', value: coverageEvent.data.faqScore, weight: '15%' },
+              { label: 'Alignement intention', value: coverageEvent.data.intentScore, weight: '10%' },
+            ] as const).map((row, i) => (
+              <div key={i} className="space-y-1">
+                <div className="flex justify-between text-[10px] text-text-muted">
+                  <span>{row.label} <span className="opacity-50">({row.weight})</span></span>
+                  <span className="font-semibold">{row.value}%</span>
+                </div>
+                <div className="h-1.5 bg-border rounded-full overflow-hidden">
+                  <div
+                    className={cn(
+                      'h-full rounded-full transition-all duration-700',
+                      row.value >= 80 ? 'bg-green-500' : row.value >= 50 ? 'bg-amber-500' : 'bg-error'
+                    )}
+                    style={{ width: `${row.value}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

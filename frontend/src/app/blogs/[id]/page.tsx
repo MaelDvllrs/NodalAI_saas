@@ -12,6 +12,7 @@ import {
   Rocket, FileEdit, RefreshCw, Trash2, AlertTriangle,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { Skeleton } from '../../components/UI';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
@@ -130,9 +131,30 @@ export default function BlogDetailPage() {
       <ProtectedRoute>
         <div className="min-h-screen bg-background">
           <Navbar />
-          <div className="flex items-center justify-center py-32 text-text-muted">
-            <RefreshCw className="animate-spin mr-3" size={24} />
-            <span className="text-sm font-medium">Chargement de l&apos;article...</span>
+          <div className="max-w-7xl mx-auto py-12 px-6">
+            <Skeleton className="h-4 w-32 mb-8" />
+            <div className="flex justify-between items-start mb-10">
+              <div className="space-y-3">
+                <Skeleton className="h-4 w-24 rounded-full" />
+                <Skeleton className="h-10 w-[600px]" />
+                <Skeleton className="h-4 w-48" />
+              </div>
+              <div className="flex gap-2">
+                <Skeleton className="h-10 w-24 rounded-xl" />
+                <Skeleton className="h-10 w-32 rounded-xl" />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-8">
+              <div className="space-y-6">
+                <Skeleton className="h-[300px] rounded-2xl" />
+                <Skeleton className="h-[200px] rounded-2xl" />
+                <Skeleton className="h-[250px] rounded-2xl" />
+              </div>
+              <div className="col-span-2 space-y-6">
+                <Skeleton className="h-12 w-64 rounded-xl" />
+                <Skeleton className="h-[600px] rounded-2xl" />
+              </div>
+            </div>
           </div>
         </div>
       </ProtectedRoute>

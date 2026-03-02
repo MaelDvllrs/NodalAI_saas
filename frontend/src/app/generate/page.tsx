@@ -7,9 +7,10 @@ import ProtectedRoute from '../components/ProtectedRoute';
 import Navbar from '../components/Navbar';
 import { LogEvent } from '../components/ProgressLog';
 import ProgressLog from '../components/ProgressLog';
-import { Sparkles, Globe, Type, Settings2, FileEdit, Rocket, RefreshCw, ChevronLeft, Terminal } from 'lucide-react';
+import { Sparkles, Globe, Type, Settings2, FileEdit, Rocket, RefreshCw, ChevronLeft, Terminal, Layout } from 'lucide-react';
 import { cn } from '../utils/cn';
 import Link from 'next/link';
+import { Skeleton, Spinner } from '../components/UI';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 const STORAGE_KEY = 'blogauto_generation_job';
@@ -39,9 +40,14 @@ function GeneratePageContent() {
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState('');
   const [theme, setTheme] = useState('');
+  const [keywordMode, setKeywordMode] = useState<'theme' | 'keyword'>('theme');
+  const [directKeyword, setDirectKeyword] = useState('');
+  const [toneMode, setToneMode] = useState<'preset' | 'custom'>('preset');
   const [tone, setTone] = useState('Expert et pédagogique');
+  const [customTone, setCustomTone] = useState('');
   const [status, setStatus] = useState<'draft' | 'publish'>('draft');
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetchingSites, setIsFetchingSites] = useState(true);
   const [events, setEvents] = useState<LogEvent[]>([]);
   const esRef = useRef<EventSource | null>(null);
   const jobIdRef = useRef<string | null>(null);
@@ -100,6 +106,7 @@ function GeneratePageContent() {
   }, [token]);
 
   async function fetchSites() {
+    setIsFetchingSites(true);
     try {
       const res = await fetch(`${API_URL}/sites`, {
         headers: { 'Authorization': `Bearer ${token}` },
@@ -110,6 +117,8 @@ function GeneratePageContent() {
       }
     } catch (error) {
       console.error('Erreur récupération sites:', error);
+    } finally {
+      setIsFetchingSites(false);
     }
   }
 
@@ -130,8 +139,9 @@ function GeneratePageContent() {
       return;
     }
 
-    if (!theme) {
-      alert('Veuillez entrer un thème');
+    const themeOrKeyword = keywordMode === 'theme' ? theme : directKeyword;
+    if (!themeOrKeyword) {
+      alert(keywordMode === 'theme' ? 'Veuillez entrer un thème' : 'Veuillez entrer un mot-clé');
       return;
     }
 
@@ -152,8 +162,9 @@ function GeneratePageContent() {
           siteId: selectedSite.webflow_site_id,
           apiKey: selectedSite.webflow_api_key,
           collectionName: selectedSite.webflow_collection_name,
-          theme,
-          tone,
+          theme: themeOrKeyword,
+          directKeyword: keywordMode === 'keyword' ? directKeyword : undefined,
+          tone: toneMode === 'custom' ? customTone : tone,
           status,
           siteUrl: selectedSite.url,
           dbSiteId: selectedSite.id,
@@ -210,110 +221,210 @@ function GeneratePageContent() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background animate-fade-in">
         <Navbar />
 
         <div className="max-w-7xl mx-auto py-12 px-6">
           <Link 
             href="/dashboard" 
-            className="inline-flex items-center gap-2 text-sm text-text-muted hover:text-text mb-8 transition-colors group"
+            className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.1em] text-text-muted hover:text-accent mb-8 transition-all group"
           >
-            <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+            <ChevronLeft size={14} className="transition-transform" />
             Retour au Dashboard
           </Link>
 
-          <div className="mb-12">
-            <h1 className="text-3xl font-bold tracking-tight mb-2 flex items-center gap-3">
+          <div className="mb-12 animate-slide-up">
+            <h1 className="text-4xl font-bold tracking-tight mb-3 flex items-center gap-4">
               Générer un article SEO
-              <Sparkles className="text-accent" size={24} />
+              <div className="p-2 bg-accent/10 rounded-xl">
+                <Sparkles className="text-accent" size={28} />
+              </div>
             </h1>
-            <p className="text-text-muted">
-              Configurez votre sujet et laissez l'IA optimiser votre contenu pour Webflow.
+            <p className="text-md text-text-muted max-w-2xl ">
+              Configurez votre sujet et laissez l'IA optimiser votre contenu pour Webflow avec une précision chirurgicale.
             </p>
           </div>
 
-          {sites.length === 0 ? (
-            <div className="bg-surface border border-border rounded-2xl p-12 text-center">
-              <Globe className="mx-auto text-text-muted mb-4" size={48} />
-              <p className="text-text-muted mb-8">Vous devez d'abord configurer un site Webflow.</p>
-              <Link href="/dashboard" className="btn-primary">
-                Ajouter un site
+          {isFetchingSites ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+              <Skeleton className="h-[600px] rounded-2xl" />
+              <Skeleton className="h-[600px] rounded-2xl" />
+            </div>
+          ) : sites.length === 0 ? (
+            <div className="bg-surface border border-border rounded-3xl p-16 text-center animate-slide-up shadow-xl shadow-black/5">
+              <div className="w-20 h-20 bg-accent/5 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Globe className="text-accent" size={40} />
+              </div>
+              <h2 className="text-2xl font-bold mb-3">Aucun site configuré</h2>
+              <p className="text-text-muted mb-10 max-w-sm mx-auto font-medium">Vous devez d'abord connecter un projet Webflow pour commencer à générer du contenu.</p>
+              <Link href="/dashboard" className="btn-accent px-6 py-2.5 text-sm font-semibold uppercase tracking-widest">
+                Ajouter mon premier site
               </Link>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
               {/* Left — Form */}
-              <div className="bg-surface border border-border rounded-2xl p-8 sticky top-24">
-                <form onSubmit={handleSubmit} className="space-y-8">
-                  <div className="space-y-6">
+              <div className="bg-surface/50 border border-border rounded-xl p-6 sticky top-24 shadow-xl shadow-black/5 backdrop-blur-sm animate-slide-up">
+                <form onSubmit={handleSubmit} className="space-y-10">
+                  <div className="space-y-8">
                     {/* Site selection */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-text-muted flex items-center gap-2">
-                        <Globe size={14} />
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted flex items-center gap-2 px-1">
+                        <Globe size={12} />
                         Projet Webflow
                       </label>
-                      <select
-                        value={selectedSiteId}
-                        onChange={(e) => setSelectedSiteId(e.target.value)}
-                        required
-                        className="input-base cursor-pointer"
-                      >
-                        <option value="">Sélectionnez un projet</option>
-                        {sites.map((site) => (
-                          <option key={site.id} value={site.id}>
-                            {site.name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative group">
+                        <select
+                          value={selectedSiteId}
+                          onChange={(e) => setSelectedSiteId(e.target.value)}
+                          required
+                          className="input-base pr-10 appearance-none cursor-pointer"
+                        >
+                          <option value="">Sélectionnez un projet</option>
+                          {sites.map((site) => (
+                            <option key={site.id} value={site.id}>
+                              {site.name}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted group-focus-within:text-accent transition-colors">
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Theme */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-text-muted flex items-center gap-2">
-                        <Type size={14} />
+                    {/* Theme / Direct keyword */}
+                    <div className="space-y-4">
+                      <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted flex items-center gap-2 px-1">
+                        <Type size={12} />
                         Sujet de l'article
                       </label>
-                      <input
-                        type="text"
-                        placeholder="ex: Comment optimiser son SEO local en 2024"
-                        value={theme}
-                        onChange={(e) => setTheme(e.target.value)}
-                        required
-                        className="input-base"
-                      />
+                      
+                      {/* Mode toggle */}
+                      <div className="p-1 bg-bg border border-border rounded-xl flex gap-1">
+                        {(['theme', 'keyword'] as const).map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setKeywordMode(m)}
+                            className={cn(
+                              'flex-1 py-2 px-4 rounded-lg text-[10px] font-semibold uppercase tracking-widest transition-all',
+                              keywordMode === m
+                                ? 'bg-primary text-primary-foreground shadow-sm'
+                                : 'text-text-muted hover:text-text'
+                            )}
+                          >
+                            {m === 'theme' ? '🎯 Thème' : '🔑 Mot-clé direct'}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="space-y-2">
+                        {keywordMode === 'theme' ? (
+                          <>
+                            <input
+                              type="text"
+                              placeholder="ex: marketing digital, intelligence artificielle..."
+                              value={theme}
+                              onChange={(e) => setTheme(e.target.value)}
+                              required
+                              className="input-base"
+                            />
+                            <div className="flex items-center gap-2 px-1">
+                              <div className="w-1.5 h-1.5 rounded-full bg-accent" />
+                              <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Analyse intelligente DataForSEO incluse</p>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <input
+                              type="text"
+                              placeholder="ex: meilleure mutuelle santé senior 2026"
+                              value={directKeyword}
+                              onChange={(e) => setDirectKeyword(e.target.value)}
+                              required
+                              className="input-base"
+                            />
+                            <div className="flex items-center gap-2 px-1">
+                              <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                              <p className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Utilisation directe du mot-clé</p>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
 
                     {/* Tone */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-text-muted flex items-center gap-2">
-                        <Settings2 size={14} />
+                    <div className="space-y-4">
+                      <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted flex items-center gap-2 px-1">
+                        <Settings2 size={12} />
                         Ton éditorial
                       </label>
-                      <select
-                        value={tone}
-                        onChange={(e) => setTone(e.target.value)}
-                        className="input-base cursor-pointer"
-                      >
-                        {TONE_OPTIONS.map((t) => (
-                          <option key={t} value={t}>{t}</option>
+
+                      {/* Tone mode toggle */}
+                      <div className="p-1 bg-bg border border-border rounded-xl flex gap-1">
+                        {(['preset', 'custom'] as const).map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setToneMode(m)}
+                            className={cn(
+                              'flex-1 py-2 px-4 rounded-lg text-[10px] font-semibold uppercase tracking-widest transition-all',
+                              toneMode === m
+                                ? 'bg-primary text-primary-foreground shadow-sm'
+                                : 'text-text-muted hover:text-text'
+                            )}
+                          >
+                            {m === 'preset' ? 'Prédéfini' : '✏️ Personnalisé'}
+                          </button>
                         ))}
-                      </select>
+                      </div>
+
+                      {toneMode === 'preset' ? (
+                        <div className="relative group">
+                          <select
+                            value={tone}
+                            onChange={(e) => setTone(e.target.value)}
+                            className="input-base pr-10 appearance-none cursor-pointer"
+                          >
+                            {TONE_OPTIONS.map((t) => (
+                              <option key={t} value={t}>{t}</option>
+                            ))}
+                          </select>
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted group-focus-within:text-accent transition-colors">
+                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </div>
+                        </div>
+                      ) : (
+                        <input
+                          type="text"
+                          placeholder="ex: Humoristique et décalé, Formel et académique..."
+                          value={customTone}
+                          onChange={(e) => setCustomTone(e.target.value)}
+                          required={toneMode === 'custom'}
+                          className="input-base"
+                        />
+                      )}
                     </div>
 
                     {/* Status */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-text-muted">Mode de publication</label>
-                      <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted px-1">Mode de publication</label>
+                      <div className="grid grid-cols-2 gap-4">
                         {(['draft', 'publish'] as const).map((s) => (
                           <button
                             key={s}
                             type="button"
                             onClick={() => setStatus(s)}
                             className={cn(
-                              "flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-medium transition-all",
+                              "flex items-center justify-center gap-2 py-3 rounded-2xl border-2 text-xs font-semibold uppercase tracking-widest transition-all active:scale-[0.98] shadow-sm",
                               status === s
-                                ? "bg-primary text-primary-foreground border-primary"
-                                : "bg-background border-border text-text-muted hover:border-text/20"
+                                ? "bg-accent/5 text-accent border-accent shadow-accent/10"
+                                : "bg-bg border-border text-text-muted hover:border-text/20 hover:text-text"
                             )}
                           >
                             {s === 'draft' ? <FileEdit size={16} /> : <Rocket size={16} />}
@@ -327,17 +438,17 @@ function GeneratePageContent() {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="btn-primary w-full py-3 shadow-md shadow-primary/5 gap-2.5"
+                    className="btn-accent w-full py-2.5 text-sm font-semibold uppercase tracking-[0.1em] shadow-lg shadow-accent/20 gap-3"
                   >
                     {isLoading ? (
                       <>
-                        <RefreshCw className="animate-spin" size={18} />
-                        Traitement intelligent...
+                        <Spinner className="w-5 h-5" />
+                        <span>Traitement intelligent...</span>
                       </>
                     ) : (
                       <>
-                        <Sparkles size={18} />
-                        Générer l'article
+                        <Sparkles size={20} />
+                        <span>Générer l'article</span>
                       </>
                     )}
                   </button>
@@ -345,35 +456,46 @@ function GeneratePageContent() {
               </div>
 
               {/* Right — Progress log */}
-              <div className="bg-surface border border-border rounded-2xl p-8 min-h-[600px] flex flex-col">
-                <div className="flex items-center justify-between mb-8 pb-4 border-b border-border">
-                  <h3 className="text-sm font-bold uppercase tracking-widest text-text-muted">Monitor de Progression</h3>
+              <div className="bg-surface/50 border border-border rounded-xl p-6 min-h-[600px] flex flex-col shadow-xl shadow-black/5 backdrop-blur-sm animate-slide-up [animation-delay:100ms]">
+                <div className="flex items-center justify-between mb-8 pb-6 border-b border-border">
                   <div className="flex items-center gap-3">
+                    <div className="p-2 bg-text/5 rounded-lg">
+                      <Terminal size={16} />
+                    </div>
+                    <h3 className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted">Monitor de Progression</h3>
+                  </div>
+                  
+                  <div className="flex items-center gap-4">
                     {isLoading && (
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-                        <span className="text-[10px] font-bold text-accent uppercase">Live</span>
+                      <div className="flex items-center gap-2 px-3 py-1 bg-accent/10 rounded-full">
+                        <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                        <span className="text-[10px] font-semibold text-accent uppercase tracking-widest">Live</span>
                       </div>
                     )}
                     {events.length > 0 && !isLoading && (
                       <button
                         onClick={handleReset}
-                        className="flex items-center gap-1.5 text-[10px] font-bold text-text-muted hover:text-text uppercase tracking-wider transition-colors"
+                        className="btn-base px-3 py-1.5 border border-border text-[10px] font-semibold text-text-muted hover:text-error hover:border-error/20 uppercase tracking-widest transition-all"
                       >
-                        <RefreshCw size={12} />
-                        Effacer
+                        <RefreshCw size={12} className="mr-1.5" />
+                        Réinitialiser
                       </button>
                     )}
                   </div>
                 </div>
-                
+
                 {events.length === 0 ? (
-                  <div className="flex-1 flex flex-col items-center justify-center text-text-muted opacity-50 italic">
-                    <Terminal size={48} className="mb-4" />
-                    <p className="text-sm">En attente de configuration...</p>
+                  <div className="flex-1 flex flex-col items-center justify-center text-text-muted/40 italic text-center p-12">
+                    <div className="w-24 h-24 bg-text/5 rounded-full flex items-center justify-center mb-8">
+                      <Layout size={40} className="opacity-20" />
+                    </div>
+                    <p className="text-sm font-semibold uppercase tracking-widest mb-2">Prêt pour la génération</p>
+                    <p className="text-[11px] not-italic max-w-[200px]">Remplissez le formulaire à gauche pour lancer le processus.</p>
                   </div>
                 ) : (
-                  <ProgressLog events={events} />
+                  <div className="flex-1 overflow-hidden flex flex-col">
+                    <ProgressLog events={events} />
+                  </div>
                 )}
               </div>
             </div>
@@ -384,9 +506,28 @@ function GeneratePageContent() {
   );
 }
 
+
+
 export default function GeneratePage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><span className="text-text-muted">Chargement...</span></div>}>
+    <Suspense fallback={
+      <div className="min-h-screen bg-background">
+        <div className="h-16 border-b border-border px-6 flex items-center">
+          <Skeleton className="h-8 w-32" />
+        </div>
+        <div className="max-w-7xl mx-auto py-12 px-6">
+          <Skeleton className="h-4 w-32 mb-8" />
+          <div className="mb-12">
+            <Skeleton className="h-10 w-64 mb-3" />
+            <Skeleton className="h-6 w-96" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            <Skeleton className="h-[600px] rounded-3xl" />
+            <Skeleton className="h-[600px] rounded-3xl" />
+          </div>
+        </div>
+      </div>
+    }>
       <GeneratePageContent />
     </Suspense>
   );

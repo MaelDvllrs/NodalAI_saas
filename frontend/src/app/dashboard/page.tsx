@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import ProtectedRoute from '../components/ProtectedRoute';
 import Navbar from '../components/Navbar';
 import Link from 'next/link';
-import { Plus, Globe, ExternalLink, RefreshCw, Trash2, Calendar, Users, Crown, UserPlus } from 'lucide-react';
+import { Plus, Globe, ExternalLink, RefreshCw, Trash2, Calendar, Users, Crown, UserPlus, ArrowRight, X } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { Skeleton, Spinner } from '../components/UI';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
@@ -29,7 +30,7 @@ interface Member {
   created_at: string;
 }
 
-export default function DashboardPage() {
+function DashboardPage() {
   const { token } = useAuth();
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +45,7 @@ export default function DashboardPage() {
   }, [token]);
 
   async function fetchSites() {
+    setLoading(true);
     try {
       const res = await fetch(`${API_URL}/sites`, {
         headers: {
@@ -110,50 +112,51 @@ export default function DashboardPage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background animate-fade-in">
         <Navbar />
         
         <div className="max-w-7xl mx-auto py-12 px-6">
           {/* Header */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-12">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-16 animate-slide-up">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight mb-2">Mes Projets</h1>
-              <p className="text-text-muted">
-                Gérez vos environnements Webflow et automatisez votre contenu.
+              <h1 className="text-4xl font-bold tracking-tight mb-3">Mes Projets</h1>
+              <p className="text-md text-text-muted max-w-xl ">
+                Gérez vos environnements Webflow et automatisez votre stratégie de contenu SEO.
               </p>
             </div>
             <button
               onClick={() => setShowAddModal(true)}
-              className="btn-primary gap-2"
+              className="btn-accent gap-3 px-5 py-2.5 text-sm font-semibold shadow-lg shadow-accent/20"
             >
-              <Plus size={18} />
+              <Plus size={20} />
               Nouveau Site
             </button>
           </div>
 
-          {/* Loading */}
+          {/* Loading Skeletons */}
           {loading && (
-            <div className="flex flex-col items-center justify-center py-32 text-text-muted">
-              <RefreshCw className="animate-spin mb-4" size={32} />
-              <p className="text-sm font-medium">Synchronisation de vos sites...</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-[340px] rounded-3xl" />
+              ))}
             </div>
           )}
 
           {/* Empty State */}
           {!loading && sites.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-32 bg-surface border border-dashed border-border rounded-2xl">
-              <div className="w-16 h-16 bg-background border border-border rounded-2xl flex items-center justify-center mb-6">
-                <Globe className="text-text-muted" size={32} />
+            <div className="flex flex-col items-center justify-center py-32 bg-surface/50 border-2 border-dashed border-border rounded-3xl animate-slide-up shadow-xl shadow-black/5">
+              <div className="w-24 h-24 bg-bg border border-border rounded-3xl flex items-center justify-center mb-8 shadow-sm">
+                <Globe className="text-text-muted/50" size={40} />
               </div>
-              <h3 className="text-lg font-bold mb-2">Aucun site configuré</h3>
-              <p className="text-text-muted text-sm mb-8 max-w-sm text-center">
-                Connectez votre premier site Webflow pour commencer à générer des articles SEO.
+              <h3 className="text-2xl font-bold mb-3">Aucun site configuré</h3>
+              <p className="text-text-muted mb-10 max-w-sm text-center font-medium">
+                Connectez votre premier site Webflow pour commencer à générer des articles SEO automatisés.
               </p>
               <button
                 onClick={() => setShowAddModal(true)}
-                className="btn-primary gap-2"
+                className="btn-accent gap-3 px-6 py-3 text-sm font-semibold shadow-lg shadow-accent/20"
               >
-                <Plus size={18} />
+                <Plus size={20} />
                 Ajouter mon premier site
               </button>
             </div>
@@ -161,77 +164,80 @@ export default function DashboardPage() {
 
           {/* Sites Grid */}
           {!loading && sites.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {sites.map((site) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {sites.map((site, index) => (
                 <div
                   key={site.id}
-                  className="group bg-surface border border-border rounded-2xl p-6 hover:border-text/20 transition-all flex flex-col"
+                  style={{ animationDelay: `${index * 50}ms` }}
+                  className="group bg-surface/50 border border-border rounded-xl p-4 hover:border-accent/40 hover:shadow-2xl hover:shadow-accent/5 transition-all duration-300 flex flex-col animate-slide-up backdrop-blur-sm"
                 >
-                  <div className="flex items-start justify-between mb-6">
-                    <div className="w-10 h-10 bg-background border border-border rounded-xl flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                      <Globe size={20} />
+                  <div className="flex items-start justify-between mb-8">
+                    <div className="w-12 h-12 bg-bg border border-border rounded-2xl flex items-center justify-center group-hover:bg-accent group-hover:text-white group-hover:border-accent group-hover:scale-110 group-hover:-translate-y-1 group-hover:shadow-lg group-hover:shadow-accent/20 transition-all duration-300 ease-out shadow-sm">
+                      <Globe size={24} />
                     </div>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
                       {site.userRole === 'admin' && (
                         <>
                           <button
                             onClick={() => { setSelectedSite(site); setShowMembersModal(true); }}
-                            className="p-2 text-text-muted hover:text-text hover:bg-border/50 rounded-lg transition-colors"
+                            className="p-2 text-text-muted hover:text-accent hover:bg-accent/10 rounded-xl transition-all"
                             title="Gérer les membres"
                           >
-                            <Users size={16} />
+                            <Users size={18} />
                           </button>
                           <button
                             onClick={() => handleCrawl(site.id)}
-                            className="p-2 text-text-muted hover:text-text hover:bg-border/50 rounded-lg transition-colors"
+                            className="p-2 text-text-muted hover:text-accent hover:bg-accent/10 rounded-xl transition-all"
                             title="Crawler le site"
                           >
-                            <RefreshCw size={16} />
+                            <RefreshCw size={18} />
                           </button>
                           <button
                             onClick={() => handleDelete(site.id, site.name)}
-                            className="p-2 text-text-muted hover:text-error hover:bg-error/10 rounded-lg transition-colors"
+                            className="p-2 text-text-muted hover:text-error hover:bg-error/10 rounded-xl transition-all"
                             title="Supprimer"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={18} />
                           </button>
                         </>
                       )}
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-lg font-bold truncate">{site.name}</h3>
+                  <div className="flex items-center gap-3 mb-2">
+                    <h3 className="text-xl font-bold truncate">{site.name}</h3>
                     {site.userRole === 'admin' ? (
-                      <span className="shrink-0 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                      <span className="shrink-0 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-amber-600 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
                         <Crown size={10} /> Admin
                       </span>
                     ) : (
-                      <span className="shrink-0 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-text-muted bg-border/50 px-2 py-0.5 rounded-full">
+                      <span className="shrink-0 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-text-muted bg-border/40 px-2.5 py-1 rounded-full border border-border/50">
                         Membre
                       </span>
                     )}
                   </div>
+                  
                   <a 
                     href={site.url} 
                     target="_blank" 
                     rel="noopener noreferrer" 
-                    className="text-sm text-text-muted hover:text-text flex items-center gap-1 mb-6 transition-colors"
+                    className="text-sm font-medium text-text-muted hover:text-accent flex items-center gap-2 mb-8 transition-colors group/link"
                   >
                     <span className="truncate">{site.url.replace(/^https?:\/\//, '')}</span>
-                    <ExternalLink size={12} />
+                    <ExternalLink size={14} className="group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5 transition-transform" />
                   </a>
 
-                  <div className="mt-auto space-y-4">
-                    <div className="flex items-center gap-2 text-xs text-text-muted">
-                      <Calendar size={14} />
-                      Ajouté le {new Date(site.created_at).toLocaleDateString('fr-FR')}
+                  <div className="mt-auto pt-6 border-t border-border/50 flex flex-col gap-6">
+                    <div className="flex items-center gap-2.5 text-xs font-semibold text-text-muted uppercase tracking-wider">
+                      <Calendar size={14} className="text-accent/60" />
+                      Ajouté le {new Date(site.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
                     </div>
                     <Link
                       href={`/generate?siteId=${site.id}`}
-                      className="btn-primary w-full py-2.5 text-sm"
+                      className="btn-primary w-full py-3 text-sm font-semibold uppercase tracking-widest group/btn"
                     >
                       Générer un article
+                      <ArrowRight size={16} className="ml-2 transition-transform" />
                     </Link>
                   </div>
                 </div>
@@ -242,9 +248,9 @@ export default function DashboardPage() {
 
         {/* Manage Members Modal */}
         {showMembersModal && selectedSite && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-fade-in">
             <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setShowMembersModal(false)} />
-            <div className="relative bg-surface border border-border rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="relative bg-bg border border-border rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-slide-up">
               <MembersModal
                 site={selectedSite}
                 onClose={() => setShowMembersModal(false)}
@@ -256,9 +262,9 @@ export default function DashboardPage() {
 
         {/* Add Site Modal */}
         {showAddModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-fade-in">
             <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
-            <div className="relative bg-surface border border-border rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="relative bg-bg border border-border rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-slide-up">
               <AddSiteModal
                 onClose={() => setShowAddModal(false)}
                 onSuccess={(newSite) => {
@@ -272,6 +278,34 @@ export default function DashboardPage() {
         )}
       </div>
     </ProtectedRoute>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background">
+        <div className="h-16 border-b border-border px-6 flex items-center">
+          <Skeleton className="h-8 w-32" />
+        </div>
+        <div className="max-w-7xl mx-auto py-12 px-6">
+          <div className="flex justify-between items-center mb-16">
+            <div className="space-y-3">
+              <Skeleton className="h-10 w-64" />
+              <Skeleton className="h-6 w-96" />
+            </div>
+            <Skeleton className="h-12 w-40 rounded-xl" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-[340px] rounded-3xl" />
+            ))}
+          </div>
+        </div>
+      </div>
+    }>
+      <DashboardPage />
+    </Suspense>
   );
 }
 
@@ -316,28 +350,29 @@ function AddSiteModal({ onClose, onSuccess, token }: { onClose: () => void; onSu
   }
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
+    <div className="p-10">
+      <div className="flex justify-between items-center mb-10">
         <div>
-          <h3 className="text-xl font-bold">Nouveau Projet</h3>
-          <p className="text-sm text-text-muted mt-1">Configurez votre environnement Webflow.</p>
+          <h3 className="text-2xl font-bold tracking-tight">Nouveau Projet</h3>
+          <p className="text-sm font-medium text-text-muted mt-2 uppercase tracking-wide">Configurez votre environnement Webflow.</p>
         </div>
-        <button onClick={onClose} className="p-2 hover:bg-border/50 rounded-lg transition-colors">
-          <Trash2 size={20} className="rotate-45" /> {/* Use Trash2 rotated as a close icon for variety or standard X */}
+        <button onClick={onClose} className="p-2 hover:bg-surface border border-transparent hover:border-border rounded-xl transition-all text-text-muted">
+          <X size={24} />
         </button>
       </div>
 
       {error && (
-        <div className="mb-6 bg-error/10 border border-error/20 text-error px-4 py-3 rounded-xl text-sm font-medium">
+        <div className="mb-8 bg-error/5 border-2 border-error/10 text-error px-5 py-4 rounded-2xl text-sm font-semibold flex items-center gap-3">
+          <div className="w-2 h-2 rounded-full bg-error" />
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-text-muted">Nom du projet</label>
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2.5">
+              <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted px-1">Nom du projet</label>
               <input
                 type="text"
                 required
@@ -347,8 +382,8 @@ function AddSiteModal({ onClose, onSuccess, token }: { onClose: () => void; onSu
                 placeholder="Mon Blog SEO"
               />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-text-muted">URL du site</label>
+            <div className="space-y-2.5">
+              <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted px-1">URL du site</label>
               <input
                 type="url"
                 required
@@ -360,30 +395,30 @@ function AddSiteModal({ onClose, onSuccess, token }: { onClose: () => void; onSu
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-text-muted">Webflow Site ID</label>
+          <div className="space-y-2.5">
+            <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted px-1">Webflow Site ID</label>
             <input
               type="text"
               value={formData.webflowSiteId}
               onChange={(e) => setFormData({ ...formData, webflowSiteId: e.target.value })}
-              className="input-base font-mono text-xs"
+              className="input-base font-mono text-xs tracking-wider"
               placeholder="5f72a..."
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-text-muted">Webflow API Key</label>
+          <div className="space-y-2.5">
+            <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted px-1">Webflow API Key</label>
             <input
               type="password"
               value={formData.webflowApiKey}
               onChange={(e) => setFormData({ ...formData, webflowApiKey: e.target.value })}
-              className="input-base font-mono text-xs"
+              className="input-base font-mono text-xs tracking-wider"
               placeholder="••••••••••••••••"
             />
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-text-muted">Nom de la Collection</label>
+          <div className="space-y-2.5">
+            <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted px-1">Nom de la Collection</label>
             <input
               type="text"
               value={formData.webflowCollectionName}
@@ -394,20 +429,20 @@ function AddSiteModal({ onClose, onSuccess, token }: { onClose: () => void; onSu
           </div>
         </div>
 
-        <div className="flex gap-3 pt-4 border-t border-border">
+        <div className="flex gap-4 pt-8 border-t border-border">
           <button
             type="button"
             onClick={onClose}
-            className="btn-secondary flex-1"
+            className="btn-secondary flex-1 py-3 text-xs font-semibold uppercase tracking-widest"
           >
             Annuler
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="btn-primary flex-1"
+            className="btn-primary flex-1 py-3 text-xs font-semibold uppercase tracking-widest"
           >
-            {loading ? 'Configuration...' : 'Ajouter le site'}
+            {loading ? <Spinner className="w-5 h-5" /> : 'Ajouter le site'}
           </button>
         </div>
       </form>
@@ -499,98 +534,99 @@ function MembersModal({ site, onClose, token }: { site: Site; onClose: () => voi
   }
 
   return (
-    <div className="p-8">
+    <div className="p-10">
       {/* Header */}
-      <div className="flex justify-between items-start mb-8">
+      <div className="flex justify-between items-start mb-10">
         <div>
-          <h3 className="text-xl font-bold">Membres du projet</h3>
-          <p className="text-sm text-text-muted mt-1">{site.name}</p>
+          <h3 className="text-2xl font-bold tracking-tight">Membres</h3>
+          <p className="text-sm font-medium text-text-muted mt-2 uppercase tracking-wide">{site.name}</p>
         </div>
-        <button onClick={onClose} className="p-2 hover:bg-border/50 rounded-lg transition-colors text-text-muted">
-          ✕
+        <button onClick={onClose} className="p-2.5 hover:bg-surface border border-transparent hover:border-border rounded-xl transition-all text-text-muted">
+          <X size={24} />
         </button>
       </div>
 
       {/* Invite form */}
-      <form onSubmit={handleInvite} className="mb-8 bg-background border border-border rounded-xl p-5 space-y-4">
-        <h4 className="text-sm font-bold flex items-center gap-2">
-          <UserPlus size={16} />
-          Inviter un utilisateur
+      <form onSubmit={handleInvite} className="mb-10 bg-surface border border-border rounded-3xl p-6 space-y-6 shadow-sm">
+        <h4 className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted flex items-center gap-2 px-1">
+          <UserPlus size={14} className="text-accent" />
+          Inviter un collaborateur
         </h4>
 
         {error && (
-          <div className="bg-error/10 border border-error/20 text-error px-4 py-2 rounded-lg text-sm">{error}</div>
+          <div className="bg-error/5 border-2 border-error/10 text-error px-4 py-3 rounded-2xl text-xs font-semibold">{error}</div>
         )}
         {success && (
-          <div className="bg-green-500/10 border border-green-500/20 text-green-600 px-4 py-2 rounded-lg text-sm">{success}</div>
+          <div className="bg-green-500/5 border-2 border-green-500/10 text-green-600 px-4 py-3 rounded-2xl text-xs font-semibold">{success}</div>
         )}
 
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-4">
           <input
             type="email"
             required
             value={inviteEmail}
             onChange={e => setInviteEmail(e.target.value)}
             placeholder="email@exemple.com"
-            className="input-base flex-1"
+            className="input-base"
           />
-          <select
-            value={inviteRole}
-            onChange={e => setInviteRole(e.target.value as 'admin' | 'member')}
-            className="input-base w-32"
-          >
-            <option value="member">Membre</option>
-            <option value="admin">Admin</option>
-          </select>
-          <button
-            type="submit"
-            disabled={inviting}
-            className="btn-primary whitespace-nowrap"
-          >
-            {inviting ? '...' : 'Inviter'}
-          </button>
+          <div className="flex gap-4">
+            <select
+              value={inviteRole}
+              onChange={e => setInviteRole(e.target.value as 'admin' | 'member')}
+              className="input-base flex-1 appearance-none cursor-pointer"
+            >
+              <option value="member">Rôle: Membre</option>
+              <option value="admin">Rôle: Admin</option>
+            </select>
+            <button
+              type="submit"
+              disabled={inviting}
+              className="btn-primary px-6 whitespace-nowrap text-xs font-semibold uppercase tracking-widest"
+            >
+              {inviting ? <Spinner className="w-5 h-5" /> : 'Inviter'}
+            </button>
+          </div>
         </div>
-        <p className="text-xs text-text-muted">
-          Si l'utilisateur n'a pas encore de compte, il recevra une invitation par email.
-        </p>
       </form>
 
       {/* Members list */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-bold text-text-muted uppercase tracking-wider">
-          Membres actuels ({members.length})
+      <div className="space-y-4">
+        <h4 className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted px-1">
+          Équipe ({members.length})
         </h4>
 
         {loading && (
-          <div className="text-center py-8 text-text-muted">
-            <RefreshCw className="animate-spin mx-auto mb-2" size={20} />
-            Chargement...
+          <div className="space-y-3">
+            {[1, 2].map((i) => <Skeleton key={i} className="h-20 rounded-2xl" />)}
           </div>
         )}
 
         {!loading && members.length === 0 && (
-          <p className="text-sm text-text-muted text-center py-6">
-            Aucun membre pour l'instant. Invitez des collaborateurs ci-dessus.
-          </p>
+          <div className="text-center py-10 bg-surface/30 border-2 border-dashed border-border rounded-3xl">
+            <p className="text-xs font-semibold text-text-muted uppercase tracking-widest">Seul pour l'instant</p>
+          </div>
         )}
 
         {!loading && members.map(member => (
           <div
             key={member.id}
-            className="flex items-center justify-between p-4 bg-background border border-border rounded-xl"
+            className="group flex items-center justify-between p-5 bg-surface border border-border rounded-2xl hover:border-accent/20 transition-all duration-300"
           >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-8 h-8 rounded-full bg-border flex items-center justify-center text-xs font-bold shrink-0">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="w-10 h-10 rounded-2xl bg-bg border border-border flex items-center justify-center text-sm font-semibold shrink-0 shadow-sm group-hover:bg-accent group-hover:text-white transition-all duration-300">
                 {member.invited_email[0].toUpperCase()}
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-medium truncate">{member.invited_email}</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className={`text-xs font-medium ${member.role === 'admin' ? 'text-amber-600' : 'text-text-muted'}`}>
+                <p className="text-sm font-semibold truncate tracking-tight">{member.invited_email}</p>
+                <div className="flex items-center gap-2.5 mt-1">
+                  <span className={cn(
+                    "text-[10px] font-semibold uppercase tracking-[0.15em]",
+                    member.role === 'admin' ? 'text-amber-600' : 'text-text-muted'
+                  )}>
                     {member.role === 'admin' ? '👑 Admin' : 'Membre'}
                   </span>
                   {member.status === 'pending' && (
-                    <span className="text-xs text-text-muted bg-border/50 px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-semibold text-text-muted bg-border/40 px-2.5 py-0.5 rounded-full border border-border/50 uppercase tracking-widest">
                       En attente
                     </span>
                   )}
@@ -599,10 +635,10 @@ function MembersModal({ site, onClose, token }: { site: Site; onClose: () => voi
             </div>
             <button
               onClick={() => handleRemove(member.id, member.invited_email)}
-              className="p-2 text-text-muted hover:text-error hover:bg-error/10 rounded-lg transition-colors shrink-0"
+              className="p-2.5 text-text-muted hover:text-error hover:bg-error/10 rounded-xl transition-all shrink-0 opacity-0 group-hover:opacity-100"
               title="Retirer ce membre"
             >
-              <Trash2 size={14} />
+              <Trash2 size={16} />
             </button>
           </div>
         ))}

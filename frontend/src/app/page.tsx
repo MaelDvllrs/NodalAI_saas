@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Search, PenTool, Globe, ArrowRight, CheckCircle2, Terminal } from 'lucide-react';
 import { cn } from './utils/cn';
+import { Skeleton } from './components/UI';
 
 export default function Home() {
   const { user, loading } = useAuth();
@@ -19,8 +20,30 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-primary"></div>
+      <div className="min-h-screen bg-background">
+        <header className="border-b border-border py-4 px-6">
+          <div className="max-w-6xl mx-auto flex justify-between items-center">
+            <Skeleton className="h-8 w-32" />
+            <div className="flex gap-4">
+              <Skeleton className="h-8 w-20" />
+              <Skeleton className="h-8 w-24" />
+            </div>
+          </div>
+        </header>
+        <main className="max-w-6xl mx-auto px-6 pt-24 text-center">
+          <Skeleton className="h-6 w-48 mx-auto mb-8 rounded-full" />
+          <Skeleton className="h-16 w-3/4 mx-auto mb-6" />
+          <Skeleton className="h-16 w-1/2 mx-auto mb-10" />
+          <div className="flex justify-center gap-4 mb-24">
+            <Skeleton className="h-12 w-48 rounded-lg" />
+            <Skeleton className="h-12 w-32 rounded-lg" />
+          </div>
+          <div className="grid grid-cols-3 gap-6">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-64 rounded-2xl" />
+            ))}
+          </div>
+        </main>
       </div>
     );
   }

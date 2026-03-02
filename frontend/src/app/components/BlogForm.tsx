@@ -1,6 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { Spinner } from './UI';
+import { cn } from '../utils/cn';
+import { Eye, EyeOff, Sparkles } from 'lucide-react';
 
 export interface FormValues {
   siteId: string;
@@ -50,10 +53,10 @@ export default function BlogForm({ onSubmit, isLoading }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in">
       {/* Webflow credentials */}
-      <fieldset className="border border-[var(--border)] rounded-xl p-5 space-y-4">
-        <legend className="px-2 text-xs font-semibold text-[var(--muted)] uppercase tracking-wider">
+      <fieldset className="border border-border rounded-2xl p-6 space-y-5 bg-surface/50">
+        <legend className="px-3 py-0.5 text-[10px] font-semibold text-text-muted uppercase tracking-[0.1em] border border-border bg-bg rounded-full">
           Webflow
         </legend>
 
@@ -68,21 +71,22 @@ export default function BlogForm({ onSubmit, isLoading }: Props) {
         </Field>
 
         <Field label="API Key" required>
-          <div className="relative">
+          <div className="relative group">
             <Input
               type={showApiKey ? 'text' : 'password'}
               placeholder="••••••••••••••••"
               value={values.apiKey}
               onChange={(e) => set('apiKey', e.target.value)}
               required
-              className="pr-20"
+              className="pr-12"
             />
             <button
               type="button"
               onClick={() => setShowApiKey(!showApiKey)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--muted)] hover:text-[var(--text)] transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-text-muted hover:text-text hover:bg-border/40 rounded-md transition-all"
+              title={showApiKey ? 'Masquer' : 'Afficher'}
             >
-              {showApiKey ? 'Masquer' : 'Afficher'}
+              {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
         </Field>
@@ -108,8 +112,8 @@ export default function BlogForm({ onSubmit, isLoading }: Props) {
       </fieldset>
 
       {/* Content settings */}
-      <fieldset className="border border-[var(--border)] rounded-xl p-5 space-y-4">
-        <legend className="px-2 text-xs font-semibold text-[var(--muted)] uppercase tracking-wider">
+      <fieldset className="border border-border rounded-2xl p-6 space-y-5 bg-surface/50">
+        <legend className="px-3 py-0.5 text-[10px] font-semibold text-text-muted uppercase tracking-[0.1em] border border-border bg-bg rounded-full">
           Contenu
         </legend>
 
@@ -124,15 +128,22 @@ export default function BlogForm({ onSubmit, isLoading }: Props) {
         </Field>
 
         <Field label="Ton de l'article" required>
-          <select
-            value={values.tone}
-            onChange={(e) => set('tone', e.target.value)}
-            className="w-full bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] transition-colors appearance-none cursor-pointer"
-          >
-            {TONE_OPTIONS.map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
+          <div className="relative group">
+            <select
+              value={values.tone}
+              onChange={(e) => set('tone', e.target.value)}
+              className="input-base pr-10 appearance-none cursor-pointer"
+            >
+              {TONE_OPTIONS.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted group-focus-within:text-accent transition-colors">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+          </div>
         </Field>
 
         <Field label="État de publication">
@@ -140,11 +151,12 @@ export default function BlogForm({ onSubmit, isLoading }: Props) {
             {(['draft', 'publish'] as const).map((s) => (
               <label
                 key={s}
-                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border cursor-pointer transition-all text-sm font-medium ${
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-2 cursor-pointer transition-all text-sm font-semibold shadow-sm active:scale-[0.98]",
                   values.status === s
-                    ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
-                    : 'border-[var(--border)] text-[var(--muted)] hover:border-[var(--muted)]'
-                }`}
+                    ? "border-accent bg-accent/5 text-accent"
+                    : "border-border bg-bg text-text-muted hover:border-text/20 hover:text-text"
+                )}
               >
                 <input
                   type="radio"
@@ -154,7 +166,9 @@ export default function BlogForm({ onSubmit, isLoading }: Props) {
                   onChange={() => set('status', s)}
                   className="sr-only"
                 />
-                <span>{s === 'draft' ? '📝 Brouillon' : '🚀 Publier'}</span>
+                <span className="flex items-center gap-2">
+                  {s === 'draft' ? '📝 Brouillon' : '🚀 Publier'}
+                </span>
               </label>
             ))}
           </div>
@@ -164,17 +178,18 @@ export default function BlogForm({ onSubmit, isLoading }: Props) {
       <button
         type="submit"
         disabled={isLoading}
-        className="w-full py-3 rounded-xl font-semibold text-sm transition-all
-          bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white
-          disabled:opacity-50 disabled:cursor-not-allowed
-          focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--bg)]"
+        className="btn-accent w-full py-3.5 text-sm font-semibold gap-3"
       >
         {isLoading ? (
-          <span className="flex items-center justify-center gap-2">
-            <Spinner /> Génération en cours...
-          </span>
+          <>
+            <Spinner className="w-5 h-5" />
+            <span>Génération en cours...</span>
+          </>
         ) : (
-          '✨ Générer l\'article'
+          <>
+            <Sparkles size={20} />
+            <span>Générer l'article</span>
+          </>
         )}
       </button>
     </form>
@@ -195,11 +210,13 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1.5">
-      <label className="flex items-center gap-2 text-sm font-medium text-[var(--text)]">
-        {label}
-        {required && <span className="text-[var(--accent)] text-xs">*</span>}
-        {hint && <span className="text-[var(--muted)] text-xs font-normal">({hint})</span>}
+    <div className="space-y-2">
+      <label className="flex items-center justify-between gap-2 px-1">
+        <span className="text-xs font-semibold uppercase tracking-wider text-text/80">
+          {label}
+          {required && <span className="text-error ml-1">*</span>}
+        </span>
+        {hint && <span className="text-[10px] font-medium text-text-muted uppercase tracking-wider">{hint}</span>}
       </label>
       {children}
     </div>
@@ -213,16 +230,7 @@ function Input({
   return (
     <input
       {...props}
-      className={`w-full bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] rounded-lg px-4 py-2.5 text-sm placeholder:text-[var(--muted)] focus:outline-none focus:border-[var(--accent)] transition-colors ${className}`}
+      className={cn('input-base', className)}
     />
-  );
-}
-
-function Spinner() {
-  return (
-    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-    </svg>
   );
 }

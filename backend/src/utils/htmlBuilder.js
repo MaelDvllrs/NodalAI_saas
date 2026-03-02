@@ -77,6 +77,34 @@ function convertContentToHtml(content) {
       continue;
     }
 
+    // Standalone blockquote marker [[QUOTE:text]] → <blockquote> block element
+    const quoteBlock = t.match(/^\[\[QUOTE:([^\]]+)\]\]$/);
+    if (quoteBlock) {
+      flushPara();
+      flushList();
+      html.push(`<blockquote>${escapeHtml(quoteBlock[1].trim())}</blockquote>`);
+      continue;
+    }
+
+    // Standalone image marker [[IMAGE:url|alt]] or [[IMAGE:description]] → block element
+    const imgBlock = t.match(/^\[\[IMAGE:([^\]]+)\]\]$/);
+    if (imgBlock) {
+      flushPara();
+      flushList();
+      const inner = imgBlock[1];
+      // If URL already injected: [[IMAGE:https://...|alt]]
+      const urlAlt = inner.match(/^(https?:\/\/[^|]+)\|(.+)$/);
+      if (urlAlt) {
+        const [, src, alt] = urlAlt;
+        html.push(
+          `<figure><img src="${src}" alt="${alt.trim()}" loading="lazy" />` +
+          `<figcaption style="text-align:center;font-size:0.875rem;color:#6b7280;margin-top:0.5rem;">${alt.trim()}</figcaption></figure>`
+        );
+      }
+      // If not yet injected (no URL yet) → skip silently
+      continue;
+    }
+
     // H2 header
     const h2 = t.match(/^##(?!#)\s+(?:H2\s*:\s*)?(.+)/i);
     if (h2) {
@@ -507,19 +535,21 @@ function estimateDifficulty(wordCount) {
  * @param {Array<{description: string, url: string}>} images - Array of uploaded images
  * @returns {string} Content avec [[IMAGE:url|alt]] markers
  */
+/**
+ * Replaces [[IMAGE:description]] markers with fully-formed <figure> HTML.
+ * This avoids the invalid <p><figure>...</figure></p> wrapping.
+ */
 export function injectImageUrls(content, images) {
   if (!images || images.length === 0) return content;
 
-  // Create a map for quick lookup
-  const imageMap = new Map(images.map(img => [img.description.toLowerCase(), img.url]));
+  const imageMap = new Map(images.map(img => [img.description.toLowerCase().trim(), img.url]));
 
-  // Replace each [[IMAGE:description]] with [[IMAGE:url|description]]
   return content.replace(/\[\[IMAGE:([^\]]+)\]\]/g, (match, description) => {
-    const url = imageMap.get(description.toLowerCase());
+    const url = imageMap.get(description.toLowerCase().trim());
     if (url) {
-      return `[[IMAGE:${url}|${description}]]`;
+      // Use [[IMAGE:url|description]] — handled as a block element in convertContentToHtml
+      return `[[IMAGE:${url}|${description.trim()}]]`;
     }
-    // If no URL found, keep the original marker or remove it
-    return '';
+    return ''; // Remove unresolved markers
   });
 }

@@ -62,10 +62,31 @@ export async function generateImageWithGemini(prompt, context = '', name = 'gene
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: IMAGE_GEN_MODEL });
 
-    const imagePrompt = `Professional blog header image, 16:9 format, no text, no watermark.
-Subject: ${prompt}.
-${context ? `Context: ${context}.` : ''}
-Style: modern, clean, professional photography or illustration.`;
+    // Build the structured prompt using the standardised JSON template.
+    // If Claude provided a rich art-direction prompt, use it as the topic.
+    // If it's a short fallback, use it as-is.
+    const topic = prompt.trim();
+
+    const imagePrompt = `${JSON.stringify({
+      image_generation_request: {
+        context: context || 'Blog post hero image',
+        topic,
+        style_guidelines: {
+          art_style: 'Photorealistic or High-end Digital Illustration',
+          composition: 'Wide angle, rule of thirds, copy-space available for text overlay',
+          lighting: 'Natural soft light, cinematic',
+          color_palette: 'Vibrant but professional, harmonized with the topic',
+          mood: 'Inspiring and clean',
+        },
+        technical_constraints: {
+          aspect_ratio: '16:9',
+          avoid: 'Text in image, distorted faces, blurry backgrounds, messy compositions',
+        },
+        prompt_template: `A high-quality photorealistic or high-end digital illustration representing ${topic}. The scene should be inspiring and clean with natural soft cinematic lighting. Professional photography style, 8k resolution, highly detailed.`,
+      },
+    }, null, 2)}
+
+Generate the image described above. No text, no watermark, no logo. 16:9 aspect ratio.`;
 
     console.log('🎨 Génération image via Gemini...');
 

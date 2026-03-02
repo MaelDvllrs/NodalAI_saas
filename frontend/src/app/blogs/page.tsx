@@ -7,6 +7,7 @@ import Navbar from '../components/Navbar';
 import Link from 'next/link';
 import { History, Filter, Search, ExternalLink, Globe, FileText, Calendar, ChevronRight, RefreshCw } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { Skeleton } from '../components/UI';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
@@ -138,9 +139,34 @@ export default function BlogsPage() {
 
           {/* Main Content */}
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-32 text-text-muted">
-              <RefreshCw className="animate-spin mb-4" size={32} />
-              <p className="text-sm font-medium">Récupération de l'historique...</p>
+            <div className="bg-surface border border-border rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-6 py-4 border-b border-border bg-background/50">
+                <div className="grid grid-cols-5 gap-4">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Skeleton key={i} className="h-4 w-20" />
+                  ))}
+                </div>
+              </div>
+              <div className="p-6 space-y-6">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <Skeleton className="w-10 h-10 rounded-lg" />
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-48" />
+                        <Skeleton className="h-3 w-32" />
+                      </div>
+                    </div>
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                    <div className="flex gap-2">
+                      <Skeleton className="w-8 h-8 rounded-lg" />
+                      <Skeleton className="w-8 h-8 rounded-lg" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : filteredBlogs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-32 bg-surface border border-dashed border-border rounded-2xl">

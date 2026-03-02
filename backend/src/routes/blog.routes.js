@@ -1,6 +1,7 @@
 import express from 'express';
-import { getMainKeyword } from '../services/dataforseo.service.js';
-import { getSecondaryKeywords, generateBlogContent } from '../services/claude.service.js';
+import { getBestKeywordFromCandidates } from '../services/dataforseo.service.js';
+import { suggestKeywordCandidates, getSecondaryKeywords, generateBlogContent, generateOptimizedOutline } from '../services/claude.service.js';
+import { fetchSerpResults, buildSerpModel, saveSerpModel, scoreSerpCoverage } from '../services/serp.service.js';
 import {
   getCollectionByName,
   getCollectionFields,
@@ -15,7 +16,7 @@ import { optionalAuth } from '../middleware/auth.middleware.js';
 import { getOrCreateKeyword, saveSecondaryKeywords, hasSecondaryKeywords, getSecondaryKeywordsForMain } from '../services/keyword.service.js';
 import { createBlog, getExistingTitles as getDbExistingTitles } from '../services/blog.service.js';
 import { getCrawledPages } from '../services/site.service.js';
-import { getAndUploadBlogImage } from '../services/image.service.js';
+import { generateImageWithGemini } from '../services/image.service.js';
 
 const router = express.Router();
 
@@ -24,7 +25,7 @@ const jobs = new Map();
 
 // ── POST /api/generate ──────────────────────────────────────────────────────
 router.post('/generate', optionalAuth, async (req, res) => {
-  const { siteId, apiKey, collectionName, theme, tone, status, siteUrl, dbSiteId } = req.body;
+  const { siteId, apiKey, collectionName, theme, tone, status, siteUrl, dbSiteId, directKeyword } = req.body;
 
   if (!siteId || !apiKey || !collectionName || !theme || !tone) {
     return res.status(400).json({ error: 'Champs obligatoires manquants.' });
@@ -46,6 +47,7 @@ router.post('/generate', optionalAuth, async (req, res) => {
     siteUrl,
     dbSiteId, // Database site ID (optional)
     userId: req.user?.id, // User ID if authenticated
+    directKeyword: directKeyword || null, // Optional: skip Claude/DataForSEO if provided
   }).catch(
     (err) => emitEvent(jobId, { type: 'error', message: err.message })
   );
@@ -97,19 +99,36 @@ function closeJob(jobId) {
 
 // ── Pipeline ─────────────────────────────────────────────────────────────────
 async function runPipeline(jobId, params) {
-  const { siteId, apiKey, collectionName, theme, tone, status, siteUrl, dbSiteId, userId } = params;
+  const { siteId, apiKey, collectionName, theme, tone, status, siteUrl, dbSiteId, userId, directKeyword } = params;
 
   try {
-    // 1. Main keyword via DataForSEO (with DB cache)
-    emitEvent(jobId, { type: 'step', message: '🔍 Récupération du mot-clé principal via DataForSEO...' });
-    const { keyword: mainKeyword, kd, warning: dfsWarning } = await getMainKeyword(theme);
-    
+    // 1. Keyword selection: use directKeyword if provided, otherwise Claude + DataForSEO
+    let mainKeyword, kd, kwSearchVolume;
+
+    if (directKeyword) {
+      mainKeyword = directKeyword;
+      kd = null;
+      kwSearchVolume = null;
+      emitEvent(jobId, { type: 'step', message: `🔑 Mot-clé direct utilisé : "${mainKeyword}"` });
+    } else {
+      emitEvent(jobId, { type: 'step', message: '🤖 Génération de candidates mots-clés avec Claude...' });
+      const candidates = await suggestKeywordCandidates(theme);
+      if (candidates.length > 0) {
+        emitEvent(jobId, { type: 'step', message: `💡 Candidats : ${candidates.map(c => `"${c}"`).join(', ')}` });
+      }
+      emitEvent(jobId, { type: 'step', message: '🔍 Analyse des métriques SEO via DataForSEO...' });
+      const best = await getBestKeywordFromCandidates(theme, candidates);
+      mainKeyword = best.keyword;
+      kd = best.kd;
+      kwSearchVolume = best.search_volume;
+    }
+
     // Save keyword to DB (or retrieve from cache)
     let keywordRecord = null;
     let mainKeywordId = null;
     if (userId) {
       const { keyword: dbKeyword, cached } = await getOrCreateKeyword(mainKeyword, {
-        search_volume: null,
+        search_volume: kwSearchVolume ?? null,
         competition_index: kd,
       });
       keywordRecord = dbKeyword;
@@ -118,14 +137,38 @@ async function runPipeline(jobId, params) {
         emitEvent(jobId, { type: 'step', message: `💾 Mot-clé trouvé en cache (économie de tokens)` });
       }
     }
-    
+
     emitEvent(jobId, { type: 'data', key: 'mainKeyword', value: mainKeyword });
     emitEvent(jobId, { type: 'data', key: 'kd', value: kd });
-    if (dfsWarning) {
-      emitEvent(jobId, { type: 'step', message: `⚠️ DataForSEO : ${dfsWarning} — thème utilisé comme mot-clé principal.` });
+    const kdLabel = kd !== null ? `concurrence ${kd}/100` : (directKeyword ? 'mot-clé direct' : 'concurrence inconnue');
+    emitEvent(jobId, { type: 'step', message: `✅ Mot-clé principal retenu : "${mainKeyword}" (volume: ${kwSearchVolume ?? '?'}, ${kdLabel})` });
+
+    // 1.5. SERP Analysis — fetch top-10 organic results + build semantic model
+    let serpModel   = null;
+    let serpResults = [];
+    emitEvent(jobId, { type: 'step', message: '🔍 Analyse SERP Google (top 10 résultats organiques)...' });
+    try {
+      serpResults = await fetchSerpResults(mainKeyword);
+      if (serpResults.length > 0) {
+        emitEvent(jobId, { type: 'step', message: `📊 ${serpResults.length} résultats SERP récupérés. Construction du modèle sémantique...` });
+        serpModel = await buildSerpModel(mainKeyword, serpResults);
+        emitEvent(jobId, {
+          type: 'step',
+          message: `✅ Modèle SERP construit — ` +
+            `intention: ${serpModel.intent}, format: ${serpModel.contentFormat}, ` +
+            `${serpModel.dominantSubtopics.length} sous-thèmes, ~${serpModel.avgWordCount} mots cibles`,
+        });
+        emitEvent(jobId, { type: 'data', key: 'serpModel', value: serpModel });
+
+        // Save snapshot for future drift detection (non-blocking)
+        saveSerpModel(mainKeyword, serpModel).catch(() => {});
+      } else {
+        emitEvent(jobId, { type: 'step', message: '⚠️ SERP indisponible — génération sans modèle concurrent' });
+      }
+    } catch (serpErr) {
+      console.error('[Pipeline] Erreur SERP (non bloquante):', serpErr.message);
+      emitEvent(jobId, { type: 'step', message: '⚠️ Analyse SERP ignorée (erreur) — poursuite du pipeline' });
     }
-    const kdLabel = kd !== null ? `concurrence ${kd}/100` : 'concurrence inconnue';
-    emitEvent(jobId, { type: 'step', message: `✅ Mot-clé principal : "${mainKeyword}" (${kdLabel})` });
 
     // 2. Secondary keywords via Claude (with DB cache)
     emitEvent(jobId, { type: 'step', message: '🤖 Génération des mots-clés secondaires avec Claude...' });
@@ -255,7 +298,20 @@ async function runPipeline(jobId, params) {
       }
     }
 
-    // 5. Generate blog with Claude
+    // 5. Generate optimised outline (Step 3) then full blog with Claude
+    let optimizedOutline = '';
+    if (serpModel && serpModel.dominantSubtopics.length > 0) {
+      emitEvent(jobId, { type: 'step', message: '📌 Génération du plan optimisé SERP avec Claude...' });
+      try {
+        optimizedOutline = await generateOptimizedOutline(mainKeyword, serpModel, theme, tone);
+        if (optimizedOutline) {
+          emitEvent(jobId, { type: 'step', message: `✅ Plan optimisé généré (${optimizedOutline.split('\n').length} lignes)` });
+        }
+      } catch (outlineErr) {
+        console.error('[Pipeline] Erreur outline (non bloquante):', outlineErr.message);
+      }
+    }
+
     emitEvent(jobId, { type: 'step', message: '✍️ Génération du blog avec Claude (peut prendre 30-60s)...' });
     const rawBlog = await generateBlogContent({
       mainKeyword,
@@ -265,6 +321,8 @@ async function runPipeline(jobId, params) {
       existingTitles,
       internalUrls,
       kd,
+      serpModel: serpModel ?? null,
+      optimizedOutline: optimizedOutline || null,
     });
     emitEvent(jobId, { type: 'step', message: '✅ Blog généré avec succès.' });
 
@@ -301,69 +359,92 @@ async function runPipeline(jobId, params) {
       });
     }
 
-    // 6.5. Process images: extract [[IMAGE:description]] markers, fetch/upload images, inject URLs
+    // 6.5. Process images
     let featuredImageUrl = null;
-    let uploadedImages = []; // Stocker toutes les images uploadées
+    let uploadedImages = [];
+
+    // ── Extract [[FEATURED_IMAGE:...]] prompt written by Claude (from raw output)
+    let featuredImagePrompt = null;
+    const featuredMatch = rawBlog.match(/\[\[FEATURED_IMAGE:([^\]]+)\]\]/);
+    if (featuredMatch) {
+      featuredImagePrompt = featuredMatch[1].trim();
+      console.log(`[Image] Prompt image principale (Claude): ${featuredImagePrompt.substring(0, 120)}...`);
+    } else {
+      // Fallback: build a basic prompt from keyword + title
+      featuredImagePrompt = `Professional blog header photograph about "${mainKeyword}". Topic: ${parsed.titleTag || parsed.h1}. Modern clean composition, soft professional lighting, 16:9 format, no text, no watermark.`;
+      console.log(`[Image] Aucun [[FEATURED_IMAGE]] trouvé — utilisation du prompt de secours`);
+    }
+
+    // ── Extract [[IMAGE:...]] markers from article content
     const imageMarkers = parsed.planMece ? parsed.planMece.match(/\[\[IMAGE:([^\]]+)\]\]/g) : [];
-    
-    if (imageMarkers && imageMarkers.length > 0) {
-      emitEvent(jobId, { type: 'step', message: `🖼️ Traitement de ${imageMarkers.length} images...` });
-      
-      try {
-        // Upload featured image (using main keyword)
-        emitEvent(jobId, { type: 'step', message: '📸 Génération et upload de l\'image principale...' });
-        const featuredImage = await getAndUploadBlogImage(mainKeyword, parsed.titleTag || parsed.h1);
-        if (featuredImage) {
-          featuredImageUrl = featuredImage.url;
-          emitEvent(jobId, { type: 'step', message: `✅ Image principale générée : ${featuredImageUrl}` });
-        } else {
-          emitEvent(jobId, { type: 'step', message: '⚠️ Image principale ignorée (erreur Gemini), article publié sans image' });
-        }
 
-        // Process each image marker in the content
-        for (let i = 0; i < Math.min(imageMarkers.length, 5); i++) {
-          const marker = imageMarkers[i];
-          const description = marker.match(/\[\[IMAGE:([^\]]+)\]\]/)[1];
+    try {
+      // Featured image
+      emitEvent(jobId, { type: 'step', message: '📸 Génération de l\'image principale (prompt Claude)...' });
+      const featuredImage = await generateImageWithGemini(
+        featuredImagePrompt,
+        '',
+        `blog-main-${(parsed.titleTag || mainKeyword).toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 40)}`
+      );
+      if (featuredImage) {
+        featuredImageUrl = featuredImage.url;
+        emitEvent(jobId, { type: 'step', message: `✅ Image principale générée` });
+      } else {
+        emitEvent(jobId, { type: 'step', message: '⚠️ Image principale ignorée (erreur Gemini)' });
+      }
 
-          emitEvent(jobId, { type: 'step', message: `🎨 Génération image ${i + 1}/${Math.min(imageMarkers.length, 5)}: "${description}"...` });
+      // Content images — use Claude's art-direction prompts directly
+      if (imageMarkers && imageMarkers.length > 0) {
+        emitEvent(jobId, { type: 'step', message: `🖼️ Génération de ${Math.min(imageMarkers.length, 4)} images de contenu...` });
 
-          const imageData = await getAndUploadBlogImage(description, description);
+        for (let i = 0; i < Math.min(imageMarkers.length, 4); i++) {
+          const description = imageMarkers[i].match(/\[\[IMAGE:([^\]]+)\]\]/)[1];
+          const slug = `blog-img${i + 1}-${Date.now()}`;
+
+          emitEvent(jobId, { type: 'step', message: `🎨 Image contenu ${i + 1}/${Math.min(imageMarkers.length, 4)}...` });
+          console.log(`[Image ${i + 1}] Prompt: ${description.substring(0, 100)}...`);
+
+          const imageData = await generateImageWithGemini(description, '', slug);
           if (imageData) {
             uploadedImages.push({ description, url: imageData.url });
-            emitEvent(jobId, { type: 'step', message: `✅ Image ${i + 1} générée et uploadée` });
+            emitEvent(jobId, { type: 'step', message: `✅ Image ${i + 1} générée` });
           } else {
             emitEvent(jobId, { type: 'step', message: `⚠️ Image ${i + 1} ignorée (erreur Gemini)` });
           }
         }
-        
-        // Inject image URLs back into content
+
         if (uploadedImages.length > 0) {
+          console.log(`[Image] Injection de ${uploadedImages.length} images dans planMece (${parsed.planMece?.length} chars)`);
           parsed.planMece = injectImageUrls(parsed.planMece, uploadedImages);
-          emitEvent(jobId, { type: 'step', message: `✅ ${uploadedImages.length} images intégrées au contenu HTML` });
+          console.log(`[Image] Après injection: ${parsed.planMece?.match(/\[\[IMAGE:https/g)?.length ?? 0} marqueurs avec URL`);
+          emitEvent(jobId, { type: 'step', message: `✅ ${uploadedImages.length} images intégrées dans l'article` });
         }
-      } catch (imgErr) {
-        console.error('Erreur traitement images:', imgErr);
-        emitEvent(jobId, { type: 'step', message: '⚠️ Erreur lors du traitement des images (article sera publié sans images)' });
       }
-    } else {
-      // No image markers found, but still upload a featured image
-      try {
-        emitEvent(jobId, { type: 'step', message: '📸 Génération de l\'image principale...' });
-        const featuredImage = await getAndUploadBlogImage(mainKeyword, parsed.titleTag || parsed.h1);
-        if (featuredImage) {
-          featuredImageUrl = featuredImage.url;
-          emitEvent(jobId, { type: 'step', message: '✅ Image principale générée' });
-        } else {
-          emitEvent(jobId, { type: 'step', message: '⚠️ Image principale ignorée (erreur Gemini), article publié sans image' });
-        }
-      } catch (imgErr) {
-        console.error('Erreur upload image principale:', imgErr);
-        emitEvent(jobId, { type: 'step', message: '⚠️ Erreur génération image principale (article sera publié sans image)' });
-      }
+    } catch (imgErr) {
+      console.error('Erreur traitement images:', imgErr);
+      emitEvent(jobId, { type: 'step', message: '⚠️ Erreur images — article publié sans images' });
     }
 
     // 7. Build HTML body
     const bodyHtml = buildBodyHtml(parsed);
+
+    // 7.1 SEO Coverage Scoring — compare article vs SERP model
+    if (serpModel && serpModel.dominantSubtopics.length > 0) {
+      try {
+        const plainText = `${parsed.titleTag || ''} ${parsed.h1 || ''} ${parsed.introduction || ''} ${parsed.planMece || ''}`;
+        const coverage  = scoreSerpCoverage(plainText, serpModel);
+        emitEvent(jobId, {
+          type: 'coverage',
+          data: coverage,
+          message: `🎯 Score SEO SERP : ${coverage.totalScore}/100 — ` +
+            `Sujets: ${coverage.topicCoverage}%, Entités: ${coverage.entityCoverage}%, ` +
+            `Mots: ${coverage.wordScore}%, FAQ: ${coverage.faqScore}%, Intention: ${coverage.intentScore}%`,
+        });
+        emitEvent(jobId, { type: 'step', message: `🎯 Score couverture SEO : ${coverage.totalScore}/100` });
+      } catch (scoreErr) {
+        console.error('[Pipeline] Erreur coverage score (non bloquante):', scoreErr.message);
+      }
+    }
 
     // Debug: show first 800 chars of generated body HTML to diagnose rendering issues
     emitEvent(jobId, {

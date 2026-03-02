@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Terminal, Lock, Mail, ArrowRight, Loader2 } from 'lucide-react';
+import { Skeleton } from '../components/UI';
 
 function LoginPageContent() {
   const [email, setEmail] = useState('');
@@ -120,7 +121,18 @@ function LoginPageContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><span className="text-text-muted">Chargement...</span></div>}>
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background px-6">
+        <div className="max-w-md w-full space-y-8">
+          <div className="flex flex-col items-center gap-4">
+            <Skeleton className="w-12 h-12 rounded-xl" />
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+          <Skeleton className="h-[400px] w-full rounded-2xl" />
+        </div>
+      </div>
+    }>
       <LoginPageContent />
     </Suspense>
   );
