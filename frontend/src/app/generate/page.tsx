@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, Suspense } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -32,7 +32,7 @@ const TONE_OPTIONS = [
   'Accessible et grand public',
 ];
 
-export default function GeneratePage() {
+function GeneratePageContent() {
   const { token } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -381,5 +381,13 @@ export default function GeneratePage() {
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+export default function GeneratePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><span className="text-text-muted">Chargement...</span></div>}>
+      <GeneratePageContent />
+    </Suspense>
   );
 }

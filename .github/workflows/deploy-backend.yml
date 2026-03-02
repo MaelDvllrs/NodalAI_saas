@@ -1,0 +1,73 @@
+name: 🚀 Deploy Backend to VPS
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+
+  workflow_dispatch: # Permet de lancer manuellement
+
+jobs:
+  deploy:
+    name: Deploy to Production VPS
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 🔐 Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: 📝 Add VPS to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: 🚀 Deploy to VPS
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          PROJECT_PATH: ${{ secrets.VPS_PROJECT_PATH }}
+        run: |
+          ssh $VPS_USER@$VPS_HOST << 'ENDSSH'
+            set -e
+            echo "📂 Navigation vers le projet..."
+            cd ${{ secrets.VPS_PROJECT_PATH }}/backend
+            
+            echo "📥 Pull des dernières modifications..."
+            git pull origin main
+            
+            echo "📦 Installation des dépendances..."
+            npm install --production
+            
+            echo "🔄 Redémarrage PM2..."
+            pm2 restart blog-backend
+            
+            echo "✅ Vérification du statut..."
+            pm2 status blog-backend
+            
+            echo "✨ Déploiement terminé avec succès!"
+          ENDSSH
+
+      - name: ✅ Deployment Success
+        if: success()
+        run: |
+          echo "🎉 Backend déployé avec succès sur le VPS!"
+          echo "📊 Vérifiez les logs: pm2 logs blog-backend"
+
+      - name: ❌ Deployment Failed
+        if: failure()
+        run: |
+          echo "💥 Échec du déploiement!"
+          echo "🔍 Vérifiez les logs ci-dessus pour plus de détails"

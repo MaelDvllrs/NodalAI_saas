@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabase.js';
+import { checkSiteAccess } from './site.service.js';
 
 /**
  * Service pour gérer les blogs
@@ -35,8 +36,11 @@ export async function createBlog(blogData) {
   return data;
 }
 
-// Récupérer tous les blogs d'un site
+// Récupérer tous les blogs d'un site (accès propriétaire OU membre)
 export async function getBlogsBySite(siteId, userId) {
+  const role = await checkSiteAccess(siteId, userId);
+  if (!role) throw new Error('Accès refusé');
+
   const { data, error } = await supabase
     .from('blogs')
     .select(`
@@ -48,7 +52,6 @@ export async function getBlogsBySite(siteId, userId) {
       )
     `)
     .eq('site_id', siteId)
-    .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(`Erreur récupération blogs: ${error.message}`);
@@ -80,9 +83,10 @@ export async function getUserBlogs(userId, filters = {}) {
   return data;
 }
 
-// Récupérer un blog par ID
+// Récupérer un blog par ID (accès via site membership)
 export async function getBlogById(blogId, userId) {
-  const { data, error } = await supabase
+  // D'abord récupérer le blog sans filtre user
+  const { data: blog, error } = await supabase
     .from('blogs')
     .select(`
       *,
@@ -90,11 +94,15 @@ export async function getBlogById(blogId, userId) {
       keywords:main_keyword_id (keyword, search_volume, competition_index)
     `)
     .eq('id', blogId)
-    .eq('user_id', userId)
     .single();
 
-  if (error) throw new Error(`Erreur récupération blog: ${error.message}`);
-  return data;
+  if (error || !blog) throw new Error('Blog introuvable');
+
+  // Vérifier que l'utilisateur a accès au site de ce blog
+  const role = await checkSiteAccess(blog.site_id, userId);
+  if (!role) throw new Error('Accès refusé');
+
+  return blog;
 }
 
 // Mettre à jour un blog

@@ -183,9 +183,38 @@
 
 ---
 
+## 🤖 CI/CD - Déploiement Automatique (Optionnel)
+
+### Configuration GitHub Actions
+- [ ] Clé SSH dédiée générée pour GitHub Actions
+- [ ] Clé publique SSH ajoutée sur le VPS
+- [ ] Token Vercel obtenu
+- [ ] Vercel Org ID et Project ID obtenus
+- [ ] Secrets ajoutés sur GitHub :
+  - [ ] `VPS_SSH_KEY`
+  - [ ] `VPS_HOST`
+  - [ ] `VPS_USER`
+  - [ ] `VPS_PROJECT_PATH`
+  - [ ] `VERCEL_TOKEN`
+  - [ ] `VERCEL_ORG_ID`
+  - [ ] `VERCEL_PROJECT_ID`
+
+### Tests CI/CD
+- [ ] Workflows GitHub Actions committés (`.github/workflows/`)
+- [ ] Test de connexion SSH manuel réussi
+- [ ] Premier déploiement manuel via GitHub Actions réussi
+- [ ] Push test sur `main` déclenche le déploiement auto
+- [ ] Backend se déploie correctement
+- [ ] Frontend se déploie correctement
+- [ ] Notifications de succès/échec fonctionnent
+
+---
+
 **Date de déploiement** : ___________
 
 **État** : ✅ Production / 🔄 En cours / ❌ En attente
+
+**CI/CD** : 🤖 Activé / ❌ Désactivé / ⏳ En configuration
 
 **Notes** :
 ```

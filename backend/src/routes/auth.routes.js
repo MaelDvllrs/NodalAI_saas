@@ -1,5 +1,6 @@
 import express from 'express';
 import { supabaseClient } from '../config/supabase.js';
+import { activatePendingInvites } from '../services/site.service.js';
 
 const router = express.Router();
 
@@ -27,6 +28,13 @@ router.post('/signup', async (req, res) => {
 
     if (error) {
       return res.status(400).json({ error: error.message });
+    }
+
+    // Activer les invitations en attente pour cet utilisateur
+    if (data.user) {
+      activatePendingInvites(data.user.id, data.user.email).catch(err =>
+        console.error('activatePendingInvites:', err)
+      );
     }
 
     res.json({
@@ -59,6 +67,13 @@ router.post('/login', async (req, res) => {
 
     if (error) {
       return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
+    }
+
+    // Activer les invitations en attente pour cet utilisateur
+    if (data.user) {
+      activatePendingInvites(data.user.id, data.user.email).catch(err =>
+        console.error('activatePendingInvites:', err)
+      );
     }
 
     res.json({

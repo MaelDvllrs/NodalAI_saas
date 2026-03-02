@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticateUser } from '../middleware/auth.middleware.js';
+import { supabase } from '../config/supabase.js';
 import {
   createSite,
   getUserSites,
@@ -8,6 +9,10 @@ import {
   deleteSite,
   saveCrawledPages,
   getCrawledPages,
+  getSiteMembers,
+  addSiteMember,
+  removeSiteMember,
+  checkSiteAccess,
 } from '../services/site.service.js';
 import { getSitemapUrls } from '../utils/sitemap.js';
 
@@ -162,6 +167,106 @@ router.get('/:id/pages', async (req, res) => {
   } catch (error) {
     console.error('Erreur récupération pages:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// Gestion des membres
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/sites/:id/members
+ * Lister les membres d'un site (admin uniquement)
+ */
+router.get('/:id/members', async (req, res) => {
+  try {
+    const members = await getSiteMembers(req.params.id, req.user.id);
+    res.json({ members });
+  } catch (error) {
+    console.error('Erreur récupération membres:', error);
+    const status = error.message.includes('Accès refusé') ? 403 : 500;
+    res.status(status).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/sites/:id/members
+ * Inviter un utilisateur par email (admin uniquement)
+ * Body: { email: string, role?: 'admin' | 'member' }
+ */
+router.post('/:id/members', async (req, res) => {
+  try {
+    const { email, role } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email requis' });
+    }
+
+    if (role && !['admin', 'member'].includes(role)) {
+      return res.status(400).json({ error: 'Rôle invalide (admin ou member)' });
+    }
+
+    const member = await addSiteMember(req.params.id, req.user.id, email, role || 'member');
+    res.status(201).json({
+      member,
+      message: member.isNewUser
+        ? 'Invitation envoyée par email'
+        : 'Utilisateur ajouté comme membre',
+    });
+  } catch (error) {
+    console.error('Erreur ajout membre:', error);
+    const status = error.message.includes('Accès refusé') ? 403
+      : error.message.includes('déjà membre') ? 409
+      : 500;
+    res.status(status).json({ error: error.message });
+  }
+});
+
+/**
+ * PATCH /api/sites/:id/members/:memberId
+ * Modifier le rôle d'un membre (admin uniquement)
+ * Body: { role: 'admin' | 'member' }
+ */
+router.patch('/:id/members/:memberId', async (req, res) => {
+  try {
+    const { role } = req.body;
+    if (!role || !['admin', 'member'].includes(role)) {
+      return res.status(400).json({ error: 'Rôle invalide (admin ou member)' });
+    }
+
+    const userRole = await checkSiteAccess(req.params.id, req.user.id);
+    if (!userRole || userRole !== 'admin') {
+      return res.status(403).json({ error: 'Accès refusé: admin uniquement' });
+    }
+
+    const { data, error } = await supabase
+      .from('site_members')
+      .update({ role })
+      .eq('id', req.params.memberId)
+      .eq('site_id', req.params.id)
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    res.json({ member: data });
+  } catch (error) {
+    console.error('Erreur modification rôle:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * DELETE /api/sites/:id/members/:memberId
+ * Retirer un membre du site (admin uniquement)
+ */
+router.delete('/:id/members/:memberId', async (req, res) => {
+  try {
+    await removeSiteMember(req.params.id, req.user.id, req.params.memberId);
+    res.json({ message: 'Membre retiré avec succès' });
+  } catch (error) {
+    console.error('Erreur suppression membre:', error);
+    const status = error.message.includes('Accès refusé') ? 403 : 500;
+    res.status(status).json({ error: error.message });
   }
 });
 

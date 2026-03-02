@@ -1,0 +1,141 @@
+name: 🚀 Deploy All (Backend + Frontend)
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+
+  workflow_dispatch: # Permet de lancer manuellement
+
+jobs:
+  # Job 1: Deploy Backend
+  deploy-backend:
+    name: 🖥️ Deploy Backend to VPS
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 🔐 Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: 📝 Add VPS to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: 🚀 Deploy Backend to VPS
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          PROJECT_PATH: ${{ secrets.VPS_PROJECT_PATH }}
+        run: |
+          ssh $VPS_USER@$VPS_HOST << 'ENDSSH'
+            set -e
+            echo "📂 Navigation vers le projet..."
+            cd ${{ secrets.VPS_PROJECT_PATH }}/backend
+            
+            echo "📥 Pull des dernières modifications..."
+            git pull origin main
+            
+            echo "📦 Installation des dépendances..."
+            npm install --production
+            
+            echo "🔄 Redémarrage PM2..."
+            pm2 restart blog-backend
+            
+            echo "✅ Backend déployé!"
+            pm2 status blog-backend
+          ENDSSH
+
+      - name: ✅ Backend Deployed
+        if: success()
+        run: echo "🎉 Backend déployé avec succès!"
+
+  # Job 2: Deploy Frontend (parallèle au backend)
+  deploy-frontend:
+    name: 🌐 Deploy Frontend to Vercel
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 📦 Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: 🔗 Pull Vercel Environment
+        working-directory: ./frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+
+      - name: 🏗️ Build Frontend
+        working-directory: ./frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel build --prod --token=$VERCEL_TOKEN
+
+      - name: 🚀 Deploy to Vercel
+        working-directory: ./frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
+
+      - name: ✅ Frontend Deployed
+        if: success()
+        run: echo "🎉 Frontend déployé avec succès!"
+
+  # Job 3: Notification (après les deux déploiements)
+  notify:
+    name: 📢 Notification
+    needs: [deploy-backend, deploy-frontend]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: ✅ Success
+        if: needs.deploy-backend.result == 'success' && needs.deploy-frontend.result == 'success'
+        run: |
+          echo "🎉 ✨ DÉPLOIEMENT COMPLET RÉUSSI! ✨"
+          echo "📊 Backend: ✅ Déployé sur VPS"
+          echo "🌐 Frontend: ✅ Déployé sur Vercel"
+          echo "🚀 Votre SaaS est maintenant à jour en production!"
+
+      - name: ⚠️ Partial Success
+        if: (needs.deploy-backend.result == 'success' && needs.deploy-frontend.result != 'success') || (needs.deploy-backend.result != 'success' && needs.deploy-frontend.result == 'success')
+        run: |
+          echo "⚠️ Déploiement partiel"
+          echo "Backend: ${{ needs.deploy-backend.result }}"
+          echo "Frontend: ${{ needs.deploy-frontend.result }}"
+
+      - name: ❌ Failed
+        if: needs.deploy-backend.result == 'failure' || needs.deploy-frontend.result == 'failure'
+        run: |
+          echo "💥 Échec du déploiement!"
+          echo "Backend: ${{ needs.deploy-backend.result }}"
+          echo "Frontend: ${{ needs.deploy-frontend.result }}"
+          exit 1
