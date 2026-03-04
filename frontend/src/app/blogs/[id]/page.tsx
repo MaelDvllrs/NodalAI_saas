@@ -549,7 +549,7 @@ export default function BlogDetailPage() {
 
               {/* Tab: Embeds (FAQ + Schémas) */}
               {tab === 'embeds' && (
-                <EmbedsDetailPanel faqEmbed={blog.faqEmbed} schemas={blog.schemas} />
+                <EmbedsDetailPanel faqEmbed={blog.faqEmbed ?? null} schemas={blog.schemas} />
               )}
 
               {/* Tab: Analyse SEO */}
