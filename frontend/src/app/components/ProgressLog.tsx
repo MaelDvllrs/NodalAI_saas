@@ -1,17 +1,61 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Terminal, CheckCircle2, AlertCircle, Copy, ExternalLink, ChevronDown, ChevronUp, Code2, Eye, Info, BarChart2, Target } from 'lucide-react';
+import { Terminal, CheckCircle2, AlertCircle, Copy, ExternalLink, ChevronDown, ChevronUp, Code2, Eye, Info, BarChart2, Target, Image, Search, Layers } from 'lucide-react';
 import { cn } from '../utils/cn';
+
+export type SemanticCluster = {
+  clusterId: number;
+  label: string;
+  terms: { term: string; display: string; score: number }[];
+  score: number;
+  pageCount?: number;
+};
+
+export type SemanticAnalysis = {
+  keyword: string;
+  pagesAnalyzed: number;
+  intent?: string;
+  contentFormat?: string;
+  avgWordCount?: number;
+  dominantSubtopics?: string[];
+  faqQuestions?: string[];
+  primaryTerms: string[];
+  secondaryTerms: string[];
+  longTailVariants: string[];
+  entities: string[];
+  semanticField: string[];
+  coOccurrences: string[];
+  contentGaps: string[];
+  tfidfTopTerms: { term: string; score: number }[];
+  relatedKws: { keyword: string; volume: number }[];
+  clusters?: SemanticCluster[];
+};
 
 export type LogEvent =
   | { type: 'step'; message: string }
   | { type: 'data'; key: string; value: unknown }
   | { type: 'preview'; data: { titleTag: string; h1: string; metaDescription: string } }
   | { type: 'embeds'; data: { faqEmbed: string | null; schemas: { position: string; code: string }[] } }
-  | { type: 'coverage'; data: { totalScore: number; topicCoverage: number; entityCoverage: number; wordScore: number; faqScore: number; intentScore: number }; message: string }
+  | { type: 'coverage'; data: { totalScore: number; bm25Score?: number; semanticScore?: number; topicCoverage: number; entityCoverage: number; wordScore: number; faqScore: number; intentScore: number }; message: string }
+  | { type: 'images'; data: { featured: string | null; content: { index: number; url: string; prompt: string }[] } }
   | { type: 'done'; data: { itemId: string; itemName: string; collectionId: string } }
   | { type: 'error'; message: string }
+  | { type: 'seo-preview'; data: {
+      mainKeyword: string;
+      kd: number | null;
+      kwSearchVolume: number | null;
+      serpResults: { rank: number; url: string; domain: string; title: string; description: string; pageType?: string }[];
+      serpModel: { intent: string; contentFormat: string; avgWordCount: number; dominantSubtopics: string[]; recurringEntities: string[]; hasFaq: boolean; faqQuestions: string[] } | null;
+      semanticAnalysis: SemanticAnalysis & {
+        intentTopTerms?: { term: string; display?: string; score: number; tfidf: number; minCount?: number; maxCount?: number; target?: number }[];
+        termDistribution?: { term: string; display?: string; presences: boolean[]; counts?: number[]; minCount?: number; maxCount?: number; target?: number }[];
+        pagesMeta?: { idx: number; url: string; domain: string; title: string; rank: number }[];
+        relatedKws?: { keyword: string; volume: number }[];
+        clusters?: SemanticCluster[];
+      } | null;
+    };
+  }
   | { type: 'debug'; label: string; [key: string]: unknown };
 
 interface Props {
@@ -37,6 +81,8 @@ export default function ProgressLog({ events }: Props) {
   const secondaryKeywords = (events.find((e) => e.type === 'data' && (e as { key: string }).key === 'secondaryKeywords') as { value: string[] } | undefined)?.value;
   const serpModelData = (events.find((e) => e.type === 'data' && (e as { key: string }).key === 'serpModel') as { value: { dominantSubtopics: string[]; recurringEntities: string[]; intent: string; contentFormat: string; avgWordCount: number; faqQuestions: string[] } } | undefined)?.value;
   const coverageEvent = events.find((e) => e.type === 'coverage') as Extract<LogEvent, { type: 'coverage' }> | undefined;
+  const imagesEvent = events.find((e) => e.type === 'images') as Extract<LogEvent, { type: 'images' }> | undefined;
+  const semanticData = (events.find((e) => e.type === 'data' && (e as { key: string }).key === 'semanticAnalysis') as { value: SemanticAnalysis } | undefined)?.value;
 
   return (
     <div className="space-y-6">
@@ -142,6 +188,154 @@ export default function ProgressLog({ events }: Props) {
         </div>
       )}
 
+      {/* Semantic Analysis Panel */}
+      {semanticData && (
+        <div className="bg-surface border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-text-muted">
+              <Search size={14} />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Analyse Sémantique Approfondie</span>
+            </div>
+            <span className="text-[10px] text-text-muted bg-border px-2 py-0.5 rounded-full">
+              {semanticData.pagesAnalyzed} pages · TF-IDF + DataForSEO
+            </span>
+          </div>
+
+          {/* Primary terms */}
+          {semanticData.primaryTerms.length > 0 && (
+            <div>
+              <p className="text-[10px] text-accent font-bold uppercase tracking-wider mb-2">Termes sémantiques principaux</p>
+              <div className="flex flex-wrap gap-1.5">
+                {semanticData.primaryTerms.map((t, i) => (
+                  <span key={i} className="px-2 py-0.5 rounded-full bg-accent/10 text-accent text-[10px] font-semibold border border-accent/20">{t}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Secondary terms */}
+          {semanticData.secondaryTerms.length > 0 && (
+            <div className="border-t border-border pt-3">
+              <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider mb-2">Termes complémentaires</p>
+              <div className="flex flex-wrap gap-1.5">
+                {semanticData.secondaryTerms.map((t, i) => (
+                  <span key={i} className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-text-muted text-[10px] border border-border">{t}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Long-tail variants */}
+          {semanticData.longTailVariants.length > 0 && (
+            <div className="border-t border-border pt-3">
+              <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider mb-2">Longues traînes identifiées</p>
+              <div className="flex flex-col gap-1">
+                {semanticData.longTailVariants.map((t, i) => (
+                  <span key={i} className="text-[11px] text-text-muted bg-background px-2 py-1 rounded border border-border font-mono">{t}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Entities + co-occurrences side by side */}
+          <div className="grid grid-cols-2 gap-3 border-t border-border pt-3">
+            {semanticData.entities.length > 0 && (
+              <div>
+                <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider mb-2">Entités sémantiques</p>
+                <div className="flex flex-wrap gap-1">
+                  {semanticData.entities.map((e, i) => (
+                    <span key={i} className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-[10px] font-medium border border-purple-200 dark:border-purple-700/40">{e}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {semanticData.coOccurrences.length > 0 && (
+              <div>
+                <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider mb-2">Co-occurrences</p>
+                <div className="flex flex-col gap-0.5">
+                  {semanticData.coOccurrences.slice(0, 6).map((c, i) => (
+                    <span key={i} className="text-[10px] text-text-muted font-mono">{c}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Content gaps */}
+          {semanticData.contentGaps.length > 0 && (
+            <div className="border-t border-border pt-3">
+              <div className="flex items-center gap-1.5 mb-2">
+                <Layers size={11} className="text-amber-500" />
+                <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider">Gaps de contenu identifiés</p>
+              </div>
+              <div className="space-y-1">
+                {semanticData.contentGaps.map((g, i) => (
+                  <div key={i} className="flex items-start gap-2 text-[11px] text-text-muted bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700/30 rounded px-2.5 py-1.5">
+                    <span className="text-amber-500 font-bold shrink-0">{i + 1}.</span>
+                    <span>{g}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Semantic clusters */}
+          {(semanticData as SemanticAnalysis & { clusters?: SemanticCluster[] }).clusters &&
+           (semanticData as SemanticAnalysis & { clusters?: SemanticCluster[] }).clusters!.length > 0 && (
+            <div className="border-t border-border pt-3">
+              <div className="flex items-center gap-1.5 mb-3">
+                <Layers size={11} className="text-violet-400" />
+                <p className="text-[10px] text-violet-400 font-bold uppercase tracking-wider">
+                  Groupes Sémantiques ({(semanticData as SemanticAnalysis & { clusters?: SemanticCluster[] }).clusters!.length} clusters)
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {(semanticData as SemanticAnalysis & { clusters?: SemanticCluster[] }).clusters!.map((cluster, ci) => {
+                  const palettes = [
+                    'border-blue-700/40 bg-blue-900/10 text-blue-300',
+                    'border-violet-700/40 bg-violet-900/10 text-violet-300',
+                    'border-emerald-700/40 bg-emerald-900/10 text-emerald-300',
+                    'border-amber-700/40 bg-amber-900/10 text-amber-300',
+                    'border-rose-700/40 bg-rose-900/10 text-rose-300',
+                    'border-cyan-700/40 bg-cyan-900/10 text-cyan-300',
+                    'border-fuchsia-700/40 bg-fuchsia-900/10 text-fuchsia-300',
+                    'border-lime-700/40 bg-lime-900/10 text-lime-300',
+                  ];
+                  const pal = palettes[ci % palettes.length];
+                  return (
+                    <div key={cluster.clusterId} className={`border rounded-lg p-2.5 flex flex-col gap-1 ${pal}`}>
+                      <span className="text-[11px] font-bold leading-tight">{cluster.label}</span>
+                      <div className="flex items-center justify-between mt-auto pt-1">
+                        {cluster.pageCount != null && (
+                          <span className="text-[9px] opacity-60">{cluster.pageCount} page{cluster.pageCount > 1 ? 's' : ''} SERP</span>
+                        )}
+                        <span className="text-[9px] font-mono opacity-50 ml-auto">{cluster.score.toFixed(3)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* TF-IDF top terms (collapsed) */}
+          {semanticData.tfidfTopTerms.length > 0 && (
+            <details className="border-t border-border pt-3">
+              <summary className="text-[10px] text-text-muted font-bold uppercase tracking-wider cursor-pointer select-none">
+                Top TF-IDF ({semanticData.tfidfTopTerms.length} termes)
+              </summary>
+              <div className="flex flex-wrap gap-1 mt-2">
+                {semanticData.tfidfTopTerms.map((t, i) => (
+                  <span key={i} className="px-1.5 py-0.5 rounded bg-border text-text-muted text-[9px] font-mono">
+                    {(t as { display?: string; term: string }).display || t.term} <span className="opacity-50">{t.score}</span>
+                  </span>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+
       {/* SEO Coverage Score */}
       {coverageEvent && (
         <div className="bg-surface border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -183,6 +377,72 @@ export default function ProgressLog({ events }: Props) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Images Panel */}
+      {imagesEvent && (
+        <div className="bg-surface border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <div className="flex items-center gap-2 text-text-muted">
+            <Image size={14} />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Images Générées</span>
+          </div>
+
+          {/* Featured */}
+          {imagesEvent.data.featured && (
+            <div className="space-y-1.5">
+              <p className="text-[10px] text-text-muted uppercase tracking-wider">Image principale</p>
+              <div className="flex items-center gap-3 p-3 bg-background border border-border rounded-lg">
+                <img
+                  src={imagesEvent.data.featured}
+                  alt="Image principale"
+                  className="w-20 h-12 object-cover rounded-md border border-border shrink-0"
+                />
+                <a
+                  href={imagesEvent.data.featured}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-accent hover:underline truncate flex items-center gap-1"
+                >
+                  <ExternalLink size={10} />
+                  {imagesEvent.data.featured.split('/').pop()}
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* Content images */}
+          {imagesEvent.data.content.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-[10px] text-text-muted uppercase tracking-wider">
+                Images rich text ({imagesEvent.data.content.length})
+              </p>
+              <div className="space-y-2">
+                {imagesEvent.data.content.map((img) => (
+                  <div key={img.index} className="flex items-center gap-3 p-3 bg-background border border-border rounded-lg">
+                    <span className="text-[10px] font-bold text-text-muted shrink-0 w-5 text-center">{img.index}</span>
+                    <img
+                      src={img.url}
+                      alt={`Image contenu ${img.index}`}
+                      className="w-20 h-12 object-cover rounded-md border border-border shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] text-text-muted italic truncate">{img.prompt}…</p>
+                      <a
+                        href={img.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-accent hover:underline truncate flex items-center gap-1 mt-0.5"
+                      >
+                        <ExternalLink size={10} />
+                        {img.url.split('/').pop()}
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -280,7 +540,7 @@ export default function ProgressLog({ events }: Props) {
   );
 }
 
-function EmbedsPanel({ faqEmbed, schemas }: { faqEmbed: string | null; schemas: { position: string; code: string }[] }) {
+function EmbedsPanel({ faqEmbed, schemas = [] }: { faqEmbed: string | null; schemas?: { position: string; code: string }[] }) {
   const blocks: { label: string; hint: string; code: string }[] = [];
   if (faqEmbed) {
     blocks.push({

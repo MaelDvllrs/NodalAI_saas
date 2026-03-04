@@ -155,3 +155,36 @@ export async function getExistingTitles(siteId) {
   if (error) throw new Error(`Erreur récupération titres: ${error.message}`);
   return data.map(b => b.title || b.h1).filter(Boolean);
 }
+
+// Noter un blog (1-5 étoiles)
+export async function rateBlog(blogId, userId, rating) {
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    throw new Error('La note doit être un entier entre 1 et 5');
+  }
+
+  const { data, error } = await supabase
+    .from('blogs')
+    .update({ rating })
+    .eq('id', blogId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Erreur notation blog: ${error.message}`);
+  return data;
+}
+
+// Récupérer les blogs les mieux notés d'un site (pour guider la génération)
+export async function getTopRatedBlogs(siteId, limit = 3) {
+  const { data, error } = await supabase
+    .from('blogs')
+    .select('id, title, tone, theme, rating, introduction')
+    .eq('site_id', siteId)
+    .gte('rating', 4)
+    .order('rating', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw new Error(`Erreur récupération blogs notés: ${error.message}`);
+  return data || [];
+}

@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { claudeCreate } from '../utils/claudeRetry.js';
 
 function getClient() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -15,7 +16,7 @@ function getClient() {
 export async function suggestKeywordCandidates(theme) {
   const client = getClient();
 
-  const message = await client.messages.create({
+  const message = await claudeCreate(client, {
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 256,
     messages: [
@@ -43,11 +44,111 @@ Exemple : ["expression 1", "expression 2", "expression 3", "expression 4", "expr
   }
 }
 
+// ── Clean semantic terms ──────────────────────────────────────────────────────
+/**
+ * Filtre et nettoie une liste de termes sémantiques bruts via Claude Haiku.
+ * Supprime les n-grams incompréhensibles, les tokens CSS/UI, corrige
+ * l'orthographe et les accents, déduplique, et retourne ~300 termes propres.
+ *
+ * @param {Array}  terms   - Tableau d'objets {term, display, score, count, ...}
+ * @param {string} keyword - Mot-clé principal (contexte SEO)
+ * @returns {Promise<Array>} Même structure, filtrée (~300 entrées)
+ */
+export async function cleanSemanticTerms(terms, keyword) {
+  if (!terms?.length) return terms ?? [];
+  const client = getClient();
+
+  // Helper : normalise un label pour la comparaison (sans accents, lowercase, espaces normalisés)
+  const normalize = (s) =>
+    (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+
+  const rawLabels = terms.slice(0, 500).map((t) => t.display || t.term);
+
+  // Index de lookup : clé normalisée → objet terme original
+  const byNorm = new Map(terms.map((t) => [normalize(t.display || t.term), t]));
+
+  // On numérote les termes pour que Claude renvoie des indices plutôt que des strings
+  // → évite tout risque d'invention et facilite le rebind
+  const numbered = rawLabels.map((label, i) => `${i + 1}. ${label}`).join('\n');
+
+  const prompt = `Tu es un expert SEO français. Voici une liste numérotée de termes-clés bruts extraits automatiquement pour le mot-clé : "${keyword}".
+
+RÈGLE ABSOLUE : tu ne dois JAMAIS inventer ou ajouter un terme qui n'est pas dans cette liste. Tu travailles UNIQUEMENT sur les termes fournis.
+
+Ta mission (dans l'ordre) :
+1. SUPPRIMER les termes inutilisables : CSS/HTML ("overflow hidden", "border radius", "px"), tokens UI, codes hex, URLs, noms de variables, fragments incompréhensibles, termes génériques sans valeur SEO (ex: "page", "site", "click", "home", "div", "span")
+2. CORRIGER uniquement l'orthographe et les accents des termes conservés (ex: "creation" → "création", "referencement" → "référencement") — sans changer le sens ni inventer
+3. DÉDUPLIQUER : si deux termes sont identiques ou quasi-identiques après correction, garder le plus propre
+4. SUPPRIMER les termes trop similaires entre eux (garder le plus précis/spécifique)
+5. SUPPRIMER les nom d'auteurs de blog, les nom de personnes peu ou pas connues
+5. RETOURNER les indices (numéros) des termes retenus avec leur version corrigée, 300 maximum, triés par pertinence SEO décroissante
+
+Format de réponse — UNIQUEMENT ce tableau JSON, sans aucun texte autour :
+[{"i": 3, "v": "terme corrigé"}, {"i": 7, "v": "autre terme"}, ...]
+
+- "i" = numéro du terme dans la liste (1-based)
+- "v" = version nettoyée/corrigée (si aucune correction nécessaire, reprendre exactement le terme original)
+
+Liste numérotée :
+${numbered}`;
+
+  try {
+    const message = await claudeCreate(client, {
+      model:      'claude-haiku-4-5-20251001',
+      max_tokens: 4096,
+      messages:   [{ role: 'user', content: prompt }],
+    });
+    const raw     = message.content[0].text.trim();
+    const jsonStr = raw.startsWith('[') ? raw : raw.match(/\[[\s\S]*\]/)?.[0];
+    if (!jsonStr) throw new Error('JSON non trouvé dans la réponse');
+    const cleaned = JSON.parse(jsonStr);
+    if (!Array.isArray(cleaned)) throw new Error('Réponse non-tableau');
+
+    const seenNorm = new Set();
+    const result   = [];
+
+    for (const entry of cleaned) {
+      if (result.length >= 300) break;
+
+      // Accepte aussi le format simple chaîne en fallback (ancienne version)
+      const idx        = typeof entry === 'object' ? entry.i : null;
+      const corrected  = typeof entry === 'object' ? String(entry.v || '').trim() : String(entry).trim();
+
+      // Retrouve l'objet original par index ou par comparaison normalisée
+      let orig = null;
+      if (idx != null && idx >= 1 && idx <= rawLabels.length) {
+        orig = terms[idx - 1]; // index direct — fiable, impossible d'inventer
+      } else {
+        orig = byNorm.get(normalize(corrected)) ?? null; // fallback fuzzy
+      }
+
+      // Si aucun original trouvé → Claude a inventé → on ignore
+      if (!orig) {
+        console.debug(`[Claude] cleanSemanticTerms: terme ignoré (introuvable) "${corrected}"`);
+        continue;
+      }
+
+      // Déduplication sur la version normalisée corrigée
+      const normV = normalize(corrected);
+      if (seenNorm.has(normV)) continue;
+      seenNorm.add(normV);
+
+      result.push({ ...orig, display: corrected || orig.display || orig.term });
+    }
+
+    console.log(`[Claude] cleanSemanticTerms: ${terms.length} → ${result.length} termes (${rawLabels.length - result.length} supprimés)`);
+    return result;
+  } catch (err) {
+    console.warn('[Claude] cleanSemanticTerms échoué, retour liste originale:', err.message);
+    return terms; // fallback non-bloquant
+  }
+}
+
 // ── Secondary keywords ────────────────────────────────────────────────────────
 export async function getSecondaryKeywords(mainKeyword, theme) {
   const client = getClient();
 
-  const message = await client.messages.create({
+  const message = await claudeCreate(client, {
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 1024,
     messages: [
@@ -71,14 +172,233 @@ Exemple : ["mot-clé 1", "mot-clé 2", ...]`,
 }
 
 // ── KD → article length ───────────────────────────────────────────────────────
+export function getWordCountBounds(kd) {
+  if (kd === null || kd === undefined) return { min: 1500, max: 2000 };
+  if (kd <= 10)  return { min: 800,  max: 1000 };
+  if (kd <= 20)  return { min: 1000, max: 1300 };
+  if (kd <= 35)  return { min: 1300, max: 1800 };
+  if (kd <= 50)  return { min: 1800, max: 2300 };
+  if (kd <= 70)  return { min: 2300, max: 2700 };
+  return { min: 2700, max: 3000 };
+}
+
+export async function trimContentToWordCount(content, targetMin, targetMax, mainKeyword) {
+  const client = getClient();
+  const currentWords = content.trim().split(/\s+/).length;
+
+  const message = await claudeCreate(client, {
+    model: 'claude-sonnet-4-6',
+    max_tokens: 8000,
+    messages: [{
+      role: 'user',
+      content: `Tu es un rédacteur-éditeur SEO senior. L'article ci-dessous fait ~${currentWords} mots. Tu dois le **réécrire et condenser** pour qu'il fasse ENTRE ${targetMin} ET ${targetMax} mots.
+
+⚠️ RÈGLE PRINCIPALE : il s'agit d'une RÉÉCRITURE CONDENSÉE, PAS d'une suppression de mots.
+Chaque phrase du résultat doit être complète, naturelle et compréhensible. Un lecteur ne doit pas sentir qu'il manque quelque chose.
+
+MÉTHODE DE CONDENSATION (par ordre de priorité) :
+1. **Fusionner** les paragraphes qui développent la même idée en un seul paragraphe synthétique
+2. **Reformuler** les phrases longues et complexes en phrases plus courtes et directes
+3. **Éliminer** les répétitions, reformulations identiques et transitions inutiles
+4. **Réduire** les listes de puces : garder les 3-4 items les plus pertinents, supprimer les redondants
+5. **Raccourcir** les descriptions d'accroche (lignes "→ Description :") à 1 phrase maximum
+6. **Supprimer** les digressions qui n'apportent pas de valeur SEO directe
+
+CONTRAINTES ABSOLUES (ne jamais toucher à) :
+- Tous les marqueurs : [[INTERNE:...]], [[EXTERNE:...]], [[QUOTE:...]], [[IMAGE:...]] — les conserver intégralement, ne jamais couper un marqueur en deux
+- Tous les titres H2 (## ...) et H3 (### ...) — les conserver tous
+- Le mot-clé principal "${mainKeyword}" — doit apparaître autant de fois qu'avant
+- L'intention de recherche et le plan logique de l'article — la structure sémantique doit rester cohérente
+- La qualité rédactionnelle — chaque phrase doit avoir un sujet, un verbe et un sens complet
+
+RÉSULTAT ATTENDU :
+- Un article fluide et agréable à lire
+- Aucune phrase tronquée ou incohérente
+- Entre ${targetMin} et ${targetMax} mots dans le corps (hors marqueurs [[...]])
+- Retourne UNIQUEMENT le contenu révisé, sans commentaire, sans en-tête, sans explication
+
+CONTENU À CONDENSER :
+${content}`,
+    }],
+  });
+
+  return message.content[0].text.trim();
+}
+
+/**
+ * Rewrite the body + introduction of an article that scored < SEO_THRESHOLD.
+ * Uses Sonnet to fully rewrite the content, forcing coverage of missing subtopics
+ * and entities identified by the SERP model and semantic analysis.
+ *
+ * @param {object} params
+ * @param {string} params.body              - Current planMece (body)
+ * @param {string} params.introduction      - Current introduction text
+ * @param {string} params.mainKeyword
+ * @param {string} params.tone
+ * @param {object} params.serpModel         - SERP model (dominantSubtopics, recurringEntities, intent, …)
+ * @param {object} params.semanticAnalysis  - Output of analyzeSemanticKeywords
+ * @param {object} params.coverageData      - scoreSerpCoverage output (shows what's missing)
+ * @param {number} params.wcMin
+ * @param {number} params.wcMax
+ * @returns {Promise<{ body: string, introduction: string }>}
+ */
+export async function rewriteArticleForSeo({
+  body, introduction, mainKeyword, tone,
+  serpModel, semanticAnalysis, coverageData, wcMin, wcMax,
+  forceTermDensity = false, termRangeDetails = [],
+}) {
+  const client = getClient();
+
+  // ── Build diagnostic of what's missing ──────────────────────────────────
+  const missingTopics = serpModel?.dominantSubtopics
+    ?.filter((t) => !`${body} ${introduction}`.toLowerCase().includes(t.toLowerCase()))
+    ?? [];
+
+  const missingEntities = serpModel?.recurringEntities
+    ?.filter((e) => !`${body} ${introduction}`.toLowerCase().includes(e.toLowerCase()))
+    ?? [];
+
+  const topicCoverage   = coverageData?.topicCoverage   ?? 'inconnue';
+  const entityCoverage  = coverageData?.entityCoverage  ?? 'inconnue';
+  const wordScore       = coverageData?.wordScore       ?? 'inconnu';
+  const totalScore      = coverageData?.totalScore      ?? 'inconnu';
+
+  const primaryTerms    = (semanticAnalysis?.primaryTerms    ?? []).join(', ') || 'aucun';
+  const longTailList    = (semanticAnalysis?.longTailVariants ?? []).join(' | ') || 'aucun';
+  const contentGaps     = (semanticAnalysis?.contentGaps      ?? []).map((g, i) => `${i+1}. ${g}`).join('\n') || 'aucun';
+
+  // Top 30 terms prioritaires pour la réécriture
+  const top30Terms = (semanticAnalysis?.intentTopTerms || []).slice(0, 30).map((t) => t.display || t.term);
+  const top30Block = top30Terms.length > 0
+    ? `\n\n### ⭐ TOP ${top30Terms.length} MOTS-CLÉS PRIORITAIRES (classés par importance SEO) :\nRÈGLE : utilise AU MOINS 20 de ces termes dans la réécriture. Chaque H2 doit en contenir ≥ 3.\n${top30Terms.map((t, i) => `${i+1}. **${t}**`).join('  |  ')}`
+    : '';
+
+  // Tableau de fréquences cibles pour la réécriture
+    const freqGuideLines = (semanticAnalysis?.intentTopTerms || [])
+    .filter((t) => t.maxCount > 0)
+    .slice(0, 60)
+    .map((t) => `| ${(t.display || t.term).padEnd(22)} | ${String(t.minCount).padStart(3)} | ${String(t.maxCount).padStart(3)} | ~${t.target} |`)
+    .join('\n');
+  const freqGuideBlock = freqGuideLines
+    ? `\n\n### Guide de fréquence des termes (normalisé pour 1000 mots) :\nObjectif : utiliser chaque terme autour de la valeur Cible. Un terme absent = opportunité SEO manquée.\n| Terme                   | Min | Max | Cible |\n|-------------------------|-----|-----|-------|\n${freqGuideLines}`
+    : '';
+
+  const missingTopicBlock = missingTopics.length > 0
+    ? `\n### Sous-thèmes SERP NON COUVERTS (obligatoires) :\n${missingTopics.map((t, i) => `${i+1}. ${t}`).join('\n')}`
+    : '\n✅ Tous les sous-thèmes SERP sont déjà couverts — renforcer leur traitement.';
+
+  const missingEntityBlock = missingEntities.length > 0
+    ? `\n### Entités SERP manquantes (à intégrer naturellement) :\n${missingEntities.join(', ')}`
+    : '\n✅ Entités déjà présentes.';
+
+  const prompt = `Tu es un expert SEO et rédacteur web senior. Tu dois RÉÉCRIRE INTÉGRALEMENT le corps et l'introduction d'un article qui a obtenu un score SEO insuffisant.
+
+## DIAGNOSTIC DU PROBLÈME
+Score SEO actuel : **${totalScore}/100** (seuil minimum : 65)
+- Couverture des sous-thèmes SERP : ${topicCoverage}%
+- Couverture des entités : ${entityCoverage}%
+- Score volume de contenu : ${wordScore}%
+
+## OBJECTIF DE LA RÉÉCRITURE
+Produire une version améliorée qui atteint au minimum 70/100 en :
+1. Couvrant TOUS les sous-thèmes SERP manquants
+2. Intégrant TOUTES les entités manquantes
+3. Utilisant abondamment les termes sémantiques principaux
+4. Respectant l'intention de recherche : **${serpModel?.intent ?? 'informationnelle'}**
+5. Longueur cible : **${wcMin}–${wcMax} mots** pour le CORPS UNIQUEMENT
+${missingTopicBlock}
+${missingEntityBlock}${top30Block}
+
+### Termes sémantiques principaux TF-IDF (à intégrer densément) :
+${primaryTerms}
+
+### Expressions longue traîne (utiliser dans les H3 et l'intro) :
+${longTailList}
+
+### Gaps de contenu identifiés chez les concurrents (si pertinent, traiter) :
+${contentGaps}${freqGuideBlock}${forceTermDensity && termRangeDetails.length > 0 ? `
+
+## ⚠️ ALERTE DENSITÉ TERMES-CLÉS — PRIORITÉ MAXIMALE
+Une analyse automatique a détecté que les termes suivants sont ABSENTS ou sous-utilisés dans l'article.
+Tu DOIS les intégrer dans la réécriture — sans exception. Chaque terme manquant nuit directement au référencement.
+Utilise-les naturellement dans les paragraphes, les H3, les listes à puces et l'introduction.
+La comparaison est insensible aux accents : "référencement" et "referencement" sont considérés identiques.
+
+### Termes à intégrer d'urgence (hors plage de fréquence cible) :
+${termRangeDetails.map((d) => `- **${d.term}** : présent ${d.density} fois/1000 mots (plage cible : ${d.minCount}–${d.maxCount})`).join('\n')}` : ''}
+
+## RÈGLES ABSOLUES DE RÉÉCRITURE
+- Conserver INTÉGRALEMENT tous les titres H2 (## ...) et H3 (### ...) du corps
+- Conserver INTÉGRALEMENT tous les marqueurs : [[INTERNE:...]], [[EXTERNE:...]], [[QUOTE:...]], [[IMAGE:...]]
+- L'introduction DOIT commencer par une accroche forte (chiffre, question, affirmation) avec le mot-clé "${mainKeyword}" dans les 15 premiers mots
+- Ne JAMAIS commencer l'introduction par un résumé descriptif ou une définition générale
+- Ton : ${tone}
+- Langue : français uniquement
+- Ne PAS répéter le même sous-thème dans plusieurs sections — chaque H2 doit traiter un angle unique
+- Inclure MINIMUM 1 marqueur [[QUOTE:...]] si absent
+
+## FORMAT DE SORTIE OBLIGATOIRE
+Retourne EXACTEMENT ce format JSON (aucun texte avant ou après) :
+{
+  "introduction": "<introduction réécrite, 180-220 mots>",
+  "body": "<corps de l'article réécrit avec tous les H2/H3 et marqueurs conservés>"
+}
+
+## CONTENU ACTUEL À RÉÉCRIRE
+
+### INTRODUCTION ACTUELLE :
+${introduction || '(vide)'}
+
+### CORPS ACTUEL :
+${body}`;
+
+  try {
+    const message = await claudeCreate(client, {
+      model:      'claude-sonnet-4-6',
+      max_tokens: 12000,
+      messages:   [{ role: 'user', content: prompt }],
+    });
+
+    const raw     = message.content[0].text.trim();
+    const jsonStr = raw.startsWith('{') ? raw : raw.match(/\{[\s\S]*\}/)?.[0];
+    if (!jsonStr) throw new Error('JSON non trouvé dans la réponse de réécriture');
+    const result  = JSON.parse(jsonStr);
+
+    if (!result.body || result.body.length < 200) {
+      throw new Error('Corps réécrit trop court ou absent');
+    }
+
+    return {
+      body:         result.body.trim(),
+      introduction: result.introduction?.trim() || introduction,
+    };
+  } catch (err) {
+    console.error('[Claude] rewriteArticleForSeo erreur:', err.message);
+    // Return original content on failure to avoid breaking the pipeline
+    return { body, introduction };
+  }
+}
+
 function getLengthFromKd(kd) {
-  if (kd === null || kd === undefined) return { range: '1 800 – 2 500 mots', objective: 'Guide complet + maillage interne' };
-  if (kd <= 10)  return { range: '700 – 900 mots',            objective: 'Réponse claire et ciblée' };
-  if (kd <= 20)  return { range: '800 – 1 200 mots',          objective: 'Contenu structuré avec sous-parties' };
-  if (kd <= 35)  return { range: '1 200 – 1 800 mots',        objective: 'Article approfondi + optimisation sémantique' };
-  if (kd <= 50)  return { range: '1 800 – 2 500 mots',        objective: 'Guide complet + maillage interne' };
-  if (kd <= 70)  return { range: '2 500 – 4 000 mots',        objective: 'Pilier / contenu expert' };
-  return               { range: '4 000 mots minimum',         objective: 'Autorité + contenu exhaustif' };
+  if (kd === null || kd === undefined)
+    return { range: '1 000 – 1 600 mots', objective: 'Article structuré et optimisé SEO' };
+
+  if (kd <= 10)
+    return { range: '800 – 1 000 mots', objective: 'Réponse claire et ciblée' };
+
+  if (kd <= 20)
+    return { range: '1 000 – 1 200 mots', objective: 'Contenu structuré avec sous-parties' };
+
+  if (kd <= 35)
+    return { range: '1 200 – 1 600 mots', objective: 'Article approfondi + optimisation sémantique' };
+
+  if (kd <= 50)
+    return { range: '1 600 – 1 800 mots', objective: 'Guide complet + maillage interne' };
+
+  if (kd <= 70)
+    return { range: '1 800 – 2 000 mots', objective: 'Contenu expert structuré' };
+
+  return { range: '2 000 – 2 300 mots', objective: 'Contenu pilier + autorité thématique' };
 }
 
 // ── SERP-driven optimised outline (Step 3) ──────────────────────────────────
@@ -122,7 +442,7 @@ Retourne UNIQUEMENT le plan en format texte, avec des H2 (## Titre) et H3 (### T
 - Pas de contenu rédigé, seulement les titres et sous-titres`;
 
   try {
-    const message = await client.messages.create({
+    const message = await claudeCreate(client, {
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
       messages: [{ role: 'user', content: prompt }],
@@ -135,7 +455,7 @@ Retourne UNIQUEMENT le plan en format texte, avec des H2 (## Titre) et H3 (### T
 }
 
 // ── Full blog generation ──────────────────────────────────────────────────────
-export async function generateBlogContent({ mainKeyword, secondaryKeywords, theme, tone, existingTitles, internalUrls, kd, serpModel, optimizedOutline }) {
+export async function generateBlogContent({ mainKeyword, secondaryKeywords, theme, tone, existingTitles, internalUrls, kd, serpModel, optimizedOutline, semanticAnalysis, ratingExamples = [] }) {
   const client = getClient();
   const { range: lengthRange, objective: lengthObjective } = getLengthFromKd(kd);
 
@@ -228,7 +548,31 @@ Rédige un titre principal H1 PERCUTANT et DIFFÉRENT du Titre SEO (max 80 carac
 ### 4. INTRODUCTION
 [Champ Webflow : Introduction]
 
-Rédige une introduction de 180 à 200 mots EXACTEMENT, conçue pour optimiser simultanément le référencement Google ET la lecture par les LLMs (ChatGPT, Perplexity, Gemini).
+Ce champ contient DEUX blocs séparés, dans cet ordre :
+
+---
+
+#### BLOC A — POINTS CLÉS DE L'ARTICLE
+Génère un encadré synthétique en tête de section avec ce format EXACT :
+
+📌 **Points clés de l'article**
+- [Point clé 1 : bénéfice ou information essentielle, 10-15 mots max]
+- [Point clé 2]
+- [Point clé 3]
+- [Point clé 4]
+- [Point clé 5]
+
+Règles :
+- Entre 5 et 7 points maximum
+- Chaque point résume un H2 ou apprentissage majeur de l'article
+- Phrases courtes, orientées bénéfice lecteur
+- Inclut le mot-clé principal dans au moins 1 point
+- Ce bloc est COMPRIS dans le comptage total des mots
+
+---
+
+#### BLOC B — INTRODUCTION (180 à 200 mots)
+Rédige une introduction de 180 à 200 mots, conçue pour optimiser simultanément le référencement Google ET la lecture par les LLMs (ChatGPT, Perplexity, Gemini).
 
 Rules OBLIGATOIRES — dans cet ordre précis :
 
@@ -253,7 +597,7 @@ Rules OBLIGATOIRES — dans cet ordre précis :
 ⚠️ INTERDITS :
 - Introduction générique ou bateau ("Dans cet article, nous allons...")
 - Répétition du title tag ou du H1 mot pour mot
-- Moins de 150 mots ou plus de 220 mots
+- Moins de 150 mots ou plus de 220 mots pour le Bloc B
 
 ---
 
@@ -267,7 +611,7 @@ RÈGLES OBLIGATOIRES :
 - Chaque H3 : description d'accroche (1-2 phrases) + contenu rédigé complet (80 à 150 mots)
 - Liens INTERNES : utilise le format exact [[INTERNE:URL|texte d'ancre riche en mots-clés]], minimum 3 liens
 - Liens EXTERNES : utilise le format exact [[EXTERNE:URL|texte d'ancre descriptif]], minimum 3 sources fiables (HubSpot, Google, McKinsey, Forbes, INSEE, études officielles)
-- BLOCKQUOTES : ajoute 2 à 4 citations pertinentes pour illustrer et décorer l'article avec le format exact [[QUOTE:Texte de la citation pertinente et inspirante]]
+- BLOCKQUOTES : MINIMUM 1 citation [[QUOTE:...]] OBLIGATOIRE dans chaque article (idéalement 2 à 4). Format exact : [[QUOTE:Texte de la citation pertinente et inspirante]]. Si aucune citation n'a encore été ajoutée avant la conclusion, en insérer une immédiatement. Un article sans aucun [[QUOTE:...]] est invalide.
 - IMAGES : ajoute 3 à 5 marqueurs d'images en anglais pour Gemini AI avec le format exact [[IMAGE:Detailed English prompt for Gemini]], placés stratégiquement après les H2/H3 importants. Chaque prompt doit être très descriptif (sujet précis lié à la section, style photographique ou illustratif, couleurs, cadrage, ambiance, sans texte, sans watermark). Exemple : [[IMAGE:A close-up photograph of hands filling out a health insurance form at a wooden desk, natural warm light, sharp focus on the document, blurred background with plants, professional and reassuring atmosphere. No text overlay, no watermark.]]
 - Intègre les liens, blockquotes et images naturellement dans les paragraphes
 - Utilise les mots-clés secondaires fournis tout au long du contenu
@@ -290,39 +634,74 @@ FORMAT OBLIGATOIRE POUR CHAQUE SECTION :
 
 ---
 
+#### CONCLUSION OBLIGATOIRE (à placer en dernière section du corps)
+Termine la section 5 par une conclusion avec ce format EXACT :
+
+## Conclusion : [Titre synthétique accrocheur]
+→ Description : [1 phrase de transition qui annonce la synthèse]
+
+[Paragraphe 1 — Synthèse des points clés : rappelle les 3-4 apprentissages principaux de l'article, sans les répéter mot pour mot. 80-120 mots.]
+
+[Paragraphe 2 — Appel à l'action ou perspective : encourage le lecteur à passer à l'action, à approfondir ou à revenir sur le site. Intègre 1 lien interne [[INTERNE:URL|ancre]] et le mot-clé principal. 60-80 mots.]
+
+Règles de la conclusion :
+- COMPRISE dans le comptage de mots de la section 5
+- Ne pas introduire de nouvelles informations
+- Ton conclusif et positif
+- Maximum 200 mots au total
+
+---
+
 ### 6. FAQ (CODE HTML EMBED)
 [Embed Webflow — À insérer en fin d'article]
 
 Génère une FAQ de 8 à 10 questions/réponses :
 - Questions et réponses riches en mots-clés
 - Optimisées GEO (réponses directes, factuelles, citables par une IA)
-- Code HTML/CSS/JS autonome, design sobre et professionnel
+- ⚠️ Code HTML UNIQUEMENT avec des attributs style="..." inline sur chaque balise
+- ⚠️ INTERDIT : class=, id=, <style>, feuilles CSS, classes Tailwind ou Bootstrap
 
 \`\`\`html
-<div class="faq-container">...</div>
-<style>/* styles */</style>
-<script>/* JS accordéon */</script>
+<div style="font-family:sans-serif;max-width:800px;margin:0 auto;padding:24px 0">
+  <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:16px">Questions fréquentes</h2>
+  <div style="border:1px solid #e5e7eb;border-radius:8px;margin-bottom:8px;overflow:hidden">
+    <button onclick="var p=this.nextElementSibling;p.style.display=p.style.display==='none'?'block':'none'" style="width:100%;text-align:left;padding:16px 20px;font-weight:600;font-size:0.95rem;background:#f9fafb;border:none;cursor:pointer">Question 1 ?</button>
+    <div style="padding:16px 20px;display:none;font-size:0.9rem;line-height:1.6;color:#374151">Réponse 1.</div>
+  </div>
+</div>
 \`\`\`
 
 ---
 
 ### 7. SCHÉMAS VISUELS (CODE HTML EMBED)
-[Embed Webflow — 2 schémas à placer aux endroits stratégiques]
+[Embed Webflow — 3 schémas à placer aux endroits stratégiques]
 
-Génère exactement 2 schémas visuels en HTML/CSS pur (sans JS externe) :
-- Illustrent des concepts clés de l'article
-- Design propre, moderne, responsive, couleurs harmonieuses
-- Boîtes, flèches, étapes ou tableaux comparatifs selon le contexte
-- Titre explicite au-dessus de chaque schéma
+⚠️ RÈGLES ABSOLUES pour TOUS les schémas :
+- UNIQUEMENT des attributs style="..." inline sur chaque balise HTML
+- INTERDIT : class=, id=, <style>, feuilles CSS, classes utilitaires
+- Design propre, moderne, responsive (utilise max-width, flexbox via style="display:flex")
+- Polices sans-serif, couleurs harmonieuses via style="..."
+
+Génère exactement 3 schémas adaptés au contenu de l'article :
+- **SCHÉMA 1 (obligatoire)** : tableau de données — comparatif, avantages/inconvénients, checklist ou grille explicative avec lignes et colonnes HTML (<table>, <tr>, <td>/<th>)
+- **SCHÉMA 2** : processus, étapes ou flux (boîtes numérotées, flèches, timeline)
+- **SCHÉMA 3** : synthèse visuelle libre (infographie, points clés encadrés, diagramme adapté au sujet)
+
+Titre explicite au-dessus de chaque schéma.
 
 📌 SCHÉMA 1 - À insérer après : [H2 ou H3 concerné]
 \`\`\`html
-<div>...</div><style>...</style>
+<div style="font-family:sans-serif;max-width:800px;margin:24px auto">...</div>
 \`\`\`
 
 📌 SCHÉMA 2 - À insérer après : [H2 ou H3 concerné]
 \`\`\`html
-<div>...</div><style>...</style>
+<div style="font-family:sans-serif;max-width:800px;margin:24px auto">...</div>
+\`\`\`
+
+📌 SCHÉMA 3 - À insérer après : [H2 ou H3 concerné]
+\`\`\`html
+<div style="font-family:sans-serif;max-width:800px;margin:24px auto">...</div>
 \`\`\`
 
 ---
@@ -330,10 +709,12 @@ Génère exactement 2 schémas visuels en HTML/CSS pur (sans JS externe) :
 ## RÈGLES GÉNÉRALES
 - Tout le contenu est rédigé en français
 - Ton : ${tone}. Jamais générique, toujours à forte valeur ajoutée
-- Longueur totale de l'article : ${lengthRange} (hors FAQ et schémas). Objectif : ${lengthObjective}
+- Longueur de la section 5 (Corps de l'article UNIQUEMENT, hors titre/intro/FAQ/schémas) : ${lengthRange}. Objectif : ${lengthObjective}. ⚠️ PLAFOND STRICT — arrête-toi dès que tu atteins la borne supérieure. Il est INTERDIT de dépasser ce plafond. Préfère un contenu dense et concis plutôt que répétitif et long. La conclusion de la section 5 EST comprise dans ce décompte.
+- La section 4 (Points clés + introduction) est un champ séparé : les Points clés et l'introduction sont TOUS les deux comptabilisés dans le décompte de la section 4.
 - Intégrer naturellement tous les mots-clés secondaires fournis
 - Ne jamais inventer des données chiffrées sans les sourcer ou les formuler comme estimations
-- Ne jamais utiliser le tiret cadratin (—) dans le contenu : remplace-le par une virgule, un point ou une reformulation`;
+- Ne jamais utiliser le tiret cadratin (—) dans le contenu : remplace-le par une virgule, un point ou une reformulation
+- RAPPEL FINAL OBLIGATOIRE : avant de terminer la section 5, vérifie que tu as inséré AU MOINS 1 marqueur [[QUOTE:...]] dans le corps de l'article. Si ce n'est pas le cas, insère-en un avant la conclusion.`;
 
   // ── SERP enforcement block (injected only when a model is available) ─────────
   const serpEnforcement = serpModel && serpModel.dominantSubtopics.length > 0
@@ -351,7 +732,7 @@ ${serpModel.recurringEntities.join(', ') || 'aucune'}
 
 ### Intention de recherche : ${serpModel.intent}
 ### Format dominant des concurrents : ${serpModel.contentFormat}
-### Longueur cible : ~${Math.round(serpModel.avgWordCount * 1.1)} mots (champ Contenu uniquement)
+### Longueur cible : ~${Math.round(serpModel.avgWordCount * 1.1)} mots MAXIMUM pour la section Corps uniquement (plafond strict — ne pas dépasser)
 ${serpModel.hasFaq ? '### FAQ : les concurrents incluent une FAQ — tu DOIS inclure une section FAQ.' : ''}
 ${serpModel.faqQuestions.length > 0 ? `
 ### Questions FAQ à traiter prioritairement :
@@ -371,6 +752,98 @@ L'introduction DOIT contenir TOUS ces éléments naturellement intégrés :
     ? `\n\n## PLAN OPTIMISÉ À SUIVRE\nRespect ce plan structurel (tu peux enrichir mais ne supprime pas de section) :\n\n${optimizedOutline}`
     : '';
 
+  // ── Semantic analysis block (injected when available) ───────────────────────
+  const semanticBlock = semanticAnalysis && (
+    semanticAnalysis.intentTopTerms?.length > 0 ||
+    semanticAnalysis.primaryTerms?.length > 0 ||
+    semanticAnalysis.longTailVariants?.length > 0 ||
+    semanticAnalysis.contentGaps?.length > 0
+  ) ? `
+
+---
+
+## ANALYSE SÉMANTIQUE APPROFONDIE (TF-IDF + DataForSEO)
+Ces termes ont été extraits par analyse NLP des pages top SERP et enrichis via DataForSEO.
+Ce bloc est **OBLIGATOIRE** — il détermine la couverture sémantique de l'article.${(() => {
+    // Top 30 terms by score (already sorted desc by count/score)
+    const top30 = (semanticAnalysis.intentTopTerms || [])
+      .slice(0, 30)
+      .map((t) => t.display || t.term);
+    if (top30.length === 0) return '';
+    return `
+
+### ⭐ TOP ${top30.length} MOTS-CLÉS À INTÉGRER EN PRIORITÉ ABSOLUE
+Ces termes sont classés par importance SEO (les premiers sont les plus critiques).
+RÈGLE : tu DOIS utiliser **au moins 20 de ces ${top30.length} termes** dans l'article.
+RÈGLE : chaque section H2 du corps doit contenir **au minimum 3 termes** de cette liste.
+RÈGLE : l'introduction doit contenir **au minimum 5 termes** de cette liste.
+Intègre-les naturellement — jamais en liste brute, toujours dans des phrases fluides.
+
+${top30.map((t, i) => `${i + 1}. **${t}**`).join('  |  ')}`;
+  })()}${(() => {
+    // Tableau de densité obligatoire — les top 50 termes avec leur plage exacte
+    const densityTerms = (semanticAnalysis.intentTopTerms || [])
+      .filter((t) => t.maxCount > 0)
+      .slice(0, 50);
+    if (densityTerms.length === 0) return '';
+    const rows = densityTerms.map((t) => `| ${(t.display || t.term).padEnd(26)} | ${String(t.minCount).padStart(3)} | ${String(t.maxCount).padStart(3)} | **~${t.target}** |`).join('\n');
+    return `\n\n### 🎯 CONTRAINTE DENSITÉ OBLIGATOIRE — Plages de fréquence par terme (pour 1000 mots)
+Ce tableau est CONTRAIGNANT. Chaque terme doit apparaître dans l'article autour de la valeur **Cible**.
+Si un terme a Min=2 Max=5, il doit apparaître entre 2 et 5 fois pour 1 000 mots rédigés.
+❌ Terme absent = pénalité SEO. ❌ Terme sur-utilisé (> Max) = pénalité sur-optimisation.\n\n| Terme                             | Min | Max | Cible |\n|-----------------------------------|-----|-----|-------|\n${rows}`;
+  })()}
+
+### Termes sémantiques principaux (à intégrer dans les sections centrales) :
+${(semanticAnalysis.primaryTerms || []).join(', ')}
+
+### Termes secondaires complémentaires :
+${(semanticAnalysis.secondaryTerms || []).join(', ')}
+
+### Expressions longue traîne (à utiliser dans les H3, questions FAQ, intro) :
+${(semanticAnalysis.longTailVariants || []).join(' | ')}
+
+### Entités sémantiques (marques, outils, concepts — à citer en contexte) :
+${(semanticAnalysis.entities || []).join(', ')}
+
+### Co-occurrences fréquentes chez les concurrents :
+${(semanticAnalysis.coOccurrences || []).join(' / ')}
+
+### Gaps de contenu identifiés (sous-thèmes souvent manquants — à traiter si pertinent) :
+${(semanticAnalysis.contentGaps || []).map((g, i) => `${i + 1}. ${g}`).join('\n')}${(() => {
+    const guide = (semanticAnalysis.intentTopTerms || [])
+      .filter((t) => t.target > 0 && t.minCount !== undefined)
+      .slice(0, 60);
+    if (guide.length === 0) return '';
+    const rows = guide.map((t) => `| ${(t.display || t.term).padEnd(22)} | ${String(t.minCount).padStart(3)} | ${String(t.maxCount).padStart(3)} | ~${t.target} |`).join('\n');
+    return `
+
+### Guide de fréquence des termes (basé sur l'analyse des pages concurrentes)
+Ce tableau indique combien de fois chaque terme apparaît chez les concurrents (normalisé pour 1000 mots).
+Les termes en haut du tableau sont les plus importants — priorise-les absolument.
+Objectif : utiliser chaque terme autour de la valeur **Cible**. Un terme absent = opportunité SEO manquée.
+
+| Terme                   | Min | Max | Cible |
+|-------------------------|-----|-----|-------|
+${rows}`;
+  })()}`
+  : '';
+
+  // ── Rating examples block (injected when top-rated blogs exist) ──────────────
+  const ratingBlock = ratingExamples.length > 0
+    ? `
+
+---
+
+## EXEMPLES D'ARTICLES BIEN NOTÉS (référence de qualité et de style)
+Ces articles ont été évalués ${Math.round(ratingExamples.reduce((s, b) => s + (b.rating || 5), 0) / ratingExamples.length * 10) / 10}/5 par l'utilisateur. Inspire-toi de leur **style d'accroche**, de la **densité de l'introduction**, du **niveau de détail**, et de la **structure des paragraphes**. Ne copie pas le contenu — adapte l'approche.
+
+${ratingExamples.map((b, i) => {
+  const intro = (b.introduction || '').slice(0, 300).replace(/\n+/g, ' ');
+  return `### Exemple ${i + 1} — Note ${b.rating}/5 (thème : ${b.theme || '—'}, ton : ${b.tone || '—'})
+**Titre** : ${b.title}\n**Début de l\'introduction** : ${intro}${(b.introduction || '').length > 300 ? '...' : ''}`;
+}).join('\n\n')}`
+    : '';
+
   const userPrompt = `Génère un article de blog complet avec les paramètres suivants :
 
 **Mot-clé principal :** ${mainKeyword}
@@ -381,9 +854,9 @@ L'introduction DOIT contenir TOUS ces éléments naturellement intégrés :
 ${competitorTitles}
 
 **URLs internes disponibles pour le maillage [[INTERNE:URL|ancre]] :**
-${internalUrlsText}${serpEnforcement}${outlineBlock}`;
+${internalUrlsText}${serpEnforcement}${semanticBlock}${outlineBlock}${ratingBlock}`;
 
-  const message = await client.messages.create({
+  const message = await claudeCreate(client, {
     model: 'claude-sonnet-4-6',
     max_tokens: 12000,
     system: systemPrompt,

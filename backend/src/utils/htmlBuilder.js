@@ -8,15 +8,10 @@
 export function buildBodyHtml(parsed) {
   const parts = [];
 
-  // Introduction
+  // Introduction (including "Points clés" block — routed through full HTML converter
+  // to handle bullet lists and bold text)
   if (parsed.introduction) {
-    const introHtml = parsed.introduction
-      .split(/\n{2,}/)
-      .map((p) => p.trim())
-      .filter(Boolean)
-      .map((p) => `<p>${processLinks(p)}</p>`)
-      .join('\n');
-    parts.push(introHtml);
+    parts.push(convertContentToHtml(parsed.introduction));
   }
 
   // Full article content (H2/H3 + paragraphs + lists + embedded links)
@@ -109,7 +104,7 @@ function convertContentToHtml(content) {
     const h2 = t.match(/^##(?!#)\s+(?:H2\s*:\s*)?(.+)/i);
     if (h2) {
       flushPara(); flushList();
-      html.push(`<h2>${escapeHtml(cleanMarkdown(h2[1].trim()))}</h2>`);
+      html.push(`<h2>${escapeHtml(cleanMarkdown(h2[1].trim().replace(/\*\*/g, '')))}</h2>`);
       continue;
     }
 
@@ -117,7 +112,7 @@ function convertContentToHtml(content) {
     const h3 = t.match(/^###\s+(?:H3\s*:\s*)?(.+)/i);
     if (h3) {
       flushPara(); flushList();
-      html.push(`<h3>${escapeHtml(cleanMarkdown(h3[1].trim()))}</h3>`);
+      html.push(`<h3>${escapeHtml(cleanMarkdown(h3[1].trim().replace(/\*\*/g, '')))}</h3>`);
       continue;
     }
 
@@ -175,6 +170,9 @@ function convertContentToHtml(content) {
  * Also handles standard markdown links [text](url).
  */
 function processLinks(text) {
+  // Bold: **text** → <strong>text</strong> (before link processing)
+  text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
   // Internal: [[INTERNE:URL|anchor text]]
   text = text.replace(/\[\[INTERNE:(https?:\/\/[^\|]+)\|([^\]]+)\]\]/g,
     '<a href="$1">$2</a>');
@@ -485,8 +483,10 @@ function escapeHtml(text) {
 
 function cleanMarkdown(text) {
   return String(text)
-    .replace(/\*\*/g, '')
-    .replace(/(?<!\w)\*(?!\w)/g, '')
+    // Do NOT strip ** here — processLinks handles ** → <strong> for inline text.
+    // For headings (which use escapeHtml after cleanMarkdown), bold markers are
+    // stripped below only if they reach this path raw.
+    .replace(/(?<!\w)\*(?!\w)/g, '')  // single stray asterisks
     .replace(/`/g, '')
     .trim();
 }

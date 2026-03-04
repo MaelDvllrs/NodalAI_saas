@@ -12,6 +12,7 @@
 import axios from 'axios';
 import { createClient } from '@supabase/supabase-js';
 import Anthropic from '@anthropic-ai/sdk';
+import { claudeCreate } from '../utils/claudeRetry.js';
 
 // ── Clients ──────────────────────────────────────────────────────────────────
 
@@ -60,7 +61,7 @@ export async function fetchSerpResults(keyword) {
       language_code: 'fr',
       location_code: 2250, // France
       device: 'desktop',
-      depth: 10,
+      depth: 20, // Top 20 pour pouvoir filtrer forums/homepages et garder 10 pages éditoriales
     },
   ];
 
@@ -89,7 +90,7 @@ export async function fetchSerpResults(keyword) {
   // Keep only organic results (exclude ads, featured snippets, people-also-ask, etc.)
   const organics = items
     .filter((i) => i.type === 'organic')
-    .slice(0, 10)
+    .slice(0, 20)
     .map((i) => ({
       rank: i.rank_group,
       title: i.title ?? '',
@@ -172,7 +173,7 @@ RÈGLES :
 - Retourne UNIQUEMENT le JSON, sans texte introductif`;
 
   try {
-    const message = await client.messages.create({
+    const message = await claudeCreate(client, {
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
       messages: [{ role: 'user', content: prompt }],
