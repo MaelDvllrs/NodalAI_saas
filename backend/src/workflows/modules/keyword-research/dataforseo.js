@@ -28,17 +28,12 @@ function resolveCompetitionIndex(item) {
  *  - Penalises single-word generic terms
  */
 function scoreKeyword(item) {
-  const volume     = item.search_volume   || 0;
-  const compIndex  = resolveCompetitionIndex(item);
-  const wordCount  = item.keyword.trim().split(/\s+/).length;
+  const volume    = item.search_volume  || 0;
+  const compIndex = resolveCompetitionIndex(item);
+  const wordCount = item.keyword.trim().split(/\s+/).length;
 
-  // Volume score: logarithmic — big gap between 100 vs 1 000 but not 10 000 vs 100 000
-  const volumeScore = volume > 0 ? Math.log10(volume) : 0;
-
-  // Competition penalty: 0 = no penalty, 100 = strong penalty
-  const compPenalty = compIndex / 100;
-
-  // Long-tail bonus: 1 word = 0, 2 words = 0.3, 3+ words = 0.6
+  const volumeScore  = volume > 0 ? Math.log10(volume) : 0;
+  const compPenalty  = compIndex / 100;
   const longTailBonus = wordCount === 1 ? 0 : wordCount === 2 ? 0.3 : 0.6;
 
   return volumeScore * (1 - compPenalty * 0.5) + longTailBonus;
@@ -54,13 +49,7 @@ export async function getKeywordsMetrics(keywords) {
     'Content-Type': 'application/json',
   };
 
-  const payload = [
-    {
-      keywords,
-      language_code: 'fr',
-      location_code: 2250, // France
-    },
-  ];
+  const payload = [{ keywords, language_code: 'fr', location_code: 2250 }];
 
   const response = await axios.post(
     `${BASE_URL}/keywords_data/google_ads/search_volume/live`,
@@ -78,7 +67,7 @@ export async function getKeywordsMetrics(keywords) {
 
   const items = task0?.result || [];
   console.log(`[DataForSEO/search_volume] Résultats (${items.length}):`);
-  items.forEach((i) =>
+  items.forEach(i =>
     console.log(`  "${i.keyword}" — volume: ${i.search_volume}, competition: ${i.competition}, competition_index: ${i.competition_index}`)
   );
 
@@ -89,7 +78,6 @@ export async function getKeywordsMetrics(keywords) {
  * Given a theme and Claude-suggested candidates, pick the best keyword via DataForSEO metrics.
  */
 export async function getBestKeywordFromCandidates(theme, candidates) {
-  // Test all candidates with exact search volume data
   const allKeywords = candidates.length > 0 ? candidates : [theme];
 
   let items = [];
@@ -100,14 +88,12 @@ export async function getBestKeywordFromCandidates(theme, candidates) {
   }
 
   if (items.length === 0) {
-    // Nothing usable — fall back to first candidate or theme
     return { keyword: candidates[0] || theme, kd: null, search_volume: null };
   }
 
-  // Score and pick best
   const scored = items
-    .filter((i) => i.keyword && (i.search_volume ?? 0) >= 10)
-    .map((i) => ({ ...i, _score: scoreKeyword(i) }))
+    .filter(i => i.keyword && (i.search_volume ?? 0) >= 10)
+    .map(i => ({ ...i, _score: scoreKeyword(i) }))
     .sort((a, b) => b._score - a._score);
 
   const best = scored[0] || items[0];
@@ -127,7 +113,6 @@ export async function getBestKeywordFromCandidates(theme, candidates) {
 /**
  * Retrieve the best main keyword for a given theme using DataForSEO.
  * Uses the "keywords for keywords" endpoint targeting French/France.
- * Selects the keyword with the best SEO opportunity score (volume / competition / long-tail).
  */
 export async function getMainKeyword(theme) {
   try {
@@ -140,8 +125,8 @@ export async function getMainKeyword(theme) {
       {
         keywords: [theme],
         language_code: 'fr',
-        location_code: 2250, // France
-        limit: 50,           // Wider pool for better selection
+        location_code: 2250,
+        limit: 50,
         order_by: ['search_volume,desc'],
       },
     ];
@@ -177,21 +162,17 @@ export async function getMainKeyword(theme) {
       return { keyword: theme, kd: null };
     }
 
-    // Filter: must have search volume, exclude exact theme repetition
     const candidates = items.filter(
-      (i) => i.keyword && i.search_volume >= 50 && i.keyword.toLowerCase() !== theme.toLowerCase()
+      i => i.keyword && i.search_volume >= 50 && i.keyword.toLowerCase() !== theme.toLowerCase()
     );
 
-    // Fall back to all items if filtering removed everything
-    const pool = candidates.length > 0 ? candidates : items.filter((i) => i.search_volume > 0);
+    const pool = candidates.length > 0 ? candidates : items.filter(i => i.search_volume > 0);
 
-    // Score and pick the best opportunity
     const scored = pool
-      .map((i) => ({ ...i, _score: scoreKeyword(i) }))
+      .map(i => ({ ...i, _score: scoreKeyword(i) }))
       .sort((a, b) => b._score - a._score);
 
     const best = scored[0];
-
     const resolvedKd = best ? resolveCompetitionIndex(best) : null;
 
     console.log(
@@ -205,7 +186,6 @@ export async function getMainKeyword(theme) {
       search_volume: best?.search_volume ?? null,
     };
   } catch (err) {
-    // DataForSEO unavailable (no credits, network error, etc.) — fall back to theme
     console.error(`[DataForSEO] Erreur pour le thème "${theme}":`, err?.response?.data ?? err?.message ?? err);
     return { keyword: theme, kd: null, warning: 'DataForSEO indisponible' };
   }

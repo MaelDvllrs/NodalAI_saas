@@ -12,7 +12,7 @@
 
 import axios from 'axios';
 import Anthropic from '@anthropic-ai/sdk';
-import { claudeCreate } from '../utils/claudeRetry.js';
+import { claudeCreate } from '../../../utils/claudeRetry.js';
 
 const BASE_URL   = 'https://api.dataforseo.com/v3';
 const MAX_PAGES        = 8;    // Nombre de pages à intégrer dans l'analyse TF-IDF

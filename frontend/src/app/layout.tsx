@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { AuthProvider } from './contexts/AuthContext';
+import { ProjectProvider } from './contexts/ProjectContext';
+import { TaskProvider } from './contexts/TaskContext';
+import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
   title: 'Blog Automation Webflow',
@@ -22,7 +25,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fr">
       <body className="min-h-screen">
         <AuthProvider>
-          {children}
+          <ProjectProvider>
+            <TaskProvider>
+              {children}
+              <Toaster position="bottom-right" />
+            </TaskProvider>
+          </ProjectProvider>
         </AuthProvider>
       </body>
     </html>

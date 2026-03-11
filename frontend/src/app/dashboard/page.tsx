@@ -2,647 +2,227 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import ProtectedRoute from '../components/ProtectedRoute';
-import Navbar from '../components/Navbar';
+import AppLayout from '../components/AppLayout';
 import Link from 'next/link';
-import { Plus, Globe, ExternalLink, RefreshCw, Trash2, Calendar, Users, Crown, UserPlus, ArrowRight, X } from 'lucide-react';
-import { cn } from '../utils/cn';
-import { Skeleton, Spinner } from '../components/UI';
+import { FileText, PenTool, Globe, BarChart2, TrendingUp, MousePointerClick, Eye, Clock } from 'lucide-react';
+import { Skeleton } from '../components/UI';
+import { useProject } from '../contexts/ProjectContext';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
-interface Site {
+interface Blog {
   id: string;
-  name: string;
-  url: string;
-  webflow_site_id: string;
-  webflow_collection_name: string;
-  created_at: string;
-  userRole: 'admin' | 'member';
-}
-
-interface Member {
-  id: string;
-  user_id: string | null;
-  invited_email: string;
-  role: 'admin' | 'member';
-  status: 'active' | 'pending';
+  site_id: string;
+  status: string;
   created_at: string;
 }
 
 function DashboardPage() {
   const { token } = useAuth();
-  const [sites, setSites] = useState<Site[]>([]);
+  const { selectedSite, selectedSiteId, loading: projectLoading } = useProject();
+  const [blogs, setBlogs] = useState<Blog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showMembersModal, setShowMembersModal] = useState(false);
-  const [selectedSite, setSelectedSite] = useState<Site | null>(null);
 
   useEffect(() => {
-    if (token) {
-      fetchSites();
+    if (token && selectedSiteId) {
+      fetchBlogs();
+    } else if (!projectLoading) {
+      setLoading(false);
     }
-  }, [token]);
+  }, [token, selectedSiteId, projectLoading]);
 
-  async function fetchSites() {
+  async function fetchBlogs() {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/sites`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+      const res = await fetch(`${API_URL}/blogs?siteId=${selectedSiteId}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-
       if (res.ok) {
         const data = await res.json();
-        setSites(data.sites);
+        setBlogs(data.blogs || []);
       }
     } catch (error) {
-      console.error('Erreur récupération sites:', error);
+      console.error('Erreur récupération blogs:', error);
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleCrawl(siteId: string) {
-    if (!confirm('Lancer le crawl de ce site ?')) return;
-
-    try {
-      const res = await fetch(`${API_URL}/sites/${siteId}/crawl`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        alert(`✅ ${data.message}`);
-      } else {
-        const error = await res.json();
-        alert(`❌ ${error.error}`);
-      }
-    } catch (error) {
-      alert('❌ Erreur lors du crawl');
-    }
-  }
-
-  async function handleDelete(siteId: string, siteName: string) {
-    if (!confirm(`Supprimer le site "${siteName}" et tous ses blogs ?`)) return;
-
-    try {
-      const res = await fetch(`${API_URL}/sites/${siteId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (res.ok) {
-        setSites(sites.filter(s => s.id !== siteId));
-        alert('✅ Site supprimé');
-      } else {
-        const error = await res.json();
-        alert(`❌ ${error.error}`);
-      }
-    } catch (error) {
-      alert('❌ Erreur lors de la suppression');
-    }
-  }
+  const totalBlogs = blogs.length;
+  const publishedBlogs = blogs.filter(b => b.status === 'published').length;
+  const draftBlogs = blogs.filter(b => b.status === 'draft' || b.status === 'generated').length;
 
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-background animate-fade-in">
-        <Navbar />
-        
-        <div className="max-w-7xl mx-auto py-12 px-6">
+    <AppLayout>
+      <div className="animate-fade-in">
+        <div className="max-w-7xl mx-auto py-8 px-6">
+
           {/* Header */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-16 animate-slide-up">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 animate-slide-up">
             <div>
-              <h1 className="text-4xl font-bold tracking-tight mb-3">Mes Projets</h1>
-              <p className="text-md text-text-muted max-w-xl ">
-                Gérez vos environnements Webflow et automatisez votre stratégie de contenu SEO.
-              </p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-text-muted mb-2">Tableau de bord</p>
+              <h1 className="text-4xl font-bold tracking-tight mb-3">
+                {selectedSite ? selectedSite.name : 'Aucun projet sélectionné'}
+              </h1>
+              {selectedSite && (
+                <p className="text-sm text-text-muted font-medium">{selectedSite.url}</p>
+              )}
             </div>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="btn-accent gap-3 px-5 py-2.5 text-sm font-semibold shadow-lg shadow-accent/20"
-            >
-              <Plus size={20} />
-              Nouveau Site
-            </button>
+            {selectedSite && (
+              <Link
+                href="/generate"
+                className="btn-accent gap-2"
+              >
+                <PenTool size={18} />
+                Générer un article
+              </Link>
+            )}
           </div>
 
-          {/* Loading Skeletons */}
-          {loading && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-[340px] rounded-3xl" />
-              ))}
-            </div>
-          )}
-
-          {/* Empty State */}
-          {!loading && sites.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-32 bg-surface/50 border-2 border-dashed border-border rounded-3xl animate-slide-up shadow-xl shadow-black/5">
-              <div className="w-24 h-24 bg-bg border border-border rounded-3xl flex items-center justify-center mb-8 shadow-sm">
+          {/* No project selected */}
+          {!projectLoading && !selectedSite && (
+            <div className="flex flex-col items-center justify-center py-20 bg-surface/50 border-2 border-dashed border-border rounded-lg animate-slide-up">
+              <div className="w-16 h-16 bg-bg border border-border rounded-lg flex items-center justify-center mb-6 shadow-sm">
                 <Globe className="text-text-muted/50" size={40} />
               </div>
-              <h3 className="text-2xl font-bold mb-3">Aucun site configuré</h3>
-              <p className="text-text-muted mb-10 max-w-sm text-center font-medium">
-                Connectez votre premier site Webflow pour commencer à générer des articles SEO automatisés.
+              <h3 className="text-2xl font-bold mb-3">Aucun projet sélectionné</h3>
+              <p className="text-text-muted mb-6 max-w-sm text-center font-medium">
+                Sélectionnez un projet dans le menu de gauche ou créez-en un nouveau.
               </p>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="btn-accent gap-3 px-6 py-3 text-sm font-semibold shadow-lg shadow-accent/20"
-              >
-                <Plus size={20} />
-                Ajouter mon premier site
-              </button>
+              <Link href="/projects" className="btn-accent gap-2">
+                Voir mes projets
+              </Link>
             </div>
           )}
 
-          {/* Sites Grid */}
-          {!loading && sites.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {sites.map((site, index) => (
-                <div
-                  key={site.id}
-                  style={{ animationDelay: `${index * 50}ms` }}
-                  className="group bg-surface/50 border border-border rounded-xl p-4 hover:border-accent/40 hover:shadow-2xl hover:shadow-accent/5 transition-all duration-300 flex flex-col animate-slide-up backdrop-blur-sm"
-                >
-                  <div className="flex items-start justify-between mb-8">
-                    <div className="w-12 h-12 bg-bg border border-border rounded-2xl flex items-center justify-center group-hover:bg-accent group-hover:text-white group-hover:border-accent group-hover:scale-110 group-hover:-translate-y-1 group-hover:shadow-lg group-hover:shadow-accent/20 transition-all duration-300 ease-out shadow-sm">
-                      <Globe size={24} />
-                    </div>
-                    <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0">
-                      {site.userRole === 'admin' && (
-                        <>
-                          <button
-                            onClick={() => { setSelectedSite(site); setShowMembersModal(true); }}
-                            className="p-2 text-text-muted hover:text-accent hover:bg-accent/10 rounded-xl transition-all"
-                            title="Gérer les membres"
-                          >
-                            <Users size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleCrawl(site.id)}
-                            className="p-2 text-text-muted hover:text-accent hover:bg-accent/10 rounded-xl transition-all"
-                            title="Crawler le site"
-                          >
-                            <RefreshCw size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(site.id, site.name)}
-                            className="p-2 text-text-muted hover:text-error hover:bg-error/10 rounded-xl transition-all"
-                            title="Supprimer"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </>
-                      )}
+          {/* Stats cards */}
+          {(selectedSite || projectLoading) && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 animate-slide-up">
+                {/* Total blogs */}
+                <div className="bg-surface/50 border border-border rounded-lg p-4 hover:border-accent/30 transition-all duration-200 backdrop-blur-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted">Articles générés</p>
+                    <div className="w-8 h-8 bg-accent/10 rounded-md flex items-center justify-center">
+                      <FileText size={16} className="text-accent" />
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-xl font-bold truncate">{site.name}</h3>
-                    {site.userRole === 'admin' ? (
-                      <span className="shrink-0 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-amber-600 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
-                        <Crown size={10} /> Admin
-                      </span>
-                    ) : (
-                      <span className="shrink-0 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-text-muted bg-border/40 px-2.5 py-1 rounded-full border border-border/50">
-                        Membre
-                      </span>
-                    )}
-                  </div>
-                  
-                  <a 
-                    href={site.url} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="text-sm font-medium text-text-muted hover:text-accent flex items-center gap-2 mb-8 transition-colors group/link"
-                  >
-                    <span className="truncate">{site.url.replace(/^https?:\/\//, '')}</span>
-                    <ExternalLink size={14} className="group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5 transition-transform" />
-                  </a>
+                  {loading ? (
+                    <Skeleton className="h-10 w-20 rounded-xl" />
+                  ) : (
+                    <p className="text-4xl font-bold tracking-tight">{totalBlogs}</p>
+                  )}
+                  <p className="text-xs text-text-muted font-medium mt-2">Total sur ce projet</p>
+                </div>
 
-                  <div className="mt-auto pt-6 border-t border-border/50 flex flex-col gap-6">
-                    <div className="flex items-center gap-2.5 text-xs font-semibold text-text-muted uppercase tracking-wider">
-                      <Calendar size={14} className="text-accent/60" />
-                      Ajouté le {new Date(site.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                {/* Published blogs */}
+                <div className="bg-surface/50 border border-border rounded-lg p-4 hover:border-accent/30 transition-all duration-200 backdrop-blur-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted">Publiés</p>
+                    <div className="w-8 h-8 bg-green-500/10 rounded-md flex items-center justify-center">
+                      <Globe size={16} className="text-green-500" />
                     </div>
-                    <Link
-                      href={`/generate?siteId=${site.id}`}
-                      className="btn-primary w-full py-3 text-sm font-semibold uppercase tracking-widest group/btn"
+                  </div>
+                  {loading ? (
+                    <Skeleton className="h-10 w-16 rounded-xl" />
+                  ) : (
+                    <p className="text-4xl font-bold tracking-tight">{publishedBlogs}</p>
+                  )}
+                  <p className="text-xs text-text-muted font-medium mt-2">Articles en ligne</p>
+                </div>
+
+                {/* Draft blogs */}
+                <div className="bg-surface/50 border border-border rounded-lg p-4 hover:border-accent/30 transition-all duration-200 backdrop-blur-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted">Brouillons</p>
+                    <div className="w-8 h-8 bg-amber-500/10 rounded-md flex items-center justify-center">
+                      <Clock size={16} className="text-amber-500" />
+                    </div>
+                  </div>
+                  {loading ? (
+                    <Skeleton className="h-10 w-16 rounded-xl" />
+                  ) : (
+                    <p className="text-4xl font-bold tracking-tight">{draftBlogs}</p>
+                  )}
+                  <p className="text-xs text-text-muted font-medium mt-2">En attente de publication</p>
+                </div>
+              </div>
+
+              {/* Future stats — placeholder section */}
+              <div className="animate-slide-up" style={{ animationDelay: '100ms' }}>
+                <div className="flex items-center gap-3 mb-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted">Performances SEO</p>
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-accent bg-accent/10 px-2.5 py-1 rounded-full border border-accent/20">
+                    Bientôt disponible
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {[
+                    { label: 'Clics organiques', icon: MousePointerClick, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+                    { label: 'Impressions', icon: Eye, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+                    { label: 'Position moyenne', icon: TrendingUp, color: 'text-pink-500', bg: 'bg-pink-500/10' },
+                  ].map(({ label, icon: Icon, color, bg }) => (
+                    <div
+                      key={label}
+                      className="relative bg-surface/30 border border-dashed border-border rounded-lg p-4 overflow-hidden"
                     >
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted/60">{label}</p>
+                        <div className={`w-8 h-8 ${bg} rounded-md flex items-center justify-center opacity-40`}>
+                          <Icon size={16} className={color} />
+                        </div>
+                      </div>
+                      <p className="text-4xl font-bold tracking-tight text-text-muted/30">—</p>
+                      <p className="text-xs text-text-muted/50 font-medium mt-2">Données non disponibles</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quick actions */}
+              {selectedSite && !loading && (
+                <div className="mt-8 animate-slide-up" style={{ animationDelay: '150ms' }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted mb-4">Accès rapide</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Link href="/generate" className="btn-primary gap-2">
+                      <PenTool size={13} />
                       Générer un article
-                      <ArrowRight size={16} className="ml-2 transition-transform" />
+                    </Link>
+                    <Link href="/blogs" className="btn-secondary gap-2">
+                      <BarChart2 size={13} />
+                      Voir l'historique
                     </Link>
                   </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
+
         </div>
-
-        {/* Manage Members Modal */}
-        {showMembersModal && selectedSite && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-fade-in">
-            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setShowMembersModal(false)} />
-            <div className="relative bg-bg border border-border rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-slide-up">
-              <MembersModal
-                site={selectedSite}
-                onClose={() => setShowMembersModal(false)}
-                token={token || ''}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Add Site Modal */}
-        {showAddModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-fade-in">
-            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
-            <div className="relative bg-bg border border-border rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-slide-up">
-              <AddSiteModal
-                onClose={() => setShowAddModal(false)}
-                onSuccess={(newSite) => {
-                  setSites([...sites, newSite]);
-                  setShowAddModal(false);
-                }}
-                token={token || ''}
-              />
-            </div>
-          </div>
-        )}
       </div>
-    </ProtectedRoute>
+    </AppLayout>
   );
 }
 
 export default function Dashboard() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-background">
-        <div className="h-16 border-b border-border px-6 flex items-center">
-          <Skeleton className="h-8 w-32" />
-        </div>
-        <div className="max-w-7xl mx-auto py-12 px-6">
-          <div className="flex justify-between items-center mb-16">
-            <div className="space-y-3">
-              <Skeleton className="h-10 w-64" />
-              <Skeleton className="h-6 w-96" />
-            </div>
-            <Skeleton className="h-12 w-40 rounded-xl" />
+      <AppLayout>
+      <div className="max-w-7xl mx-auto py-8 px-6">
+          <div className="space-y-3 mb-8">
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="h-10 w-72" />
+            <Skeleton className="h-5 w-48" />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-[340px] rounded-3xl" />
+              <Skeleton key={i} className="h-28 rounded-lg" />
             ))}
           </div>
         </div>
-      </div>
+      </AppLayout>
     }>
       <DashboardPage />
     </Suspense>
-  );
-}
-
-function AddSiteModal({ onClose, onSuccess, token }: { onClose: () => void; onSuccess: (site: Site) => void; token: string }) {
-  const [formData, setFormData] = useState({
-    name: '',
-    url: '',
-    webflowSiteId: '',
-    webflowApiKey: '',
-    webflowCollectionName: '',
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    try {
-      const res = await fetch(`${API_URL}/sites`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(formData),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        onSuccess(data.site);
-      } else {
-        const error = await res.json();
-        setError(error.error || 'Erreur lors de la création du site');
-      }
-    } catch (err) {
-      setError('Erreur de connexion au serveur');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="p-10">
-      <div className="flex justify-between items-center mb-10">
-        <div>
-          <h3 className="text-2xl font-bold tracking-tight">Nouveau Projet</h3>
-          <p className="text-sm font-medium text-text-muted mt-2 uppercase tracking-wide">Configurez votre environnement Webflow.</p>
-        </div>
-        <button onClick={onClose} className="p-2 hover:bg-surface border border-transparent hover:border-border rounded-xl transition-all text-text-muted">
-          <X size={24} />
-        </button>
-      </div>
-
-      {error && (
-        <div className="mb-8 bg-error/5 border-2 border-error/10 text-error px-5 py-4 rounded-2xl text-sm font-semibold flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full bg-error" />
-          {error}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-8">
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2.5">
-              <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted px-1">Nom du projet</label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="input-base"
-                placeholder="Mon Blog SEO"
-              />
-            </div>
-            <div className="space-y-2.5">
-              <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted px-1">URL du site</label>
-              <input
-                type="url"
-                required
-                value={formData.url}
-                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                className="input-base"
-                placeholder="https://site.webflow.io"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2.5">
-            <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted px-1">Webflow Site ID</label>
-            <input
-              type="text"
-              value={formData.webflowSiteId}
-              onChange={(e) => setFormData({ ...formData, webflowSiteId: e.target.value })}
-              className="input-base font-mono text-xs tracking-wider"
-              placeholder="5f72a..."
-            />
-          </div>
-
-          <div className="space-y-2.5">
-            <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted px-1">Webflow API Key</label>
-            <input
-              type="password"
-              value={formData.webflowApiKey}
-              onChange={(e) => setFormData({ ...formData, webflowApiKey: e.target.value })}
-              className="input-base font-mono text-xs tracking-wider"
-              placeholder="••••••••••••••••"
-            />
-          </div>
-
-          <div className="space-y-2.5">
-            <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted px-1">Nom de la Collection</label>
-            <input
-              type="text"
-              value={formData.webflowCollectionName}
-              onChange={(e) => setFormData({ ...formData, webflowCollectionName: e.target.value })}
-              className="input-base"
-              placeholder="Blog Posts"
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-4 pt-8 border-t border-border">
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn-secondary flex-1 py-3 text-xs font-semibold uppercase tracking-widest"
-          >
-            Annuler
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn-primary flex-1 py-3 text-xs font-semibold uppercase tracking-widest"
-          >
-            {loading ? <Spinner className="w-5 h-5" /> : 'Ajouter le site'}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// Modal gestion des membres
-// ─────────────────────────────────────────────────────────────
-
-function MembersModal({ site, onClose, token }: { site: Site; onClose: () => void; token: string }) {
-  const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member');
-  const [inviting, setInviting] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-
-  useEffect(() => {
-    fetchMembers();
-  }, []);
-
-  async function fetchMembers() {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/sites/${site.id}/members`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setMembers(data.members);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleInvite(e: React.FormEvent) {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-    setInviting(true);
-
-    try {
-      const res = await fetch(`${API_URL}/sites/${site.id}/members`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setSuccess(data.message);
-        setInviteEmail('');
-        fetchMembers();
-      } else {
-        setError(data.error || "Erreur lors de l'invitation");
-      }
-    } catch {
-      setError('Erreur de connexion au serveur');
-    } finally {
-      setInviting(false);
-    }
-  }
-
-  async function handleRemove(memberId: string, email: string) {
-    if (!confirm(`Retirer ${email} du projet ?`)) return;
-
-    try {
-      const res = await fetch(`${API_URL}/sites/${site.id}/members/${memberId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (res.ok) {
-        setMembers(members.filter(m => m.id !== memberId));
-      } else {
-        const data = await res.json();
-        alert(`❌ ${data.error}`);
-      }
-    } catch {
-      alert('❌ Erreur lors de la suppression');
-    }
-  }
-
-  return (
-    <div className="p-10">
-      {/* Header */}
-      <div className="flex justify-between items-start mb-10">
-        <div>
-          <h3 className="text-2xl font-bold tracking-tight">Membres</h3>
-          <p className="text-sm font-medium text-text-muted mt-2 uppercase tracking-wide">{site.name}</p>
-        </div>
-        <button onClick={onClose} className="p-2.5 hover:bg-surface border border-transparent hover:border-border rounded-xl transition-all text-text-muted">
-          <X size={24} />
-        </button>
-      </div>
-
-      {/* Invite form */}
-      <form onSubmit={handleInvite} className="mb-10 bg-surface border border-border rounded-3xl p-6 space-y-6 shadow-sm">
-        <h4 className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted flex items-center gap-2 px-1">
-          <UserPlus size={14} className="text-accent" />
-          Inviter un collaborateur
-        </h4>
-
-        {error && (
-          <div className="bg-error/5 border-2 border-error/10 text-error px-4 py-3 rounded-2xl text-xs font-semibold">{error}</div>
-        )}
-        {success && (
-          <div className="bg-green-500/5 border-2 border-green-500/10 text-green-600 px-4 py-3 rounded-2xl text-xs font-semibold">{success}</div>
-        )}
-
-        <div className="flex flex-col gap-4">
-          <input
-            type="email"
-            required
-            value={inviteEmail}
-            onChange={e => setInviteEmail(e.target.value)}
-            placeholder="email@exemple.com"
-            className="input-base"
-          />
-          <div className="flex gap-4">
-            <select
-              value={inviteRole}
-              onChange={e => setInviteRole(e.target.value as 'admin' | 'member')}
-              className="input-base flex-1 appearance-none cursor-pointer"
-            >
-              <option value="member">Rôle: Membre</option>
-              <option value="admin">Rôle: Admin</option>
-            </select>
-            <button
-              type="submit"
-              disabled={inviting}
-              className="btn-primary px-6 whitespace-nowrap text-xs font-semibold uppercase tracking-widest"
-            >
-              {inviting ? <Spinner className="w-5 h-5" /> : 'Inviter'}
-            </button>
-          </div>
-        </div>
-      </form>
-
-      {/* Members list */}
-      <div className="space-y-4">
-        <h4 className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted px-1">
-          Équipe ({members.length})
-        </h4>
-
-        {loading && (
-          <div className="space-y-3">
-            {[1, 2].map((i) => <Skeleton key={i} className="h-20 rounded-2xl" />)}
-          </div>
-        )}
-
-        {!loading && members.length === 0 && (
-          <div className="text-center py-10 bg-surface/30 border-2 border-dashed border-border rounded-3xl">
-            <p className="text-xs font-semibold text-text-muted uppercase tracking-widest">Seul pour l'instant</p>
-          </div>
-        )}
-
-        {!loading && members.map(member => (
-          <div
-            key={member.id}
-            className="group flex items-center justify-between p-5 bg-surface border border-border rounded-2xl hover:border-accent/20 transition-all duration-300"
-          >
-            <div className="flex items-center gap-4 min-w-0">
-              <div className="w-10 h-10 rounded-2xl bg-bg border border-border flex items-center justify-center text-sm font-semibold shrink-0 shadow-sm group-hover:bg-accent group-hover:text-white transition-all duration-300">
-                {member.invited_email[0].toUpperCase()}
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold truncate tracking-tight">{member.invited_email}</p>
-                <div className="flex items-center gap-2.5 mt-1">
-                  <span className={cn(
-                    "text-[10px] font-semibold uppercase tracking-[0.15em]",
-                    member.role === 'admin' ? 'text-amber-600' : 'text-text-muted'
-                  )}>
-                    {member.role === 'admin' ? '👑 Admin' : 'Membre'}
-                  </span>
-                  {member.status === 'pending' && (
-                    <span className="text-[10px] font-semibold text-text-muted bg-border/40 px-2.5 py-0.5 rounded-full border border-border/50 uppercase tracking-widest">
-                      En attente
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => handleRemove(member.id, member.invited_email)}
-              className="p-2.5 text-text-muted hover:text-error hover:bg-error/10 rounded-xl transition-all shrink-0 opacity-0 group-hover:opacity-100"
-              title="Retirer ce membre"
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }

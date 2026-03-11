@@ -65,29 +65,29 @@ body {
   }
 
   .btn-base {
-    @apply inline-flex items-center justify-center rounded-lg text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98];
+    @apply inline-flex items-center justify-center rounded-md text-xs font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98];
   }
 
   .btn-primary {
-    @apply btn-base px-4 py-2 shadow-sm hover:shadow-md;
+    @apply btn-base px-3 py-1.5;
     background-color: var(--primary);
     color: var(--primary-foreground);
   }
 
   .btn-secondary {
-    @apply btn-base px-4 py-2 border border-border shadow-sm hover:bg-surface;
+    @apply btn-base px-3 py-1.5 border border-border hover:bg-surface;
     background-color: transparent;
     color: var(--text);
   }
 
   .btn-accent {
-    @apply btn-base px-4 py-2 shadow-sm hover:shadow-md;
+    @apply btn-base px-3 py-1.5;
     background-color: var(--accent);
     color: var(--accent-foreground);
   }
 
   .input-base {
-    @apply w-full rounded-lg px-4 py-2.5 text-sm transition-all duration-200 border border-border bg-surface text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:border-accent;
+    @apply w-full rounded-md px-3 py-2 text-sm transition-all duration-150 border border-border bg-surface text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:border-accent;
   }
   .input-base:focus {
     --tw-ring-color: var(--accent-soft);

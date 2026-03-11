@@ -58,8 +58,10 @@ export async function getBlogsBySite(siteId, userId) {
   return data;
 }
 
-// Récupérer tous les blogs d'un utilisateur
-export async function getUserBlogs(userId, filters = {}) {
+// Récupérer tous les blogs d'un projet (site), accessible par tout membre du site
+export async function getProjectBlogs(siteId, filters = {}) {
+  if (!siteId) return [];
+
   let query = supabase
     .from('blogs')
     .select(`
@@ -67,20 +69,40 @@ export async function getUserBlogs(userId, filters = {}) {
       sites:site_id (name, url),
       keywords:main_keyword_id (keyword, search_volume, competition_index)
     `)
-    .eq('user_id', userId);
+    .eq('site_id', siteId);
 
   if (filters.status) {
     query = query.eq('status', filters.status);
   }
 
-  if (filters.siteId) {
-    query = query.eq('site_id', filters.siteId);
-  }
-
   const { data, error } = await query.order('created_at', { ascending: false });
 
-  if (error) throw new Error(`Erreur récupération blogs utilisateur: ${error.message}`);
-  return data;
+  if (error) throw new Error(`Erreur récupération blogs du projet: ${error.message}`);
+
+  // Fetch author info for unique user_ids
+  const userIds = [...new Set((data || []).map(b => b.user_id).filter(Boolean))];
+  const userMap = {};
+  await Promise.all(
+    userIds.map(async (uid) => {
+      try {
+        const { data: userData } = await supabase.auth.admin.getUserById(uid);
+        if (userData?.user) {
+          const u = userData.user;
+          const name = u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0] || 'Inconnu';
+          userMap[uid] = {
+            email: u.email || null,
+            name,
+            avatar_url: u.user_metadata?.avatar_url || null,
+          };
+        }
+      } catch (_) { /* ignore */ }
+    })
+  );
+
+  return (data || []).map(b => ({
+    ...b,
+    author: b.user_id ? (userMap[b.user_id] || { email: null, name: 'Inconnu', avatar_url: null }) : null,
+  }));
 }
 
 // Récupérer un blog par ID (accès via site membership)

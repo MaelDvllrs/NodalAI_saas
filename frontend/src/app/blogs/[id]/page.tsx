@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
-import ProtectedRoute from '../../components/ProtectedRoute';
-import Navbar from '../../components/Navbar';
+import AppLayout from '../../components/AppLayout';
 import Link from 'next/link';
 import {
   ChevronLeft, ExternalLink, Calendar, Globe, Tag, FileText,
@@ -239,51 +238,45 @@ export default function BlogDetailPage() {
 
   if (loading) {
     return (
-      <ProtectedRoute>
-        <div className="min-h-screen bg-background">
-          <Navbar />
-          <div className="max-w-7xl mx-auto py-12 px-6">
-            <Skeleton className="h-4 w-32 mb-8" />
-            <div className="flex justify-between items-start mb-10">
-              <div className="space-y-3">
-                <Skeleton className="h-4 w-24 rounded-full" />
-                <Skeleton className="h-10 w-[600px]" />
-                <Skeleton className="h-4 w-48" />
-              </div>
-              <div className="flex gap-2">
-                <Skeleton className="h-10 w-24 rounded-xl" />
-                <Skeleton className="h-10 w-32 rounded-xl" />
-              </div>
+      <AppLayout>
+        <div className="max-w-7xl mx-auto py-12 px-6">
+          <Skeleton className="h-4 w-32 mb-8" />
+          <div className="flex justify-between items-start mb-10">
+            <div className="space-y-3">
+              <Skeleton className="h-4 w-24 rounded-full" />
+              <Skeleton className="h-10 w-[600px]" />
+              <Skeleton className="h-4 w-48" />
             </div>
-            <div className="grid grid-cols-3 gap-8">
-              <div className="space-y-6">
-                <Skeleton className="h-[300px] rounded-2xl" />
-                <Skeleton className="h-[200px] rounded-2xl" />
-                <Skeleton className="h-[250px] rounded-2xl" />
-              </div>
-              <div className="col-span-2 space-y-6">
-                <Skeleton className="h-12 w-64 rounded-xl" />
-                <Skeleton className="h-[600px] rounded-2xl" />
-              </div>
+            <div className="flex gap-2">
+              <Skeleton className="h-10 w-24 rounded-xl" />
+              <Skeleton className="h-10 w-32 rounded-xl" />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-8">
+            <div className="space-y-6">
+              <Skeleton className="h-[300px] rounded-2xl" />
+              <Skeleton className="h-[200px] rounded-2xl" />
+              <Skeleton className="h-[250px] rounded-2xl" />
+            </div>
+            <div className="col-span-2 space-y-6">
+              <Skeleton className="h-12 w-64 rounded-xl" />
+              <Skeleton className="h-[600px] rounded-2xl" />
             </div>
           </div>
         </div>
-      </ProtectedRoute>
+      </AppLayout>
     );
   }
 
   if (!blog) {
     return (
-      <ProtectedRoute>
-        <div className="min-h-screen bg-background">
-          <Navbar />
-          <div className="flex flex-col items-center justify-center py-32 text-text-muted">
-            <FileText size={48} className="mb-4 opacity-20" />
-            <p className="font-bold mb-2">Article introuvable</p>
-            <Link href="/blogs" className="btn-primary mt-4">Retour à l&apos;historique</Link>
-          </div>
+      <AppLayout>
+        <div className="flex flex-col items-center justify-center py-32 text-text-muted">
+          <FileText size={48} className="mb-4 opacity-20" />
+          <p className="font-bold mb-2">Article introuvable</p>
+          <Link href="/blogs" className="btn-primary mt-4">Retour à l&apos;historique</Link>
         </div>
-      </ProtectedRoute>
+      </AppLayout>
     );
   }
 
@@ -291,11 +284,8 @@ export default function BlogDetailPage() {
   const kdColor = kd == null ? 'text-text-muted' : kd < 30 ? 'text-success' : kd < 60 ? 'text-accent' : 'text-error';
 
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-background">
-        <Navbar />
-
-        <div className="max-w-7xl mx-auto py-12 px-6">
+    <AppLayout>
+      <div className="max-w-7xl mx-auto py-8 px-6">
           {/* Back + header */}
           <Link
             href="/blogs"
@@ -305,7 +295,7 @@ export default function BlogDetailPage() {
             Retour à l&apos;historique
           </Link>
 
-          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 mb-10">
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 mb-6">
             <div className="min-w-0">
               <div className="flex items-center gap-3 mb-2">
                 <span className={cn(
@@ -337,8 +327,8 @@ export default function BlogDetailPage() {
               <button
                 onClick={handleDelete}
                 disabled={deleting}
-                className={cn(
-                  'flex items-center gap-2 py-2 px-4 rounded-xl border text-xs font-bold transition-all',
+              className={cn(
+                  'flex items-center gap-2 py-1.5 px-3 rounded-md border text-xs font-bold transition-all',
                   confirmDelete
                     ? 'bg-error text-white border-error'
                     : 'bg-background border-border text-text-muted hover:border-error/40 hover:text-error',
@@ -350,12 +340,12 @@ export default function BlogDetailPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* ── Left column: metadata ───────────────────────────── */}
-            <div className="space-y-6">
+            <div className="space-y-4">
 
               {/* SEO */}
-              <div className="bg-surface border border-border rounded-2xl p-6 space-y-5">
+              <div className="bg-surface border border-border rounded-lg p-4 space-y-4">
                 <h2 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
                   <BarChart2 size={14} /> SEO
                 </h2>
@@ -382,7 +372,7 @@ export default function BlogDetailPage() {
               </div>
 
               {/* Keyword */}
-              <div className="bg-surface border border-border rounded-2xl p-6 space-y-4">
+              <div className="bg-surface border border-border rounded-lg p-4 space-y-3">
                 <h2 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
                   <Hash size={14} /> Mots-clés
                 </h2>
@@ -411,7 +401,7 @@ export default function BlogDetailPage() {
               </div>
 
               {/* Infos */}
-              <div className="bg-surface border border-border rounded-2xl p-6 space-y-4">
+              <div className="bg-surface border border-border rounded-lg p-4 space-y-3">
                 <h2 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
                   <Tag size={14} /> Infos
                 </h2>
@@ -456,7 +446,7 @@ export default function BlogDetailPage() {
                 )}
               </div>
               {/* Notation */}
-              <div className="bg-surface border border-border rounded-2xl p-6 space-y-4">
+              <div className="bg-surface border border-border rounded-lg p-4 space-y-3">
                 <h2 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
                   <Star size={14} /> Notation
                 </h2>
@@ -469,10 +459,10 @@ export default function BlogDetailPage() {
             </div>
 
             {/* ── Right column: content ───────────────────────────── */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="lg:col-span-2 space-y-4">
 
               {/* Tabs */}
-              <div className="flex gap-1 bg-surface border border-border rounded-xl p-1 w-fit">
+              <div className="flex gap-0.5 bg-surface border border-border rounded-md p-0.5 w-fit">
                 {([
                   { key: 'seo', label: 'Aperçu SEO', icon: Eye },
                   { key: 'content', label: 'Article HTML', icon: FileText },
@@ -484,9 +474,9 @@ export default function BlogDetailPage() {
                     key={key}
                     onClick={() => setTab(key)}
                     className={cn(
-                      'flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all',
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all',
                       tab === key
-                        ? 'bg-background border border-border text-text shadow-sm'
+                        ? 'bg-background border border-border text-text'
                         : 'text-text-muted hover:text-text',
                     )}
                   >
@@ -498,8 +488,8 @@ export default function BlogDetailPage() {
 
               {/* Tab: Aperçu SEO (Google preview + introduction) */}
               {tab === 'seo' && (
-                <div className="space-y-6">
-                  <div className="bg-surface border border-border rounded-2xl p-6 space-y-4">
+                <div className="space-y-4">
+                  <div className="bg-surface border border-border rounded-lg p-4 space-y-3">
                     <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
                       <Eye size={14} /> Aperçu Google
                     </h3>
@@ -514,8 +504,8 @@ export default function BlogDetailPage() {
                     </div>
                   </div>
 
-                  <div className="bg-surface border border-border rounded-2xl p-6">
-                    <div className="flex items-center justify-between mb-4">
+                  <div className="bg-surface border border-border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
                       <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
                         <FileText size={14} /> Introduction
                       </h3>
@@ -528,8 +518,8 @@ export default function BlogDetailPage() {
 
               {/* Tab: Article HTML */}
               {tab === 'content' && (
-                <div className="bg-surface border border-border rounded-2xl overflow-hidden">
-                  <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                <div className="bg-surface border border-border rounded-lg overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                     <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
                       <FileText size={14} /> Corps de l&apos;article
                       <span className="text-text-muted font-mono">({blog.body?.length?.toLocaleString() ?? 0} car.)</span>
@@ -562,8 +552,8 @@ export default function BlogDetailPage() {
 
               {/* Tab: Raw Claude output */}
               {tab === 'raw' && (
-                <div className="bg-surface border border-border rounded-2xl overflow-hidden">
-                  <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-zinc-900/50">
+                <div className="bg-surface border border-border rounded-lg overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-zinc-900/50">
                     <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-2">
                       <Code2 size={14} /> Sortie brute Claude
                     </h3>
@@ -577,8 +567,7 @@ export default function BlogDetailPage() {
             </div>
           </div>
         </div>
-      </div>
-    </ProtectedRoute>
+    </AppLayout>
   );
 }
 
@@ -811,7 +800,7 @@ function SeoAnalysisPanel({ seoAnalysis, articleText = '' }: { seoAnalysis?: Seo
 
       {/* ── 1. Coverage Score ─────────────────────────────────────── */}
       {coverage && (
-        <div className="bg-surface border border-border rounded-2xl p-6 space-y-5">
+        <div className="bg-surface border border-border rounded-lg p-4 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
               <BarChart2 size={14} /> Score Couverture SEO
@@ -899,7 +888,7 @@ function SeoAnalysisPanel({ seoAnalysis, articleText = '' }: { seoAnalysis?: Seo
 
       {/* ── 2. Semantic Terms ─────────────────────────────────────── */}
       {semantic && (
-        <div className="bg-surface border border-border rounded-2xl p-6 space-y-5">
+        <div className="bg-surface border border-border rounded-lg p-4 space-y-4">
           <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
             <Search size={14} /> Termes Sémantiques
             <span className="font-normal text-text-muted/50">({semantic.pagesAnalyzed} pages analysées)</span>
@@ -981,7 +970,7 @@ function SeoAnalysisPanel({ seoAnalysis, articleText = '' }: { seoAnalysis?: Seo
 
       {/* ── 2b. Clusters sémantiques ──────────────────────────────── */}
       {semantic?.clusters && semantic.clusters.length > 0 && (
-        <div className="bg-surface border border-border rounded-2xl p-6 space-y-4">
+        <div className="bg-surface border border-border rounded-lg p-4 space-y-3">
           <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
             <Layers size={14} /> Expressions Clés des SERP
             <span className="font-normal text-text-muted/50">({semantic.clusters.length} expressions)</span>
@@ -1037,8 +1026,8 @@ function SeoAnalysisPanel({ seoAnalysis, articleText = '' }: { seoAnalysis?: Seo
         const editorial = serpResults.filter((r) => !r.pageType || !EXCL.has(r.pageType));
         const excluded  = serpResults.filter((r) => r.pageType && EXCL.has(r.pageType));
         return (
-          <div className="bg-surface border border-border rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-border flex items-center justify-between gap-3 flex-wrap">
+          <div className="bg-surface border border-border rounded-lg overflow-hidden">
+            <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2">
                 <Target size={14} className="text-text-muted" />
                 <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
@@ -1107,9 +1096,9 @@ function SeoAnalysisPanel({ seoAnalysis, articleText = '' }: { seoAnalysis?: Seo
 
       {/* ── 4. 300 Key Terms Table ─────────────────────────────────── */}
       {allTerms.length > 0 && (
-        <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+        <div className="bg-surface border border-border rounded-lg overflow-hidden">
           {/* Header */}
-          <div className="px-6 py-4 border-b border-border space-y-3">
+          <div className="px-4 py-3 border-b border-border space-y-3">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
                 <BarChart2 size={14} /> Termes clés ({allTerms.length}) — min · max · cible vs article

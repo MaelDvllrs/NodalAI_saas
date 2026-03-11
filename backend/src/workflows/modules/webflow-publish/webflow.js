@@ -11,6 +11,7 @@ function headers(apiKey) {
 }
 
 // ── Collections ───────────────────────────────────────────────────────────────
+
 export async function getCollectionByName(siteId, apiKey, collectionName) {
   const res = await axios.get(`${BASE_URL}/sites/${siteId}/collections`, {
     headers: headers(apiKey),
@@ -22,8 +23,8 @@ export async function getCollectionByName(siteId, apiKey, collectionName) {
   return (
     collections.find(
       (c) =>
-        c.slug?.toLowerCase() === name ||
-        c.displayName?.toLowerCase() === name ||
+        c.slug?.toLowerCase()         === name ||
+        c.displayName?.toLowerCase()  === name ||
         c.singularName?.toLowerCase() === name
     ) || null
   );
@@ -37,6 +38,7 @@ export async function getCollectionFields(collectionId, apiKey) {
 }
 
 // ── Items ─────────────────────────────────────────────────────────────────────
+
 export async function getExistingItems(collectionId, apiKey) {
   const items = [];
   let offset = 0;

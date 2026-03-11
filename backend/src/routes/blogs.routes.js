@@ -1,7 +1,7 @@
 import express from 'express';
 import { authenticateUser } from '../middleware/auth.middleware.js';
 import {
-  getUserBlogs,
+  getProjectBlogs,
   getBlogById,
   updateBlog,
   deleteBlog,
@@ -18,17 +18,22 @@ router.use(authenticateUser);
 
 /**
  * GET /api/blogs
- * Récupérer tous les blogs de l'utilisateur connecté
+ * Récupérer tous les blogs du projet (site) sélectionné
  */
 router.get('/', async (req, res) => {
   try {
     const { status, siteId } = req.query;
-    
-    const blogs = await getUserBlogs(req.user.id, {
-      status,
-      siteId,
-    });
 
+    if (!siteId) {
+      return res.status(400).json({ error: 'siteId requis.' });
+    }
+
+    // Vérifier que l'utilisateur a accès au site
+    const { checkSiteAccess } = await import('../services/site.service.js');
+    const role = await checkSiteAccess(siteId, req.user.id);
+    if (!role) return res.status(403).json({ error: 'Accès refusé.' });
+
+    const blogs = await getProjectBlogs(siteId, { status });
     res.json({ blogs });
   } catch (error) {
     console.error('Erreur récupération blogs:', error);

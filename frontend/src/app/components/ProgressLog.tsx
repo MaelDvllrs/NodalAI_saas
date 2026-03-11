@@ -63,10 +63,11 @@ interface Props {
 }
 
 export default function ProgressLog({ events }: Props) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = scrollContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [events]);
 
   if (events.length === 0) return null;
@@ -99,7 +100,7 @@ export default function ProgressLog({ events }: Props) {
             Output Stream
           </span>
         </div>
-        <div className="p-4 space-y-1.5 max-h-[300px] overflow-y-auto font-mono text-[11px] leading-relaxed">
+        <div ref={scrollContainerRef} className="p-4 space-y-1.5 max-h-[300px] overflow-y-auto font-mono text-[11px] leading-relaxed">
           {events
             .filter((e) => e.type === 'step')
             .map((e, i) => (
@@ -108,7 +109,6 @@ export default function ProgressLog({ events }: Props) {
                 <span className="opacity-90">{(e as { message: string }).message}</span>
               </div>
             ))}
-          <div ref={bottomRef} />
         </div>
       </div>
 

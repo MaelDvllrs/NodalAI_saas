@@ -16,6 +16,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => void;
+  updateProfile: (name: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -125,6 +126,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function updateProfile(name: string) {
+    if (!supabase) throw new Error('Supabase client non initialisé');
+    const { data, error } = await supabase.auth.updateUser({ data: { name } });
+    if (error) throw new Error(error.message);
+    if (data.user) {
+      setUser(prev => prev ? { ...prev, name: data.user.user_metadata?.name ?? name } : prev);
+    }
+  }
+
   async function logout() {
     if (!supabase) return;
 
@@ -134,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, signup, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );
