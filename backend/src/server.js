@@ -46,4 +46,6 @@ app.use('/api/tasks', taskRoutes);
 app.listen(PORT, () => {
   console.log(`Backend running on http://localhost:${PORT}`);
   startGenerationWorker();
+  // Signal PM2 that the app is ready (required when wait_ready: true)
+  if (process.send) process.send('ready');
 });
