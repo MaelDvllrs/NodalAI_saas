@@ -1,5 +1,5 @@
 import { Worker } from 'bullmq';
-import { connection } from '../config/redis.js';
+import { createRedisConnection } from '../config/redis.js';
 import { runSeoPreview } from '../services/pipeline.service.js';
 import { runCustomWorkflow } from '../workflows/index.js';
 import { emitEvent, closeJob } from '../services/events.service.js';
@@ -54,7 +54,7 @@ export function startGenerationWorker() {
         throw new Error(`Unknown job type: ${type}`);
       }
     },
-    { connection, concurrency: 2 }
+    { connection: createRedisConnection(), concurrency: 2 }
   );
 
   worker.on('failed', (job, err) => {
