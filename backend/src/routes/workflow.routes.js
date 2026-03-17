@@ -14,6 +14,7 @@
  *
  * GET    /api/workflow/runs?projectId=  — list recent runs
  * GET    /api/workflow/runs/:runId/steps — get step results for a run
+ * POST   /api/workflow/runs/:runId/rate — rate a workflow run (1-5 stars)
  */
 import express from 'express';
 import { authenticateUser as requireAuth, optionalAuth } from '../middleware/auth.middleware.js';
@@ -25,10 +26,12 @@ import {
   getWorkflow,
   updateWorkflow,
   deleteWorkflow,
+  getPublicWorkflows,
   createWorkflowRun,
   getWorkflowRuns,
   getWorkflowRunSteps,
   getWorkflowRun,
+  rateWorkflowRun,
 } from '../services/workflow.service.js';
 
 const router = express.Router();
@@ -48,6 +51,7 @@ router.post('/workflows', requireAuth, async (req, res) => {
       name:         name || 'Mon workflow',
       workflowJson,
     });
+    
     res.status(201).json(workflow);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -59,7 +63,18 @@ router.get('/workflows', requireAuth, async (req, res) => {
   try {
     const { projectId } = req.query;
     const workflows = await getWorkflows(req.user.id, projectId || null);
+    console.log('Workflows récupérés:', workflows);
     res.json(workflows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/workflows/public — list public workflow templates (no auth required)
+router.get('/workflows/public', async (req, res) => {
+  try {
+    const templates = await getPublicWorkflows();
+    res.json(templates);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -111,7 +126,7 @@ router.delete('/workflows/:id', requireAuth, async (req, res) => {
  */
 router.post('/workflow/run', optionalAuth, async (req, res) => {
   try {
-    const { steps, input, projectId, workflowId } = req.body;
+    const { steps, edges, input, projectId, workflowId } = req.body;
 
     if (!Array.isArray(steps) || steps.length === 0) {
       return res.status(400).json({ error: 'steps[] requis et non vide.' });
@@ -137,6 +152,7 @@ router.post('/workflow/run', optionalAuth, async (req, res) => {
       type:           'workflow',
       jobId:          runId,
       steps,
+      edges:          Array.isArray(edges) ? edges : [],
       input:          input || {},
       userId:         req.user?.id || null,
       projectId:      projectId    || null,
@@ -156,7 +172,7 @@ router.post('/workflow/run', optionalAuth, async (req, res) => {
 router.post('/workflows/:id/run', requireAuth, async (req, res) => {
   try {
     const workflow = await getWorkflow(req.params.id, req.user.id);
-    const { steps } = workflow.workflow_json;
+    const { steps, edges } = workflow.workflow_json;
 
     if (!Array.isArray(steps) || steps.length === 0) {
       return res.status(400).json({ error: 'Ce workflow ne contient aucun step.' });
@@ -175,6 +191,7 @@ router.post('/workflows/:id/run', requireAuth, async (req, res) => {
       type:          'workflow',
       jobId:         run.id,
       steps,
+      edges:         Array.isArray(edges) ? edges : [],
       input:         req.body.input || {},
       userId:        req.user.id,
       projectId:     workflow.project_id || null,
@@ -212,6 +229,20 @@ router.get('/workflow/runs/:runId/steps', requireAuth, async (req, res) => {
   try {
     const steps = await getWorkflowRunSteps(req.params.runId);
     res.json(steps);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/workflow/runs/:runId/rate — rate a workflow run (1-5 stars)
+router.post('/workflow/runs/:runId/rate', requireAuth, async (req, res) => {
+  try {
+    const { rating } = req.body;
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+    }
+    const updated = await rateWorkflowRun(req.params.runId, req.user.id, rating);
+    res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

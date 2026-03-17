@@ -27,6 +27,29 @@ export function buildBodyHtml(parsed) {
   return parts.join('\n');
 }
 
+/**
+ * Returns a single HTML string with body + FAQ + schemas concatenated.
+ * Useful for non-Webflow platforms or for manual copy-paste from history.
+ */
+export function buildFullHtml(parsed) {
+  const parts = [];
+
+  const body = buildBodyHtml(parsed);
+  if (body) parts.push(body);
+
+  if (parsed.faqEmbed) {
+    parts.push(`\n<!-- === FAQ === -->\n${parsed.faqEmbed}`);
+  }
+
+  if (parsed.schemas?.length > 0) {
+    parsed.schemas.forEach((schema, i) => {
+      parts.push(`\n<!-- === SCH\u00c9MA ${i + 1} === -->\n${schema}`);
+    });
+  }
+
+  return parts.join('\n');
+}
+
 // ── Full content → HTML ───────────────────────────────────────────────────────
 /**
  * Converts the structured article content block to HTML.
@@ -152,6 +175,9 @@ function convertContentToHtml(content) {
     if (/^#{1,4}/.test(t)) continue;
     if (/^\[.*\]$/.test(t)) continue;
     if (/^-{3,}$/.test(t)) continue;
+
+    // Skip raw HTML tags and code fence markers (tables/schemas Claude may inline in section 5)
+    if (t.startsWith('<') || /^```/.test(t)) continue;
 
     // Regular text → accumulate in paragraph buffer
     paraBuffer.push(cleanMarkdown(t));

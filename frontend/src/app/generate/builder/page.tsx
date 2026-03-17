@@ -8,10 +8,11 @@ import AppLayout from '../../components/AppLayout';
 import { LogEvent } from '../../components/ProgressLog';
 import ProgressLog from '../../components/ProgressLog';
 import { useTasks } from '../../contexts/TaskContext';
-import { Sparkles, Globe, ArrowLeft } from 'lucide-react';
+import { Globe, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Skeleton } from '../../components/UI';
 import WorkflowEditor, { CanvasBlock, SavedEdge } from '../../components/WorkflowEditor';
+import type { WorkflowEditorActions } from '../../components/WorkflowEditor';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 const STORAGE_KEY = 'blogauto_generation_job';
@@ -20,7 +21,7 @@ interface SavedWorkflow {
   id: string;
   name: string;
   workflow_json: {
-    steps: { instanceId?: string; type: string; config: Record<string, unknown> }[];
+    steps: { instanceId?: string; type: string; config: Record<string, unknown>; position?: { x: number; y: number } }[];
     edges?: SavedEdge[];
   };
 }
@@ -55,6 +56,7 @@ function BuilderPageContent() {
           instanceId: s.instanceId ?? `loaded-${s.type}-${i}`,
           type: s.type,
           config: s.config,
+          position: s.position,
         }))
     : undefined; // no workflowId — use default pipeline
 
@@ -136,24 +138,18 @@ function BuilderPageContent() {
 
   async function handleSave(blocks: CanvasBlock[], edges: SavedEdge[]) {
     if (!workflowId) return;
-    const UI_ONLY_TYPES = new Set(['trigger-manual']);
-    const steps = blocks
-      .filter((b) => !UI_ONLY_TYPES.has(b.type))
-      .map((b) => ({ instanceId: b.instanceId, type: b.type, config: b.config ?? {} }));
-    // Only keep edges between non-UI nodes
-    const stepIds = new Set(steps.map(s => s.instanceId));
-    const filteredEdges = edges.filter(e => stepIds.has(e.source) && stepIds.has(e.target));
+    const steps = blocks.map((b) => ({ instanceId: b.instanceId, type: b.type, config: b.config ?? {}, position: b.position }));
     await fetch(`${API_URL}/workflows/${workflowId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ name: workflow?.name, workflowJson: { steps, edges: filteredEdges } }),
+      body: JSON.stringify({ name: workflow?.name, workflowJson: { steps, edges } }),
     });
   }
 
-  async function handleRun(blocks: CanvasBlock[]) {
+  async function handleRun(blocks: CanvasBlock[], edges: SavedEdge[]) {
     if (!selectedSite) {
       alert('Veuillez sélectionner un projet dans la barre latérale');
       return;
@@ -162,7 +158,9 @@ function BuilderPageContent() {
     const UI_ONLY_TYPES = new Set(['trigger-manual']);
     const steps = blocks
       .filter(b => !UI_ONLY_TYPES.has(b.type))
-      .map(b => ({ type: b.type, config: b.config ?? {} }));
+      .map(b => ({ instanceId: b.instanceId, type: b.type, config: b.config ?? {} }));
+    const stepIds = new Set(steps.map(s => s.instanceId));
+    const filteredEdges = edges.filter(e => stepIds.has(e.source) && stepIds.has(e.target));
 
     if (steps.length === 0) {
       alert('Ajoutez au moins un module au workflow avant de le lancer.');
@@ -190,11 +188,8 @@ function BuilderPageContent() {
     }
 
     const input = {
-      siteId:         selectedSite!.webflow_site_id,
-      apiKey:         selectedSite!.webflow_api_key,
-      collectionName: selectedSite!.webflow_collection_name,
-      siteUrl:        selectedSite!.url,
-      dbSiteId:       selectedSite!.id,
+      siteUrl:  selectedSite!.url,
+      dbSiteId: selectedSite!.id,
       ...(theme         ? { theme }         : {}),
       ...(directKeyword ? { directKeyword } : {}),
       ...(mainKeyword   ? { mainKeyword }   : {}),
@@ -207,6 +202,12 @@ function BuilderPageContent() {
     localStorage.removeItem(STORAGE_KEY);
     setIsLoading(true);
 
+    console.group('[Workflow] Lancement');
+    console.log('Steps (%d):', steps.length, steps.map(s => ({ instanceId: s.instanceId, type: s.type, config: s.config })));
+    console.log('Edges (%d):', filteredEdges.length, filteredEdges);
+    console.log('Input:', input);
+    console.groupEnd();
+
     try {
       const _projectName = selectedSite?.name ?? 'Projet';
       const res = await fetch(`${API_URL}/workflow/run`, {
@@ -217,6 +218,7 @@ function BuilderPageContent() {
         },
         body: JSON.stringify({
           steps,
+          edges: filteredEdges,
           input,
           projectId: selectedSite!.id,
           ...(workflowId ? { workflowId } : {}),
@@ -276,31 +278,43 @@ function BuilderPageContent() {
   }
 
   const isWorkflowLoading = !!workflowId && workflowLoading;
+  const editorActionsRef = useRef<WorkflowEditorActions | null>(null);
+
+  function handleExport() {
+    const state = editorActionsRef.current?.getState();
+    if (!state) return;
+    const name = workflow?.name ?? 'workflow';
+    const data = { name, workflowJson: { steps: state.blocks, edges: state.edges } };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${name.replace(/\s+/g, '_')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <AppLayout>
-      <div className="animate-fade-in">
-        <div className="max-w-[1400px] mx-auto py-8 px-6">
-          <div className="mb-8 animate-slide-up">
-            <Link href="/generate" className="inline-flex items-center gap-2 text-sm text-text-muted hover:text-text mb-4 transition-colors">
-              <ArrowLeft size={14} />
-              Retour aux workflows
+      <div className="animate-fade-in h-full flex flex-col">
+        <div className="max-w-[1400px] w-full mx-auto py-8 px-6 flex flex-col flex-1 min-h-0">
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-8 animate-slide-up">
+            <Link
+              href="/generate"
+              className="p-2 rounded-lg border border-border text-text-muted hover:text-text hover:border-accent/30 transition-all shrink-0"
+            >
+              <ArrowLeft size={16} />
             </Link>
-            <h1 className="text-4xl font-bold tracking-tight mb-3 flex items-center gap-4">
+            <h1 className="text-2xl font-bold tracking-tight flex-1 truncate">
               {workflow?.name ?? 'Workflow Builder'}
-              <div className="p-2 bg-accent/10 rounded-md">
-                <Sparkles className="text-accent" size={28} />
-              </div>
             </h1>
-            <p className="text-md text-text-muted max-w-2xl">
-              Assemblez des modules pour créer votre pipeline de génération de contenu SEO sur mesure.
-            </p>
           </div>
 
           {sitesLoading || isWorkflowLoading ? (
-            <div className="flex gap-6">
-              <Skeleton className="w-72 h-[600px] rounded-xl shrink-0" />
-              <Skeleton className="flex-1 h-[600px] rounded-xl" />
+            <div className="flex gap-6 flex-1 min-h-0">
+              <Skeleton className="w-72 rounded-xl shrink-0" />
+              <Skeleton className="flex-1 rounded-xl" />
             </div>
           ) : sites.length === 0 ? (
             <div className="bg-surface border border-border rounded-lg p-10 text-center animate-slide-up">
@@ -314,16 +328,20 @@ function BuilderPageContent() {
               </Link>
             </div>
           ) : (
-            <WorkflowEditor
-              isRunning={isLoading}
-              events={events}
-              onRun={handleRun}
-              onReset={handleReset}
-              initialBlocks={initialBlocks}
-              initialEdges={initialEdges}
-              onSave={workflowId ? handleSave : undefined}
-              monitoring={events.length > 0 ? <ProgressLog events={events} /> : undefined}
-            />
+            <div className="flex-1 min-h-0">
+              <WorkflowEditor
+                isRunning={isLoading}
+                events={events}
+                onRun={handleRun}
+                onReset={handleReset}
+                initialBlocks={initialBlocks}
+                initialEdges={initialEdges}
+                onSave={workflowId ? handleSave : undefined}
+                onExport={handleExport}
+                actionsRef={editorActionsRef}
+                monitoring={events.length > 0 ? <ProgressLog events={events} /> : undefined}
+              />
+            </div>
           )}
         </div>
       </div>

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useAuth } from '../contexts/AuthContext';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, PenTool, History, LogOut, Terminal, Sparkles } from 'lucide-react';
+import { LayoutDashboard, GitBranch, History, LogOut, Terminal, Sparkles } from 'lucide-react';
 import { cn } from '../utils/cn';
 
 export default function Navbar() {
@@ -14,7 +14,7 @@ export default function Navbar() {
 
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/generate', label: 'Générer', icon: PenTool },
+    { href: '/generate', label: 'Workflow', icon: GitBranch },
     { href: '/blogs', label: 'Historique', icon: History },
   ];
 

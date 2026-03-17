@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Terminal, CheckCircle2, AlertCircle, Copy, ExternalLink, ChevronDown, ChevronUp, Code2, Eye, Info, BarChart2, Target, Image, Search, Layers } from 'lucide-react';
+import { Terminal, CheckCircle2, AlertCircle, Copy, ExternalLink, ChevronDown, ChevronUp, Code2, Eye, Info, BarChart2, Target, Image, Search, Layers, Globe, Link } from 'lucide-react';
 import { cn } from '../utils/cn';
 
 export type SemanticCluster = {
@@ -34,12 +34,15 @@ export type SemanticAnalysis = {
 
 export type LogEvent =
   | { type: 'step'; message: string }
+  | { type: 'module-start'; moduleType: string; instanceId: string; label: string }
+  | { type: 'module-done'; moduleType: string; instanceId: string; label: string }
+  | { type: 'module-error'; moduleType: string; instanceId: string; label: string; error: string }
   | { type: 'data'; key: string; value: unknown }
   | { type: 'preview'; data: { titleTag: string; h1: string; metaDescription: string } }
   | { type: 'embeds'; data: { faqEmbed: string | null; schemas: { position: string; code: string }[] } }
   | { type: 'coverage'; data: { totalScore: number; bm25Score?: number; semanticScore?: number; topicCoverage: number; entityCoverage: number; wordScore: number; faqScore: number; intentScore: number }; message: string }
   | { type: 'images'; data: { featured: string | null; content: { index: number; url: string; prompt: string }[] } }
-  | { type: 'done'; data: { itemId: string; itemName: string; collectionId: string } }
+  | { type: 'done'; message?: string; data?: { itemId: string; itemName: string; collectionId: string } }
   | { type: 'error'; message: string }
   | { type: 'seo-preview'; data: {
       mainKeyword: string;
@@ -84,6 +87,13 @@ export default function ProgressLog({ events }: Props) {
   const coverageEvent = events.find((e) => e.type === 'coverage') as Extract<LogEvent, { type: 'coverage' }> | undefined;
   const imagesEvent = events.find((e) => e.type === 'images') as Extract<LogEvent, { type: 'images' }> | undefined;
   const semanticData = (events.find((e) => e.type === 'data' && (e as { key: string }).key === 'semanticAnalysis') as { value: SemanticAnalysis } | undefined)?.value;
+  const siteProfileData = (events.find((e) => e.type === 'data' && (e as { key: string }).key === 'siteProfile') as { value: {
+    theme?: string; tone?: string; targetAudience?: string; mainTopics?: string[];
+    existingBlogTitles?: string[]; description?: string; writingStyle?: string;
+    keywords?: string[]; contentGaps?: string[]; recommendedToneForGeneration?: string; language?: string;
+  } } | undefined)?.value;
+  const sitemapUrlsData = (events.find((e) => e.type === 'data' && (e as { key: string }).key === 'sitemapUrls') as { value: string[] } | undefined)?.value;
+  const generationPrompt = (events.find((e) => e.type === 'data' && (e as { key: string }).key === 'generationPrompt') as { value: string } | undefined)?.value;
 
   return (
     <div className="space-y-6">
@@ -111,6 +121,168 @@ export default function ProgressLog({ events }: Props) {
             ))}
         </div>
       </div>
+
+      {/* Generation Prompt Panel */}
+      {generationPrompt && (
+        <details className="group border border-border rounded-xl bg-surface overflow-hidden transition-all">
+          <summary className="flex items-center justify-between px-5 py-3 cursor-pointer select-none text-xs font-bold text-text-muted uppercase tracking-wider hover:bg-border/30">
+            <div className="flex items-center gap-2">
+              <Code2 size={14} />
+              Prompt de génération Claude
+            </div>
+            <ChevronDown className="group-open:rotate-180 transition-transform" size={14} />
+          </summary>
+          <div className="px-5 pb-5 border-t border-border bg-black/5">
+            <pre className="text-[10px] font-mono bg-background border border-border rounded-lg p-3 overflow-x-auto text-text-muted mt-4 whitespace-pre-wrap max-h-[500px] overflow-y-auto">
+              {generationPrompt}
+            </pre>
+          </div>
+        </details>
+      )}
+
+      {/* Site Profile Panel */}
+      {siteProfileData && (
+        <div className="bg-surface border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-text-muted">
+              <Globe size={14} />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Profil du site</span>
+            </div>
+            {sitemapUrlsData && sitemapUrlsData.length > 0 && (
+              <div className="flex items-center gap-1.5 text-[10px] text-accent bg-accent/10 border border-accent/20 rounded-full px-2.5 py-0.5">
+                <Link size={9} />
+                <span>{sitemapUrlsData.length} URLs sitemap</span>
+              </div>
+            )}
+          </div>
+
+          {/* Theme + description */}
+          {siteProfileData.theme && (
+            <div className="bg-background rounded-lg p-3 border border-border">
+              <p className="text-[10px] text-text-muted uppercase tracking-wider mb-0.5">Thème</p>
+              <p className="text-sm font-bold text-text">{siteProfileData.theme}</p>
+              {siteProfileData.description && (
+                <p className="text-[11px] text-text-muted mt-1 leading-relaxed">{siteProfileData.description}</p>
+              )}
+            </div>
+          )}
+
+          {/* Tone + audience grid */}
+          <div className="grid grid-cols-2 gap-2">
+            {siteProfileData.tone && (
+              <div className="bg-background rounded-lg p-2.5 border border-border">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider mb-0.5">Ton détecté</p>
+                <p className="text-[11px] font-semibold text-text">{siteProfileData.tone}</p>
+              </div>
+            )}
+            {siteProfileData.language && (
+              <div className="bg-background rounded-lg p-2.5 border border-border">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider mb-0.5">Langue</p>
+                <p className="text-[11px] font-semibold text-text uppercase">{siteProfileData.language}</p>
+              </div>
+            )}
+            {siteProfileData.targetAudience && (
+              <div className="bg-background rounded-lg p-2.5 border border-border col-span-2">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider mb-0.5">Audience cible</p>
+                <p className="text-[11px] text-text">{siteProfileData.targetAudience}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Writing style */}
+          {siteProfileData.writingStyle && (
+            <div className="bg-background rounded-lg p-2.5 border border-border">
+              <p className="text-[10px] text-text-muted uppercase tracking-wider mb-0.5">Style rédactionnel</p>
+              <p className="text-[11px] text-text-muted leading-relaxed">{siteProfileData.writingStyle}</p>
+            </div>
+          )}
+
+          {/* Recommended tone for generation */}
+          {siteProfileData.recommendedToneForGeneration && (
+            <div className="bg-accent/5 border border-accent/15 rounded-lg p-2.5">
+              <p className="text-[10px] text-accent font-bold uppercase tracking-wider mb-0.5">Ton recommandé pour la génération</p>
+              <p className="text-[11px] text-text-muted leading-relaxed">{siteProfileData.recommendedToneForGeneration}</p>
+            </div>
+          )}
+
+          {/* Main topics */}
+          {siteProfileData.mainTopics && siteProfileData.mainTopics.length > 0 && (
+            <div>
+              <p className="text-[10px] text-text-muted uppercase tracking-wider mb-1.5">Sujets principaux</p>
+              <div className="flex flex-wrap gap-1.5">
+                {siteProfileData.mainTopics.map((t, i) => (
+                  <span key={i} className="px-2 py-0.5 rounded-full bg-border text-text-muted text-[10px] font-medium">{t}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Keywords */}
+          {siteProfileData.keywords && siteProfileData.keywords.length > 0 && (
+            <div className="border-t border-border pt-3">
+              <p className="text-[10px] text-text-muted uppercase tracking-wider mb-1.5">Mots-clés détectés</p>
+              <div className="flex flex-wrap gap-1.5">
+                {siteProfileData.keywords.map((k, i) => (
+                  <span key={i} className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-text-muted text-[10px] border border-border font-mono">{k}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Existing blog titles */}
+          {siteProfileData.existingBlogTitles && siteProfileData.existingBlogTitles.length > 0 && (
+            <details className="border-t border-border pt-3">
+              <summary className="text-[10px] text-amber-500 font-bold uppercase tracking-wider cursor-pointer select-none">
+                Articles existants ({siteProfileData.existingBlogTitles.length}) — à ne pas dupliquer
+              </summary>
+              <div className="mt-2 space-y-0.5">
+                {siteProfileData.existingBlogTitles.map((t, i) => (
+                  <div key={i} className="text-[11px] text-text-muted px-1 py-0.5 flex items-start gap-1.5">
+                    <span className="text-amber-500/60 shrink-0 font-mono text-[9px] mt-0.5">{i + 1}.</span>
+                    <span>{t}</span>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+
+          {/* Content gaps */}
+          {siteProfileData.contentGaps && siteProfileData.contentGaps.length > 0 && (
+            <details className="border-t border-border pt-3">
+              <summary className="text-[10px] text-green-500 font-bold uppercase tracking-wider cursor-pointer select-none">
+                Gaps de contenu ({siteProfileData.contentGaps.length}) — opportunités
+              </summary>
+              <div className="mt-2 space-y-1">
+                {siteProfileData.contentGaps.map((g, i) => (
+                  <div key={i} className="flex items-start gap-1.5 text-[11px] text-text-muted bg-green-500/5 border border-green-500/15 rounded px-2 py-1">
+                    <span className="text-green-500 font-bold shrink-0">{i + 1}.</span>
+                    <span>{g}</span>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+
+          {/* Sitemap URLs */}
+          {sitemapUrlsData && sitemapUrlsData.length > 0 && (
+            <details className="border-t border-border pt-3">
+              <summary className="text-[10px] text-text-muted font-bold uppercase tracking-wider cursor-pointer select-none flex items-center gap-1.5">
+                <Link size={9} />
+                URLs internes disponibles ({sitemapUrlsData.length})
+              </summary>
+              <div className="mt-2 space-y-0.5 max-h-48 overflow-y-auto">
+                {sitemapUrlsData.map((url, i) => (
+                  <div key={i} className="text-[10px] text-text-muted font-mono truncate px-1 py-0.5 hover:bg-border/30 rounded">
+                    {url}
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
 
       {/* Dynamic Data Panel */}
       {(mainKeyword || secondaryKeywords) && (
@@ -514,7 +686,7 @@ export default function ProgressLog({ events }: Props) {
         </div>
       )}
 
-      {doneEvent && (
+      {doneEvent?.data && (
         <div className="bg-success/10 border border-success/20 rounded-xl p-6 flex gap-5 items-start animate-in zoom-in-95 duration-500">
           <div className="mt-1 p-2 bg-success/20 rounded-lg">
             <CheckCircle2 className="text-success" size={24} />

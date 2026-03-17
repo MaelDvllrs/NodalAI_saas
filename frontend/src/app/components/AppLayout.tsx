@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { useProject } from '../contexts/ProjectContext';
-import { LayoutDashboard, PenTool, History, LogOut, Terminal, User, ChevronDown, Globe, Plus, Check, Settings, Bell } from 'lucide-react';
+import { LayoutDashboard, GitBranch, History, LogOut, Terminal, User, ChevronDown, Globe, Plus, Check, Settings } from 'lucide-react';
 import { cn } from '../utils/cn';
 import TaskPanel from './TaskPanel';
 import toast from 'react-hot-toast';
@@ -80,7 +80,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/generate', label: 'Générer', icon: PenTool },
+    { href: '/generate', label: 'Workflow', icon: GitBranch },
     { href: '/runs', label: 'Historique', icon: History },
   ];
 
@@ -224,26 +224,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           )}
         </nav>
 
-        {/* Dev: test notifications */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="px-3 pb-4 pt-2 border-t border-border shrink-0">
-            <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-text-muted mb-2 px-1">Dev</p>
-            <button
-              onClick={() => notifySuccess('Blog généré avec succès — Mon Projet')}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium text-text-muted hover:text-text hover:bg-background transition-all"
-            >
-              <Bell size={13} className="shrink-0" />
-              Tester notif succès
-            </button>
-            <button
-              onClick={() => notifyError('Erreur lors de la génération — Mon Projet')}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium text-text-muted hover:text-text hover:bg-background transition-all"
-            >
-              <Bell size={13} className="shrink-0" />
-              Tester notif erreur
-            </button>
-          </div>
-        )}
       </aside>
 
       {/* ── Main ── */}

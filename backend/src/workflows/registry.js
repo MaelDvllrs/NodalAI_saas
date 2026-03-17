@@ -23,8 +23,10 @@ import { KeywordResearchModule }    from './modules/keyword-research/index.js';
 import { SerpAnalysisModule }       from './modules/serp-analysis/index.js';
 import { SemanticExtractionModule } from './modules/semantic-extraction/index.js';
 import { ContentGenerationModule }  from './modules/content-generation/index.js';
+import { BlogGenerationModule }     from './modules/blog-generation/index.js';
 import { FaqGeneratorModule }       from './modules/faq-generator.js';
 import { InternalLinkingModule }    from './modules/internal-linking/index.js';
+import { WebflowStructureModule }    from './modules/webflow-structure/index.js';
 import { WebflowPublishModule }     from './modules/webflow-publish/index.js';
 
 const MODULES = [
@@ -45,11 +47,9 @@ const MODULES = [
   {
     id:          'website-scraper',
     label:       'Scraping de site',
-    description: 'Scrape la homepage + sitemap et extrait le thème, le ton, les sujets clés et le profil du site.',
+    description: 'Scrape la homepage + sitemap du projet sélectionné et extrait le thème, le ton et le profil du site.',
     ports: {
-      in:  [
-        { key: 'siteUrl', label: 'URL du site', required: true },
-      ],
+      in:  [],   // siteUrl vient automatiquement du projet (ctx.siteUrl injecté par le runner)
       out: [
         { key: 'siteProfile',  label: 'Profil du site' },
         { key: 'sitemapUrls',  label: 'URLs sitemap' },
@@ -119,7 +119,35 @@ const MODULES = [
     module:      SemanticExtractionModule,
   },
 
-  // ── Content Generation ─────────────────────────────────────────────────────
+  // ── Blog Generation ────────────────────────────────────────────────────────
+  {
+    id:          'blog-generation',
+    label:       'Génération de blog',
+    description: 'Génère un article de blog SEO optimisé avec Claude Sonnet.',
+    ports: {
+      in:  [
+        { key: 'mainKeyword',      label: 'Mot-clé principal',      required: true  },
+        { key: 'serpModel',        label: 'Modèle SERP',            required: false },
+        { key: 'semanticAnalysis', label: 'Analyse sémantique',     required: false },
+        { key: 'siteProfile',      label: 'Profil du site',          required: false },
+        { key: 'sitemapUrls',      label: 'URLs sitemap',            required: false },
+        { key: 'internalLinks',    label: 'Liens internes',          required: false },
+        { key: 'tone',             label: 'Ton rédactionnel',        required: false },
+        { key: 'detectedFields',   label: 'Champs Webflow détectés', required: false },
+      ],
+      out: [
+        { key: 'blogContent', label: 'Contenu article' },
+        { key: 'parsedBlog',  label: 'Article parsé' },
+        { key: 'htmlBody',    label: 'HTML généré' },
+        { key: 'fieldData',   label: 'Champs Webflow' },
+        { key: 'outline',     label: 'Plan généré' },
+      ],
+    },
+    defaultConfig: {},
+    module:      BlogGenerationModule,
+  },
+
+  // ── Content Generation (legacy — kept for backward compatibility) ───────────
   {
     id:          'content-generation',
     label:       'Génération de contenu',
@@ -183,6 +211,23 @@ const MODULES = [
     module:      InternalLinkingModule,
   },
 
+  // ── Webflow Structure ──────────────────────────────────────────────────────
+  {
+    id:          'webflow-structure',
+    label:       'Structure Webflow',
+    description: 'Récupère les champs de la collection Webflow CMS.',
+    ports: {
+      in:  [],
+      out: [
+        { key: 'collectionId',   label: 'ID de la collection' },
+        { key: 'webflowFields',  label: 'Champs bruts' },
+        { key: 'detectedFields', label: 'Champs détectés' },
+      ],
+    },
+    defaultConfig: { apiKey: '', siteId: '', collectionName: '' },
+    module:      WebflowStructureModule,
+  },
+
   // ── Webflow Publish ────────────────────────────────────────────────────────
   {
     id:          'webflow-publish',
@@ -190,19 +235,19 @@ const MODULES = [
     description: 'Crée et publie l\'article dans une collection Webflow CMS.',
     ports: {
       in:  [
-        // Either fieldData (pre-built) or parsedBlog (module builds it)
-        { key: 'parsedBlog',    label: 'Article analysé',    required: false },
-        { key: 'fieldData',     label: 'Champs Webflow',     required: false },
-        // collectionId/apiKey can come from ctx (input seed) or config
-        { key: 'apiKey',        label: 'Clé API Webflow',    required: false },
-        { key: 'publishStatus', label: 'Statut publication', required: false },
+        { key: 'parsedBlog',     label: 'Article analysé',    required: false },
+        { key: 'fieldData',      label: 'Champs Webflow',     required: false },
+        { key: 'collectionId',   label: 'ID collection',      required: false },
+        { key: 'webflowFields',  label: 'Champs bruts',       required: false },
+        { key: 'detectedFields', label: 'Champs détectés',    required: false },
+        { key: 'publishStatus',  label: 'Statut publication', required: false },
       ],
       out: [
         { key: 'webflowItemId',  label: 'ID article Webflow' },
         { key: 'webflowItemUrl', label: 'URL article' },
       ],
     },
-    defaultConfig: { status: 'draft' },
+    defaultConfig: { apiKey: '', siteId: '', collectionName: '', status: 'draft' },
     module:      WebflowPublishModule,
   },
 ];

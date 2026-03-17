@@ -1,9 +1,32 @@
 'use client';
 
-import { CheckCircle2, AlertCircle, Loader2, Search, TrendingUp, Layers, Sparkles, Rocket, Globe, Type } from 'lucide-react';
+import type { ComponentType } from 'react';
+import { CheckCircle2, AlertCircle, Loader2, Search, Layers, Sparkles, Globe, Type } from 'lucide-react';
 import { cn } from '../utils/cn';
 import type { LogEvent } from './ProgressLog';
-import type { LucideIcon } from 'lucide-react';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Brand icons
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function WebflowIcon({ size = 16, className }: { size?: number | string; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 1080 674" xmlns="http://www.w3.org/2000/svg" className={className}>
+      <path fillRule="evenodd" clipRule="evenodd" d="M1080 0L735.386 673.684H411.695L555.916 394.481H549.445C430.464 548.934 252.942 650.61 -0.000488281 673.684V398.344C-0.000488281 398.344 161.813 388.787 256.938 288.776H-0.000488281V0.0053214H288.771V237.515L295.252 237.489L413.254 0.0053214H631.644V236.009L638.126 235.999L760.555 0H1080Z" fill="#146EF5" />
+    </svg>
+  );
+}
+
+export function GoogleIcon({ size = 16, className }: { size?: number | string; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className={className}>
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+    </svg>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -23,8 +46,8 @@ export interface WorkflowBlockDef {
   label: string | ((opts: BlockOpts) => string);
   /** Short description shown below the label */
   description: string | ((opts: BlockOpts) => string);
-  /** Lucide icon */
-  icon: LucideIcon;
+  /** Icon component */
+  icon: ComponentType<{ size?: number | string; className?: string }>;
   /** Show this block when seoTestMode is true */
   showInSeoTest: boolean;
   /** Returns true while this block is currently executing */
@@ -87,8 +110,18 @@ export const WORKFLOW_BLOCKS: WorkflowBlockDef[] = [
         : 'DataForSEO • Métriques SEO • KD',
     icon: Search,
     showInSeoTest: true,
-    isActive: (events) =>
-      events.some(e => e.type === 'step') && !hasDataKey(events, 'mainKeyword'),
+    isActive: (events) => {
+      const msgs = stepMsgs(events);
+      return (
+        msgs.some(m =>
+          m.includes('candidats mots-clés') ||
+          m.includes('Mot-clé direct') ||
+          m.includes('Analyse métriques SEO') ||
+          m.includes('Thème résolu')
+        ) &&
+        !hasDataKey(events, 'mainKeyword')
+      );
+    },
     isDone: (events) => hasDataKey(events, 'mainKeyword'),
   },
 
@@ -97,7 +130,7 @@ export const WORKFLOW_BLOCKS: WorkflowBlockDef[] = [
     id: 'serp',
     label: 'Analyse SERP',
     description: 'Google top 10 • Résultats organiques',
-    icon: TrendingUp,
+    icon: GoogleIcon,
     showInSeoTest: true,
     isActive: (events) => {
       const msgs = stepMsgs(events);
@@ -139,10 +172,10 @@ export const WORKFLOW_BLOCKS: WorkflowBlockDef[] = [
       events.some(e => e.type === 'seo-preview'),
   },
 
-  // ── 4. Content Generation ─────────────────────────────────────────────────
+  // ── 4. Blog Generation ────────────────────────────────────────────────────
   {
     id: 'generation',
-    label: 'Génération de contenu',
+    label: 'Génération de blog',
     description: 'Claude Sonnet • Optimisation SEO',
     icon: Sparkles,
     showInSeoTest: false,
@@ -157,6 +190,7 @@ export const WORKFLOW_BLOCKS: WorkflowBlockDef[] = [
           m.includes('Tentative')
         ) &&
         !msgs.some(m =>
+          m.includes('Structure Webflow') ||
           m.includes('champs de la collection') ||
           m.includes('articles existants') ||
           m.includes('champs récupérés') ||
@@ -166,6 +200,7 @@ export const WORKFLOW_BLOCKS: WorkflowBlockDef[] = [
     },
     isDone: (events) =>
       stepMsgs(events).some(m =>
+        m.includes('Structure Webflow') ||
         m.includes('champs de la collection') ||
         m.includes('champs récupérés') ||
         m.includes('articles existants') ||
@@ -173,23 +208,38 @@ export const WORKFLOW_BLOCKS: WorkflowBlockDef[] = [
       ) || events.some(e => e.type === 'done'),
   },
 
+  // ── 4b. Webflow Structure ─────────────────────────────────────────────────
+  {
+    id: 'webflow-structure',
+    label: 'Structure Webflow',
+    description: 'Collection • Champs • Détection',
+    icon: WebflowIcon,
+    showInSeoTest: false,
+    isActive: (events) => {
+      const msgs = stepMsgs(events);
+      return (
+        msgs.some(m => m.includes('Récupération de la structure Webflow')) &&
+        !msgs.some(m => m.includes('Structure Webflow récupérée'))
+      );
+    },
+    isDone: (events) =>
+      stepMsgs(events).some(m => m.includes('Structure Webflow récupérée')),
+  },
+
   // ── 5. Webflow Publication ────────────────────────────────────────────────
   {
     id: 'publish',
     label: 'Publication Webflow',
     description: 'Push CMS • Collection Webflow',
-    icon: Rocket,
+    icon: WebflowIcon,
     showInSeoTest: false,
     isActive: (events) => {
       const msgs = stepMsgs(events);
       return (
         msgs.some(m =>
-          m.includes('champs de la collection') ||
-          m.includes('articles existants') ||
-          m.includes('URLs internes') ||
-          m.includes('Webflow') ||
-          m.includes('Création') ||
-          m.includes('Publié')
+          m.includes('Création de l\'article') ||
+          m.includes('Recherche de la collection') ||
+          m.includes('Récupération des champs de la collection')
         ) &&
         !events.some(e => e.type === 'done')
       );

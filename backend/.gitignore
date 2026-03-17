@@ -19,6 +19,7 @@ build/
 # ===== TESTS =====
 test-imgbb.js
 test-*.js
+migration/
 
 # ===== FICHIERS TEMPORAIRES =====
 *.tmp

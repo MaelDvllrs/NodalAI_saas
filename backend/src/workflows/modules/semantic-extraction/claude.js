@@ -32,12 +32,12 @@ export async function cleanSemanticTerms(terms, keyword) {
 RÈGLE ABSOLUE : tu ne dois JAMAIS inventer ou ajouter un terme qui n'est pas dans cette liste. Tu travailles UNIQUEMENT sur les termes fournis.
 
 Ta mission (dans l'ordre) :
-1. SUPPRIMER les termes inutilisables : CSS/HTML ("overflow hidden", "border radius", "px"), tokens UI, codes hex, URLs, noms de variables, fragments incompréhensibles, termes génériques sans valeur SEO (ex: "page", "site", "click", "home", "div", "span")
+1. SUPPRIMER uniquement les termes clairement inutilisables : CSS/HTML brut ("overflow hidden", "border radius", "px", "rgba"), codes hex, URLs complètes, noms de variables code, fragments incompréhensibles de moins de 3 caractères
 2. CORRIGER uniquement l'orthographe et les accents des termes conservés (ex: "creation" → "création", "referencement" → "référencement") — sans changer le sens ni inventer
 3. DÉDUPLIQUER : si deux termes sont identiques ou quasi-identiques après correction, garder le plus propre
-4. SUPPRIMER les termes trop similaires entre eux (garder le plus précis/spécifique)
-5. SUPPRIMER les nom d'auteurs de blog, les nom de personnes peu ou pas connues
-5. RETOURNER les indices (numéros) des termes retenus avec leur version corrigée, 300 maximum, triés par pertinence SEO décroissante
+4. SUPPRIMER les noms d'auteurs de blog et noms de personnes peu ou pas connues
+5. CONSERVER les termes génériques s'ils ont une valeur SEO dans le contexte du mot-clé (ex: "guide", "comparatif", "prix", "avis" sont utiles)
+6. RETOURNER au moins 200 termes si possible — objectif 250 à 300 — triés par pertinence SEO décroissante
 
 Format de réponse — UNIQUEMENT ce tableau JSON, sans aucun texte autour :
 [{"i": 3, "v": "terme corrigé"}, {"i": 7, "v": "autre terme"}, ...]
@@ -51,7 +51,7 @@ ${numbered}`;
   try {
     const message = await claudeCreate(client, {
       model:      'claude-haiku-4-5-20251001',
-      max_tokens: 4096,
+      max_tokens: 8192,
       messages:   [{ role: 'user', content: prompt }],
     });
     const raw     = message.content[0].text.trim();

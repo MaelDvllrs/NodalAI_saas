@@ -41,8 +41,6 @@ interface Site {
   id: string;
   name: string;
   url: string;
-  webflow_site_id: string;
-  webflow_collection_name: string;
   created_at: string;
   userRole: 'admin' | 'member';
 }
@@ -340,9 +338,6 @@ function AddSiteModal({ onClose, onSuccess, token }: { onClose: () => void; onSu
   const [formData, setFormData] = useState({
     name: '',
     url: '',
-    webflowSiteId: '',
-    webflowApiKey: '',
-    webflowCollectionName: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -381,7 +376,7 @@ function AddSiteModal({ onClose, onSuccess, token }: { onClose: () => void; onSu
       <div className="flex justify-between items-center mb-6">
         <div>
           <h3 className="text-xl font-bold tracking-tight">Nouveau Projet</h3>
-          <p className="text-sm font-medium text-text-muted mt-1 uppercase tracking-wide">Configurez votre environnement Webflow.</p>
+          <p className="text-sm font-medium text-text-muted mt-1 uppercase tracking-wide">Configurez votre nouveau projet.</p>
         </div>
         <button onClick={onClose} className="p-1.5 hover:bg-surface border border-transparent hover:border-border rounded-md transition-all text-text-muted">
           <X size={24} />
@@ -422,38 +417,7 @@ function AddSiteModal({ onClose, onSuccess, token }: { onClose: () => void; onSu
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted px-1">Webflow Site ID</label>
-            <input
-              type="text"
-              value={formData.webflowSiteId}
-              onChange={(e) => setFormData({ ...formData, webflowSiteId: e.target.value })}
-              className="input-base font-mono text-xs tracking-wider"
-              placeholder="5f72a..."
-            />
-          </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted px-1">Webflow API Key</label>
-            <input
-              type="password"
-              value={formData.webflowApiKey}
-              onChange={(e) => setFormData({ ...formData, webflowApiKey: e.target.value })}
-              className="input-base font-mono text-xs tracking-wider"
-              placeholder="••••••••••••••••"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted px-1">Nom de la Collection</label>
-            <input
-              type="text"
-              value={formData.webflowCollectionName}
-              onChange={(e) => setFormData({ ...formData, webflowCollectionName: e.target.value })}
-              className="input-base"
-              placeholder="Blog Posts"
-            />
-          </div>
         </div>
 
         <div className="flex gap-3 pt-4 border-t border-border">

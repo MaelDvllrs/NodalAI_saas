@@ -3,11 +3,12 @@
  *
  * Creates (and optionally publishes) a Webflow CMS item.
  *
- * Two modes:
- *   1. ctx.fieldData already set (content-generation ran with detectedFields)
- *   2. ctx.parsedBlog available → fetch collection fields → build fieldData here
+ * Expects ctx.collectionId, ctx.webflowFields and ctx.detectedFields to have been
+ * set by the "webflow-structure" module that runs before this one. Falls back to
+ * fetching the collection itself when those values are absent (standalone mode).
  *
- * Inputs  (ctx): parsedBlog | fieldData, siteId, apiKey, collectionName | collectionId
+ * Inputs  (ctx): parsedBlog | fieldData, collectionId, webflowFields, detectedFields
+ * Inputs  (config): apiKey, siteId, collectionName, status
  * Outputs (ctx): webflowItemId
  */
 
@@ -17,26 +18,48 @@ import { buildBodyHtml, buildFieldData, detectFields } from '../../../utils/html
 export const WebflowPublishModule = {
   /**
    * @param {WorkflowContext} ctx
-   * @param {{ status?: 'draft' | 'publish', collectionId?: string, apiKey?: string }} config
+   * @param {{ status?: 'draft' | 'publish', apiKey?: string, siteId?: string, collectionName?: string }} config
    * @param {{ emitEvent: Function, jobId: string }} runtime
    */
   async execute(ctx, config, { emitEvent, jobId }) {
-    const apiKey          = ctx.apiKey         ?? config?.apiKey         ?? null;
-    const collectionName  = ctx.collectionName  ?? config?.collectionName ?? null;
-    const siteId          = ctx.siteId          ?? config?.siteId         ?? null;
-    const publishStatus   = ctx.publishStatus;
-    const status          = config?.status      ?? publishStatus          ?? 'draft';
-    const secondaryKeywords = ctx.secondaryKeywords ?? [];
-    const images          = ctx.images          ?? null;
+    const apiKey         = config?.apiKey         ?? ctx.apiKey         ?? null;
+    const siteId         = config?.siteId         ?? ctx.siteId         ?? null;
+    const collectionName = config?.collectionName ?? ctx.collectionName ?? null;
+    const publishStatus  = ctx.publishStatus;
+    const status         = config?.status         ?? publishStatus      ?? 'draft';
+    const images         = ctx.images             ?? null;
 
     if (!apiKey) {
       emitEvent(jobId, { type: 'step', message: '⚠️ apiKey Webflow manquant — publication ignorée' });
       return { webflowItemId: null };
     }
 
+    // ── Resolve collection ID + fields ──────────────────────────────────────
+    // Primary path: webflow-structure has already resolved these and put them in ctx.
+    // Fallback: fetch on the spot (standalone mode, no webflow-structure in the workflow).
+    let resolvedCollectionId = ctx.collectionId  ?? config?.collectionId ?? null;
+    let fields               = ctx.webflowFields ?? null;
+    let detectedFields       = ctx.detectedFields ?? null;
+
+    if (!resolvedCollectionId) {
+      if (!siteId || !collectionName) {
+        emitEvent(jobId, { type: 'step', message: '⚠️ collectionId introuvable — ajoutez le module "Structure Webflow" en amont ou configurez siteId et collectionName' });
+        return { webflowItemId: null };
+      }
+      emitEvent(jobId, { type: 'step', message: '📋 Recherche de la collection Webflow...' });
+      const collection = await getCollectionByName(siteId, apiKey, collectionName);
+      if (!collection) throw new Error(`Collection "${collectionName}" introuvable sur ce site Webflow.`);
+      resolvedCollectionId = collection.id;
+    }
+
+    if (!fields) {
+      emitEvent(jobId, { type: 'step', message: '📋 Récupération des champs de la collection...' });
+      fields         = await getCollectionFields(resolvedCollectionId, apiKey);
+      detectedFields = detectFields(fields);
+    }
+
     // ── Resolve field data ──────────────────────────────────────────────────
-    let fieldData          = ctx.fieldData          ?? null;
-    let resolvedCollectionId = ctx.collectionId     ?? config?.collectionId ?? null;
+    let fieldData = ctx.fieldData ?? null;
 
     if (!fieldData) {
       const parsedBlog = ctx.parsedBlog ?? null;
@@ -45,25 +68,10 @@ export const WebflowPublishModule = {
         return { webflowItemId: null };
       }
 
-      // Resolve collection ID from name when not provided directly
-      if (!resolvedCollectionId) {
-        if (!siteId || !collectionName) {
-          emitEvent(jobId, { type: 'step', message: '⚠️ siteId ou collectionName manquant — publication Webflow ignorée' });
-          return { webflowItemId: null };
-        }
-        emitEvent(jobId, { type: 'step', message: '📋 Recherche de la collection Webflow...' });
-        const collection = await getCollectionByName(siteId, apiKey, collectionName);
-        if (!collection) throw new Error(`Collection "${collectionName}" introuvable sur ce site Webflow.`);
-        resolvedCollectionId = collection.id;
-      }
-
-      emitEvent(jobId, { type: 'step', message: '📋 Récupération des champs de la collection Webflow...' });
-      const fields         = await getCollectionFields(resolvedCollectionId, apiKey);
-      const detectedFields = detectFields(fields);
-
-      const htmlBody         = ctx.htmlBody ?? buildBodyHtml(parsedBlog);
+      const htmlBody         = ctx.htmlBody ?? buildBodyHtml(parsedBlog, detectedFields ?? {});
       const featuredImageUrl = images?.featured ?? null;
       const uploadedImages   = images?.content  ?? [];
+      const secondaryKeywords = ctx.secondaryKeywords ?? [];
 
       fieldData = buildFieldData(
         fields,
@@ -75,16 +83,6 @@ export const WebflowPublishModule = {
         uploadedImages,
         {}
       );
-
-      emitEvent(jobId, {
-        type: 'step',
-        message: `✅ ${fields.length} champs Webflow résolus (body → "${detectedFields.body || 'NON DÉTECTÉ'}")`,
-      });
-    }
-
-    if (!resolvedCollectionId) {
-      emitEvent(jobId, { type: 'step', message: '⚠️ collectionId Webflow introuvable — publication ignorée' });
-      return { webflowItemId: null };
     }
 
     // ── Create item ─────────────────────────────────────────────────────────

@@ -374,7 +374,8 @@ export async function runPipeline(jobId, params) {
     if (serpModel && serpModel.dominantSubtopics.length > 0) {
       emitEvent(jobId, { type: 'step', message: '📌 Génération du plan optimisé SERP avec Claude...' });
       try {
-        optimizedOutline = await generateOptimizedOutline(mainKeyword, serpModel, theme, tone);
+        const { max: wcMaxOutline } = getWordCountBounds(serpModel?.kd ?? kd);
+        optimizedOutline = await generateOptimizedOutline(mainKeyword, serpModel, theme, tone, wcMaxOutline);
         if (optimizedOutline) {
           emitEvent(jobId, { type: 'step', message: `✅ Plan optimisé généré (${optimizedOutline.split('\n').length} lignes)` });
         }

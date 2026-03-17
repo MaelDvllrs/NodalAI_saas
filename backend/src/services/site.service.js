@@ -49,9 +49,6 @@ export async function createSite(userId, siteData) {
       user_id: userId,
       name: siteData.name,
       url: siteData.url,
-      webflow_site_id: siteData.webflowSiteId,
-      webflow_api_key: siteData.webflowApiKey,
-      webflow_collection_name: siteData.webflowCollectionName,
     })
     .select()
     .single();

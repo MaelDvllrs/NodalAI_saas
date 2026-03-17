@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import AppLayout from '../components/AppLayout';
 import Link from 'next/link';
-import { FileText, PenTool, Globe, BarChart2, TrendingUp, MousePointerClick, Eye, Clock } from 'lucide-react';
+import { FileText, GitBranch, Globe, BarChart2, TrendingUp, MousePointerClick, Eye, Clock } from 'lucide-react';
 import { Skeleton } from '../components/UI';
 import { useProject } from '../contexts/ProjectContext';
 
@@ -58,23 +58,20 @@ function DashboardPage() {
         <div className="max-w-7xl mx-auto py-8 px-6">
 
           {/* Header */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 animate-slide-up">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 animate-slide-up">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-text-muted mb-2">Tableau de bord</p>
-              <h1 className="text-4xl font-bold tracking-tight mb-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-text-muted mb-1">Tableau de bord</p>
+              <h1 className="text-2xl font-bold tracking-tight mb-3">
                 {selectedSite ? selectedSite.name : 'Aucun projet sélectionné'}
               </h1>
-              {selectedSite && (
-                <p className="text-sm text-text-muted font-medium">{selectedSite.url}</p>
-              )}
             </div>
             {selectedSite && (
               <Link
                 href="/generate"
                 className="btn-accent gap-2"
               >
-                <PenTool size={18} />
-                Générer un article
+                <GitBranch size={18} />
+                Lancer un workflow
               </Link>
             )}
           </div>
@@ -185,8 +182,8 @@ function DashboardPage() {
                   <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted mb-4">Accès rapide</p>
                   <div className="flex flex-wrap gap-2">
                     <Link href="/generate" className="btn-primary gap-2">
-                      <PenTool size={13} />
-                      Générer un article
+                      <GitBranch size={13} />
+                      Lancer un workflow
                     </Link>
                     <Link href="/blogs" className="btn-secondary gap-2">
                       <BarChart2 size={13} />

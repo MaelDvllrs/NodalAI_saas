@@ -7,9 +7,6 @@ interface Site {
   id: string;
   name: string;
   url: string;
-  webflow_site_id: string;
-  webflow_api_key: string;
-  webflow_collection_name: string;
   userRole: 'admin' | 'member';
 }
 

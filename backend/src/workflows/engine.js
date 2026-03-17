@@ -26,10 +26,80 @@ export class WorkflowEngine {
    *
    * @param {{ id: string, name: string, steps: StepDefinition[] }} template
    * @param {Record<string, unknown>} initialInput  - seed values (keyword, theme, siteId…)
+   * @param {Array<{source: string, target: string}>} edges  - canvas connexions for dependency checks
    * @returns {Promise<WorkflowContext>}
    */
-  async run(template, initialInput = {}) {
+  // Module types that are "input sources": they inject static values into ctx
+  // immediately and are never treated as blocking dependencies.
+  static INPUT_TYPES = new Set(['text-input']);
+
+  async run(template, initialInput = {}, edges = []) {
     const ctx = this._buildContext(initialInput);
+
+    // ── Pre-execute all input-source steps (text-input etc.) ──────────────────
+    // Their values are injected into ctx before the main loop so downstream
+    // modules never get blocked waiting for them.
+    const doneIds = new Set();
+    for (const stepDef of template.steps) {
+      if (!WorkflowEngine.INPUT_TYPES.has(stepDef.type)) continue;
+      
+      // Emit start event for frontend tracking
+      this.emitEvent(this.jobId, {
+        type: 'module-start',
+        moduleType: stepDef.type,
+        instanceId: stepDef.instanceId,
+        label: stepDef.label ?? stepDef.type,
+      });
+      
+      const mod = stepDef.module;
+      if (mod && typeof mod.execute === 'function') {
+        try {
+          const output = await mod.execute(ctx, stepDef.config ?? {}, {
+            emitEvent: this.emitEvent,
+            jobId:     this.jobId,
+            stepIndex: -1,
+            stepDef,
+          });
+          if (output && typeof output === 'object') Object.assign(ctx, output);
+          
+          // Emit done event for frontend tracking
+          this.emitEvent(this.jobId, {
+            type: 'module-done',
+            moduleType: stepDef.type,
+            instanceId: stepDef.instanceId,
+            label: stepDef.label ?? stepDef.type,
+          });
+        } catch (e) {
+          this.emitEvent(this.jobId, { type: 'step', message: `⚠️ Entrée texte ignorée (${stepDef.type}): ${e.message}` });
+          // Emit error event for frontend tracking
+          this.emitEvent(this.jobId, {
+            type: 'module-error',
+            moduleType: stepDef.type,
+            instanceId: stepDef.instanceId,
+            label: stepDef.label ?? stepDef.type,
+            error: e.message,
+          });
+        }
+      }
+      // Mark as done so it never blocks downstream modules
+      if (stepDef.instanceId) doneIds.add(stepDef.instanceId);
+    }
+    // ──────────────────────────────────────────────────────────────────────────
+
+    // Build predecessors map: instanceId → [instanceId…] of required upstream steps
+    // Input-source predecessors are excluded from blocking checks (already done above).
+    const predecessors = new Map(template.steps.map(s => [s.instanceId, []]));
+    for (const { source, target } of edges) {
+      if (predecessors.has(target)) {
+        const srcStep = template.steps.find(s => s.instanceId === source);
+        // Only non-input predecessors are blocking
+        if (!srcStep || !WorkflowEngine.INPUT_TYPES.has(srcStep.type)) {
+          predecessors.get(target).push(source);
+        }
+      }
+    }
+    // Map instanceId → label for readable log messages
+    const idToLabel = new Map(template.steps.map(s => [s.instanceId, s.label ?? s.type]));
 
     this.emitEvent(this.jobId, {
       type: 'step',
@@ -38,6 +108,9 @@ export class WorkflowEngine {
 
     for (let i = 0; i < template.steps.length; i++) {
       const stepDef = template.steps[i];
+
+      // Input-source steps were pre-executed above — skip them in the main loop
+      if (WorkflowEngine.INPUT_TYPES.has(stepDef.type)) continue;
 
       // Skip disabled steps
       if (stepDef.enabled === false) {
@@ -48,9 +121,38 @@ export class WorkflowEngine {
         continue;
       }
 
+      // ── Dependency gate ────────────────────────────────────────────────────
+      const requiredPreds = (predecessors.get(stepDef.instanceId) ?? []);
+      if (requiredPreds.length > 0) {
+        const pendingLabels = requiredPreds
+          .filter(id => !doneIds.has(id))
+          .map(id => idToLabel.get(id) ?? id);
+
+        if (pendingLabels.length > 0) {
+          const msg = `⛔ Module "${stepDef.label ?? stepDef.type}" bloqué — modules précédents non terminés : ${pendingLabels.join(', ')}`;
+          this.emitEvent(this.jobId, { type: 'error', message: msg });
+          throw new Error(msg);
+        }
+
+        const doneLabels = requiredPreds.map(id => idToLabel.get(id) ?? id);
+        this.emitEvent(this.jobId, {
+          type: 'step',
+          message: `✔ Dépendances OK (${doneLabels.join(', ')}) → lancement de "${stepDef.label ?? stepDef.type}"`,
+        });
+      }
+      // ───────────────────────────────────────────────────────────────────────
+
       this.emitEvent(this.jobId, {
         type: 'step',
         message: `[${i + 1}/${template.steps.length}] ${stepDef.label ?? stepDef.type}`,
+      });
+
+      // Emit module start event for precise frontend tracking
+      this.emitEvent(this.jobId, {
+        type: 'module-start',
+        moduleType: stepDef.type,
+        instanceId: stepDef.instanceId,
+        label: stepDef.label ?? stepDef.type,
       });
 
       // Resolve module implementation
@@ -83,6 +185,17 @@ export class WorkflowEngine {
           output,
         });
 
+        // Mark this step as done for downstream dependency checks
+        if (stepDef.instanceId) doneIds.add(stepDef.instanceId);
+
+        // Emit module done event for precise frontend tracking
+        this.emitEvent(this.jobId, {
+          type: 'module-done',
+          moduleType: stepDef.type,
+          instanceId: stepDef.instanceId,
+          label: stepDef.label ?? stepDef.type,
+        });
+
         // Persist step result to DB (non-blocking)
         if (this.saveStep && this.workflowRunId) {
           this.saveStep(this.workflowRunId, stepDef.type, i, 'done', output, null).catch(() => {});
@@ -100,6 +213,15 @@ export class WorkflowEngine {
         this.emitEvent(this.jobId, {
           type:    'step',
           message: `${isOptional ? '⚠️' : '❌'} Erreur step "${stepDef.type}": ${err.message}`,
+        });
+
+        // Emit module error event for precise frontend tracking
+        this.emitEvent(this.jobId, {
+          type: 'module-error',
+          moduleType: stepDef.type,
+          instanceId: stepDef.instanceId,
+          label: stepDef.label ?? stepDef.type,
+          error: err.message,
         });
 
         // Persist error to DB (non-blocking)
@@ -127,6 +249,9 @@ export class WorkflowEngine {
     return {
       // User-provided inputs
       ...initialInput,
+
+      // Prompt snippets contributed by upstream modules (consumed by blog-generation)
+      promptSnippets:    [],
 
       // Populated by modules as they run
       siteProfile:       null,

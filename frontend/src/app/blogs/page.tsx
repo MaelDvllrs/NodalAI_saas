@@ -165,7 +165,7 @@ export default function BlogsPage() {
               <FileText className="text-text-muted mb-4 opacity-20" size={48} />
               <h3 className="text-lg font-bold mb-1">Aucun article trouvé</h3>
               <p className="text-text-muted text-sm mb-6">Ajustez vos filtres ou lancez une nouvelle génération.</p>
-              <Link href="/generate" className="btn-primary">Générer un article</Link>
+              <Link href="/generate" className="btn-primary">Lancer un workflow</Link>
             </div>
           ) : (
             <div className="bg-surface border border-border rounded-lg overflow-hidden">

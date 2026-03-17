@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { useProject } from '../contexts/ProjectContext';
 import AppLayout from '../components/AppLayout';
-import { Sparkles, Plus, Play, Pencil, Trash2, Layers, Clock, X, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Layers, Clock, X, Loader2, MoreVertical, ExternalLink, History, Download, Upload, Terminal } from 'lucide-react';
 import Link from 'next/link';
 import { Skeleton } from '../components/UI';
+import { MODULE_CATALOG } from '../components/WorkflowEditor';
+import { GoogleIcon, WebflowIcon } from '../components/WorkflowBlocks';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
@@ -20,24 +22,119 @@ interface Workflow {
   updated_at: string;
 }
 
+interface PublicWorkflow {
+  id: string;
+  name: string;
+  description: string | null;
+  workflow_json: { steps: { type: string; config: Record<string, unknown> }[]; edges?: { source: string; target: string }[] };
+  created_at: string;
+  creator: { id: string; email: string | null; initials: string };
+}
+
+// ─── Workflow Module Icons ───────────────────────────────────────────────────
+
+// Composant pour afficher les logos des modules en cercles imbriqués
+function WorkflowModuleIcons({ steps }: { steps: { type: string; config: Record<string, unknown> }[] }) {
+  // Mapping des modules vers leurs logos de marque (dédupliqués par marque)
+  const MODULE_TO_BRAND: Record<string, string> = {
+    'serp-analysis': 'google',
+    'webflow-structure': 'webflow',
+    'webflow-publish': 'webflow',
+  };
+  
+  // Extraire les marques uniques utilisées dans le workflow
+  const brands = Array.from(
+    new Set(
+      steps
+        .map(s => MODULE_TO_BRAND[s.type])
+        .filter(Boolean)
+    )
+  );
+  
+  // Mapper chaque marque vers son premier module correspondant pour obtenir l'icône
+  const modules = brands
+    .map(brand => {
+      // Trouver le premier type de module qui correspond à cette marque
+      const type = Object.keys(MODULE_TO_BRAND).find(t => MODULE_TO_BRAND[t] === brand);
+      return type ? MODULE_CATALOG.find(m => m.type === type) : null;
+    })
+    .filter((m): m is NonNullable<typeof m> => !!m)
+    .slice(0, 4); // Max 4 icônes
+
+  if (modules.length === 0) {
+    return (
+      <div className="p-2 bg-accent/10 rounded-lg shrink-0">
+        <Layers className="text-accent" size={18} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-start shrink-0">
+      {modules.map((mod, i) => {
+        const Icon = mod.icon;
+        const textColor = mod.accent.text;
+        
+        return (
+          <div
+            key={mod.type}
+            className={`flex items-center justify-center w-7 h-7 rounded-full border-2 border-surface bg-neutral-800 ${i > 0 ? '-ml-2' : ''}`}
+            style={{ zIndex: modules.length - i }}
+            title={mod.label}
+          >
+            <Icon size={12} className={textColor} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Create modal ────────────────────────────────────────────────────────────
 
-function CreateWorkflowModal({ onClose, onCreate }: {
+function CreateWorkflowModal({ onClose, onCreate, initialImport, initialName }: {
   onClose: () => void;
-  onCreate: (name: string) => Promise<void>;
+  onCreate: (name: string, workflowJson?: { steps: unknown[]; edges?: unknown[] }) => Promise<void>;
+  initialImport?: { steps: unknown[]; edges?: unknown[] };
+  initialName?: string;
 }) {
-  const [name, setName] = useState('');
+  const [name, setName] = useState(initialName ?? '');
   const [loading, setLoading] = useState(false);
+  const [importedJson, setImportedJson] = useState<{ steps: unknown[]; edges?: unknown[] } | null>(initialImport ?? null);
+  const [importError, setImportError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target?.result as string);
+        const wf = parsed.workflowJson ?? parsed;
+        if (!Array.isArray(wf.steps)) throw new Error('Format invalide');
+        setImportedJson({ steps: wf.steps, edges: wf.edges });
+        setImportError('');
+        if (!name.trim() && parsed.name) setName(parsed.name);
+      } catch {
+        setImportError('Fichier JSON invalide ou format incorrect.');
+        setImportedJson(null);
+      }
+    };
+    reader.readAsText(file);
+    // reset so re-selecting same file triggers onChange
+    e.target.value = '';
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) return;
     setLoading(true);
-    try { await onCreate(trimmed); } finally { setLoading(false); }
+    try { await onCreate(trimmed, importedJson ?? undefined); } finally { setLoading(false); }
   }
 
   return (
@@ -46,7 +143,7 @@ function CreateWorkflowModal({ onClose, onCreate }: {
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Card */}
-      <div className="relative z-10 bg-surface border border-border rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 animate-slide-up">
+      <div className="relative z-10 bg-surface border border-border rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6 animate-slide-up">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-bold">Nouveau workflow</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-bg transition-colors">
@@ -68,18 +165,26 @@ function CreateWorkflowModal({ onClose, onCreate }: {
             />
           </div>
 
-          <div className="flex items-center gap-3 pt-1">
+          {/* Import JSON */}
+          <div>
+            <input ref={fileRef} type="file" accept=".json,application/json" className="hidden" onChange={handleFileChange} />
             <button
               type="button"
-              onClick={onClose}
-              className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-text-muted hover:text-text transition-colors"
+              onClick={() => fileRef.current?.click()}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-dashed border-border text-sm text-text-muted hover:border-accent/50 hover:text-accent transition-colors"
             >
-              Annuler
+              <Upload size={13} />
+              {importedJson ? `${importedJson.steps.length} modules importés` : 'Importer depuis un fichier JSON'}
             </button>
+            {importError && <p className="mt-1 text-xs text-red-400">{importError}</p>}
+          </div>
+
+          <div className="flex items-center gap-3 pt-1">
+            <button type="button" onClick={onClose} className="btn-secondary flex-1">Annuler</button>
             <button
               type="submit"
               disabled={!name.trim() || loading}
-              className="flex-1 py-2 rounded-lg btn-accent text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-2"
+              className="btn-accent flex-1 gap-2 disabled:opacity-40"
             >
               {loading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
               Créer
@@ -94,70 +199,138 @@ function CreateWorkflowModal({ onClose, onCreate }: {
 // ─── Workflow card ───────────────────────────────────────────────────────────
 
 function WorkflowCard({ workflow, onDelete }: { workflow: Workflow; onDelete: (id: string) => void }) {
+  const router = useRouter();
   const steps = workflow.workflow_json?.steps ?? [];
-  const stepCount = steps.filter((s) => s.type !== 'trigger-manual').length;
+  const stepCount = steps.length;
   const updatedAt = new Date(workflow.updated_at).toLocaleDateString('fr-FR', {
     day: '2-digit', month: 'short', year: 'numeric',
   });
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [menuOpen]);
+
+  function handleExport(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenuOpen(false);
+    const data = { name: workflow.name, workflowJson: workflow.workflow_json };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${workflow.name.replace(/\s+/g, '_')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
-    <div className="bg-surface border border-border rounded-xl p-5 flex flex-col gap-4 hover:border-accent/40 transition-colors group">
+    <Link
+      href={`/generate/builder?workflowId=${workflow.id}`}
+      className="bg-surface border border-border rounded-lg p-4 flex flex-col gap-4 hover:border-accent/40 transition-colors cursor-pointer"
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-accent/10 rounded-lg shrink-0">
-            <Layers className="text-accent" size={18} />
-          </div>
+          <WorkflowModuleIcons steps={steps} />
           <div>
             <h3 className="font-semibold text-text leading-tight">{workflow.name}</h3>
-            <div className="flex items-center gap-3 mt-1 text-xs text-text-muted">
-              <span className="flex items-center gap-1">
-                <Layers size={11} />
-                {stepCount} module{stepCount !== 1 ? 's' : ''}
-              </span>
-              <span className="flex items-center gap-1">
-                <Clock size={11} />
-                {updatedAt}
-              </span>
+            <div className="flex items-center gap-1 mt-1 text-xs text-text-muted">
+              <Layers size={11} />
+              <span>{stepCount} module{stepCount !== 1 ? 's' : ''}</span>
             </div>
           </div>
         </div>
-        <button
-          onClick={() => onDelete(workflow.id)}
-          className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-red-500/10 hover:text-red-400 text-text-muted"
-          title="Supprimer"
-        >
-          <Trash2 size={14} />
-        </button>
-      </div>
 
-      {/* Steps preview */}
-      {stepCount > 0 && (
-        <div className="flex items-center gap-1 flex-wrap">
-          {steps.filter(s => s.type !== 'trigger-manual').map((s, i) => (
-            <span key={i} className="text-xs bg-bg px-2 py-0.5 rounded-full border border-border text-text-muted font-mono">
-              {s.type}
-            </span>
-          ))}
+        {/* 3-dot menu */}
+        <div className="relative shrink-0" ref={menuRef}>
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen(v => !v); }}
+            className="p-1.5 rounded-md text-text-muted hover:text-text hover:bg-bg transition-colors"
+          >
+            <MoreVertical size={15} />
+          </button>
+
+          {menuOpen && (
+            <div
+              className="absolute right-0 top-full mt-1 z-50 w-52 bg-surface border border-border rounded-xl shadow-xl py-1 animate-fade-in"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            >
+              <button
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text hover:bg-bg transition-colors"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen(false); router.push(`/generate/builder?workflowId=${workflow.id}`); }}
+              >
+                <ExternalLink size={13} className="text-text-muted" />
+                Ouvrir le workflow
+              </button>
+              <button
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text hover:bg-bg transition-colors"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen(false); localStorage.setItem('runs_filters', JSON.stringify({ workflowId: workflow.id, status: '', sort: 'desc' })); router.push('/runs'); }}
+              >
+                <History size={13} className="text-text-muted" />
+                Voir les exécutions
+              </button>
+              <button
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text hover:bg-bg transition-colors"
+                onClick={handleExport}
+              >
+                <Download size={13} className="text-text-muted" />
+                Exporter en JSON
+              </button>
+              <div className="border-t border-border my-1" />
+              <button
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen(false); onDelete(workflow.id); }}
+              >
+                <Trash2 size={13} />
+                Supprimer
+              </button>
+            </div>
+          )}
         </div>
-      )}
-
-      <div className="flex items-center gap-2 mt-auto pt-2 border-t border-border">
-        <Link
-          href={`/generate/builder?workflowId=${workflow.id}`}
-          className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-accent text-bg text-sm font-medium hover:bg-accent/90 transition-colors"
-        >
-          <Play size={13} />
-          Lancer
-        </Link>
-        <Link
-          href={`/generate/builder?workflowId=${workflow.id}`}
-          className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-border text-text-muted text-sm hover:border-accent/40 hover:text-text transition-colors"
-          title="Modifier"
-        >
-          <Pencil size={13} />
-        </Link>
       </div>
-    </div>
+
+      {/* Footer */}
+      <div className="mt-auto pt-2 border-t border-border flex items-center gap-1 text-xs text-text-muted">
+        <Clock size={11} />
+        <span>{updatedAt}</span>
+      </div>
+    </Link>
+  );
+}
+
+// ─── Template card ──────────────────────────────────────────────────────────
+
+function TemplateCard({ template, onUse }: { template: PublicWorkflow; onUse: (t: PublicWorkflow) => void }) {
+  const stepCount = template.workflow_json?.steps?.length ?? 0;
+  return (
+    <button
+      type="button"
+      onClick={() => onUse(template)}
+      className="bg-surface border border-border rounded-xl p-4 flex flex-col gap-3 text-left hover:border-accent/40 transition-colors w-full"
+    >
+      <div className="flex items-start gap-3">
+        <WorkflowModuleIcons steps={template.workflow_json?.steps ?? []} />
+        <div className="min-w-0">
+          <h3 className="font-semibold text-text leading-tight truncate">{template.name}</h3>
+          <div className="flex items-center gap-1 mt-1 text-xs text-text-muted">
+            <Layers size={11} />
+            <span>{stepCount} module{stepCount !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
+      </div>
+      {template.description && (
+        <p className="text-xs text-text-muted leading-relaxed line-clamp-3">{template.description}</p>
+      )}
+    </button>
   );
 }
 
@@ -170,6 +343,18 @@ function GenerateListContent() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [pendingTemplate, setPendingTemplate] = useState<PublicWorkflow | null>(null);
+  const [publicWorkflows, setPublicWorkflows] = useState<PublicWorkflow[]>([]);
+  const [publicLoading, setPublicLoading] = useState(true);
+
+  useEffect(() => {
+    setPublicLoading(true);
+    fetch(`${API_URL}/workflows/public`)
+      .then((r) => r.json())
+      .then((data) => setPublicWorkflows(Array.isArray(data) ? data : []))
+      .catch(() => setPublicWorkflows([]))
+      .finally(() => setPublicLoading(false));
+  }, []);
 
   useEffect(() => {
     if (!token) return;
@@ -184,7 +369,7 @@ function GenerateListContent() {
       .finally(() => setLoading(false));
   }, [token, selectedSite]);
 
-  async function handleCreate(name: string) {
+  async function handleCreate(name: string, workflowJson?: { steps: unknown[]; edges?: unknown[] }) {
     const res = await fetch(`${API_URL}/workflows`, {
       method: 'POST',
       headers: {
@@ -194,7 +379,7 @@ function GenerateListContent() {
       body: JSON.stringify({
         name,
         projectId: selectedSite?.id ?? null,
-        workflowJson: { steps: [] },
+        workflowJson: workflowJson ?? { steps: [] },
       }),
     });
     if (!res.ok) throw new Error('Erreur lors de la création');
@@ -213,10 +398,12 @@ function GenerateListContent() {
 
   return (
     <AppLayout>
-      {showModal && (
+      {(showModal || pendingTemplate !== null) && (
         <CreateWorkflowModal
-          onClose={() => setShowModal(false)}
+          onClose={() => { setShowModal(false); setPendingTemplate(null); }}
           onCreate={handleCreate}
+          initialImport={pendingTemplate ? pendingTemplate.workflow_json : undefined}
+          initialName={pendingTemplate?.name}
         />
       )}
 
@@ -224,21 +411,14 @@ function GenerateListContent() {
         <div className="max-w-[1400px] mx-auto py-8 px-6">
 
           {/* Header */}
-          <div className="mb-8 animate-slide-up flex items-start justify-between">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 animate-slide-up">
             <div>
-              <h1 className="text-4xl font-bold tracking-tight mb-3 flex items-center gap-4">
-                Workflows
-                <div className="p-2 bg-accent/10 rounded-md">
-                  <Sparkles className="text-accent" size={28} />
-                </div>
-              </h1>
-              <p className="text-md text-text-muted max-w-2xl">
-                Gérez vos pipelines de génération de contenu SEO.
-              </p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-text-muted mb-1">Workflow</p>
+              <h1 className="text-2xl font-bold tracking-tight mb-3">Gérer mes workflows</h1>
             </div>
             <button
               onClick={() => setShowModal(true)}
-              className="flex items-center gap-2 btn-accent uppercase tracking-widest text-sm shrink-0"
+              className="btn-accent gap-2"
             >
               <Plus size={16} />
               Nouveau workflow
@@ -271,20 +451,30 @@ function GenerateListContent() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-slide-up">
-              {/* New workflow card */}
-              <button
-                onClick={() => setShowModal(true)}
-                className="bg-surface border border-border border-dashed rounded-xl p-5 flex flex-col items-center justify-center gap-3 min-h-[180px] hover:border-accent/50 hover:bg-accent/5 transition-colors group text-text-muted hover:text-accent"
-              >
-                <div className="w-10 h-10 rounded-full border-2 border-dashed border-current flex items-center justify-center group-hover:border-accent transition-colors">
-                  <Plus size={18} />
-                </div>
-                <span className="text-sm font-medium">Nouveau workflow</span>
-              </button>
-
               {workflows.map((wf) => (
                 <WorkflowCard key={wf.id} workflow={wf} onDelete={handleDelete} />
               ))}
+            </div>
+          )}
+
+          {/* ── Templates section ── */}
+          {(publicLoading || publicWorkflows.length > 0) && (
+            <div className="mt-12">
+              <div className="mb-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-text-muted mb-1">Communauté</p>
+                <h2 className="text-xl font-bold tracking-tight">Templates de workflow</h2>
+              </div>
+              {publicLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-xl" />)}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-slide-up">
+                  {publicWorkflows.map((t) => (
+                    <TemplateCard key={t.id} template={t} onUse={(tmpl) => setPendingTemplate(tmpl)} />
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

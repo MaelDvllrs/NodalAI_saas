@@ -15,7 +15,7 @@ export function startGenerationWorker() {
       const { type, jobId } = job.data;
 
       if (type === 'workflow') {
-        const { steps, input, userId, workflowRunId } = job.data;
+        const { steps, edges, input, userId, workflowRunId } = job.data;
 
         // workflowRunId === jobId when the user is authenticated (created in the route)
         const saveStepFn = workflowRunId
@@ -29,6 +29,7 @@ export function startGenerationWorker() {
             emitEvent,
             workflowRunId: workflowRunId ?? null,
             saveStep:      saveStepFn,
+            edges:         edges ?? [],
           });
 
           if (workflowRunId) {

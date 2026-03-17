@@ -3,7 +3,9 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   ReactFlow,
-  Background,
+  ReactFlowProvider,
+  useReactFlow,
+  useViewport,
   Controls,
   MiniMap,
   addEdge,
@@ -11,24 +13,40 @@ import {
   useEdgesState,
   Handle,
   Position,
-  BackgroundVariant,
   MarkerType,
   BaseEdge,
   EdgeLabelRenderer,
   getSmoothStepPath,
 } from '@xyflow/react';
-import type { NodeProps, Connection, Node, Edge, EdgeProps } from '@xyflow/react';
+import type { NodeProps, Connection, Node, Edge, EdgeProps, OnNodesChange, OnEdgesChange } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
   Search, TrendingUp, Layers, Sparkles, Rocket,
   X, CheckCircle2, AlertCircle, Loader2, Check, SlidersHorizontal, MoreVertical,
-  Play, RefreshCw, FileEdit, Info, MousePointerClick, Zap, Globe, Save, Type,
+  Play, RefreshCw, FileEdit, Info, MousePointerClick, Zap, Globe, Save, Type, Download, Database,
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 import type { LogEvent } from './ProgressLog';
-import { WORKFLOW_BLOCKS } from './WorkflowBlocks';
-import type { LucideIcon } from 'lucide-react';
-import { Spinner } from './UI';
+import { WebflowIcon, GoogleIcon } from './WorkflowBlocks';
+
+// Dot background that pans with the canvas but keeps dot size fixed on zoom
+function FixedDotBackground({ gap = 100, dotSize = 0.5, color = 'var(--border)' }: { gap?: number; dotSize?: number; color?: string }) {
+  const { x, y } = useViewport();
+  const ox = ((x % gap) + gap) % gap;
+  const oy = ((y % gap) + gap) % gap;
+  return (
+    <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0 }}>
+      <defs>
+        <pattern id="rf-fixed-dots" x={ox} y={oy} width={gap} height={gap} patternUnits="userSpaceOnUse">
+          <circle cx={dotSize} cy={dotSize} r={dotSize} fill={color} />
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#rf-fixed-dots)" />
+    </svg>
+  );
+}
+import type { ComponentType } from 'react';
+import { Spinner, SelectMenu } from './UI';
 
 // 
 // Types
@@ -50,7 +68,7 @@ interface ModuleDef {
   label: string;
   description: string;
   details: string;
-  icon: LucideIcon;
+  icon: ComponentType<{ size?: number | string; className?: string }>;
   category: 'trigger' | 'input' | 'research' | 'analysis' | 'generation' | 'publish';
   accent: { bg: string; text: string; border: string };
   defaultConfig: BlockConfig;
@@ -98,14 +116,14 @@ export const MODULE_CATALOG: ModuleDef[] = [
     type: 'website-scraper',
     label: 'Scraping de site',
     description: 'Sitemap · Thème · Profil',
-    details: 'Scrape la homepage et le sitemap du site pour en extraire le thème, le ton, les sujets clés et les titres d\'articles existants.',
+    details: 'Scrape la homepage et le sitemap du site lié au projet sélectionné pour en extraire le thème, le ton, les sujets clés et les titres d\'articles existants.',
     icon: Globe,
     category: 'research',
     accent: { bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/20' },
     defaultConfig: { maxPages: 6 },
 
     ports: {
-      in:  [{ key: 'siteUrl',     label: 'URL du site',   required: true }],
+      in:  [],
       out: [{ key: 'siteProfile', label: 'Profil du site' }, { key: 'sitemapUrls', label: 'URLs sitemap' }],
     },
   },
@@ -137,9 +155,9 @@ export const MODULE_CATALOG: ModuleDef[] = [
     label: 'Analyse SERP',
     description: 'Google top 10 · Résultats organiques',
     details: 'Recupere les 10 premiers resultats Google et classe les pages par type (article, comparatif, forum...).',
-    icon: TrendingUp,
+    icon: GoogleIcon,
     category: 'analysis',
-    accent: { bg: 'bg-violet-500/10', text: 'text-violet-400', border: 'border-violet-500/20' },
+    accent: { bg: 'bg-white/10', text: 'text-white', border: 'border-white/20' },
     defaultConfig: {},
 
     ports: {
@@ -167,28 +185,51 @@ export const MODULE_CATALOG: ModuleDef[] = [
     },
   },
   {
-    type: 'content-generation',
-    label: 'Generation de contenu',
+    type: 'blog-generation',
+    label: 'Génération de blog',
     description: 'Claude Sonnet · SEO-optimisé',
-    details: 'Genere un article long format optimise SEO avec structure MECE, FAQ integree et suggestion de liens internes.',
+    details: 'Génère un article de blog long format optimisé SEO. Seul le mot-clé principal est requis. Connectez optionnellement : analyse SERP, extraction sémantique, profil site (liens internes), ton rédactionnel, structure Webflow (pour buildFieldData).',
     icon: Sparkles,
     category: 'generation',
     accent: { bg: 'bg-accent/10', text: 'text-accent', border: 'border-accent/20' },
-    defaultConfig: { tone: 'Expert et pedagogique', toneMode: 'preset' },
+    defaultConfig: {},
 
     ports: {
       in:  [
-        { key: 'mainKeyword',      label: 'Mot-clé principal',   required: true  },
-        { key: 'serpModel',        label: 'Modèle SERP',          required: false },
-        { key: 'semanticAnalysis', label: 'Analyse sémantique',   required: false },
-        { key: 'siteProfile',      label: 'Profil du site',       required: false },
-        { key: 'theme',            label: 'Thème',                required: false },
-        { key: 'tone',             label: 'Ton rédactionnel',     required: false },
+        { key: 'mainKeyword',      label: 'Mot-clé principal',      required: true  },
+        { key: 'serpModel',        label: 'Modèle SERP',            required: false },
+        { key: 'semanticAnalysis', label: 'Analyse sémantique',     required: false },
+        { key: 'siteProfile',      label: 'Profil du site',          required: false },
+        { key: 'sitemapUrls',      label: 'URLs sitemap',            required: false },
+        { key: 'internalLinks',    label: 'Liens internes',          required: false },
+        { key: 'tone',             label: 'Ton rédactionnel',        required: false },
+        { key: 'detectedFields',   label: 'Champs Webflow détectés', required: false },
       ],
       out: [
         { key: 'blogContent', label: 'Contenu article' },
+        { key: 'parsedBlog',  label: 'Article parsé' },
         { key: 'htmlBody',    label: 'HTML généré' },
         { key: 'fieldData',   label: 'Champs Webflow' },
+        { key: 'outline',     label: 'Plan généré' },
+      ],
+    },
+  },
+  {
+    type: 'webflow-structure',
+    label: 'Structure Webflow',
+    description: 'Collection · Champs · Détection',
+    details: 'Récupère la structure de la collection Webflow CMS (champs, types) et l\'injecte dans le pipeline. À placer avant la génération pour que les champs soient connus à la construction du contenu.',
+    icon: WebflowIcon,
+    category: 'publish',
+    accent: { bg: 'bg-[#146EF5]/10', text: 'text-[#146EF5]', border: 'border-[#146EF5]/20' },
+    defaultConfig: { apiKey: '', siteId: '', collectionName: '' },
+
+    ports: {
+      in:  [],
+      out: [
+        { key: 'collectionId',   label: 'ID de la collection' },
+        { key: 'webflowFields',  label: 'Champs bruts' },
+        { key: 'detectedFields', label: 'Champs détectés' },
       ],
     },
   },
@@ -196,14 +237,19 @@ export const MODULE_CATALOG: ModuleDef[] = [
     type: 'webflow-publish',
     label: 'Publication Webflow',
     description: 'Push CMS · Collection Webflow',
-    details: "Publie l'article dans la collection Webflow du projet selectionne, en brouillon ou directement en ligne.",
-    icon: Rocket,
+    details: "Publie l'article dans la collection Webflow. Nécessite le module 'Structure Webflow' en amont pour la résolution des champs, ou configurez directement apiKey, siteId et collectionName ici.",
+    icon: WebflowIcon,
     category: 'publish',
-    accent: { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20' },
-    defaultConfig: { status: 'draft' },
+    accent: { bg: 'bg-[#146EF5]/10', text: 'text-[#146EF5]', border: 'border-[#146EF5]/20' },
+    defaultConfig: { apiKey: '', siteId: '', collectionName: '', status: 'draft' },
 
     ports: {
-      in:  [{ key: 'fieldData', label: 'Champs Webflow', required: true }],
+      in:  [
+        { key: 'parsedBlog',     label: 'Article analysé',    required: false },
+        { key: 'fieldData',      label: 'Champs Webflow',     required: false },
+        { key: 'collectionId',   label: 'ID collection',      required: false },
+        { key: 'detectedFields', label: 'Champs détectés',    required: false },
+      ],
       out: [{ key: 'webflowItemId', label: 'ID article Webflow' }, { key: 'webflowItemUrl', label: 'URL article' }],
     },
   },
@@ -215,27 +261,22 @@ export const MODULE_CATALOG: ModuleDef[] = [
 
 type BlockStatus = 'idle' | 'active' | 'done' | 'error';
 
-// Map MODULE_CATALOG types → WORKFLOW_BLOCKS ids
-const TYPE_TO_BLOCK_ID: Record<string, string> = {
-  'keyword-research':    'keyword',
-  'serp-analysis':       'serp',
-  'semantic-extraction': 'semantic',
-  'content-generation':  'generation',
-  'webflow-publish':     'publish',
-  'website-scraper':     'website-scraper',
-};
-
-function getBlockStatus(type: string, events: LogEvent[]): BlockStatus {
-  const blockId = TYPE_TO_BLOCK_ID[type] ?? type;
-  const def = WORKFLOW_BLOCKS.find(b => b.id === blockId);
-  console.log(`[getBlockStatus] type="${type}" → blockId="${blockId}" | def found: ${!!def} | events: ${events.length}`);
-  if (!def || events.length === 0) return 'idle';
-  const hasError = events.some(e => e.type === 'error');
-  const done = def.isDone(events);
-  const active = def.isActive(events);
-  console.log(`[getBlockStatus] type="${type}" → isDone: ${done} | isActive: ${active} | hasError: ${hasError}`);
-  if (done) return 'done';
-  if (active) return hasError ? 'error' : 'active';
+function getBlockStatus(type: string, instanceId: string, events: LogEvent[]): BlockStatus {
+  // Priority 1: Use precise module-start/module-done/module-error events (new workflow engine)
+  const moduleStartEvents = events.filter(e => e.type === 'module-start') as { type: 'module-start'; moduleType: string; instanceId: string }[];
+  const moduleDoneEvents = events.filter(e => e.type === 'module-done') as { type: 'module-done'; moduleType: string; instanceId: string }[];
+  const moduleErrorEvents = events.filter(e => e.type === 'module-error') as { type: 'module-error'; moduleType: string; instanceId: string }[];
+  
+  // Check for events matching BOTH moduleType AND instanceId
+  const hasStarted = moduleStartEvents.some(e => e.moduleType === type && e.instanceId === instanceId);
+  const hasDone = moduleDoneEvents.some(e => e.moduleType === type && e.instanceId === instanceId);
+  const hasError = moduleErrorEvents.some(e => e.moduleType === type && e.instanceId === instanceId);
+  
+  if (hasDone) return 'done';
+  if (hasError) return 'error';
+  if (hasStarted) return 'active';
+  
+  // No precise events found for this specific instance → module hasn't started yet
   return 'idle';
 }
 
@@ -243,61 +284,59 @@ function getBlockStatus(type: string, events: LogEvent[]): BlockStatus {
 // Config renderers
 // 
 
-const TONE_PRESETS = [
-  'Expert et pedagogique',
-  'Professionnel et concis',
-  'Engageant et conversationnel',
-  'Inspirant et motivant',
-  'Technique et precis',
-  'Accessible et grand public',
-];
 
-
-function ContentConfig({ config, onChange, readOnly }: { config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean }) {
-  const toneMode = (config.toneMode as string) ?? 'preset';
-  const tone = (config.tone as string) ?? 'Expert et pedagogique';
+function WebflowConnectionFields({ config, onChange, readOnly }: { config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean }) {
   return (
-    <div className="space-y-2">
-      <div className="p-0.5 bg-background/60 rounded-md flex">
-        {(['preset', 'custom'] as const).map(m => (
-          <button key={m} type="button" disabled={readOnly}
-            onClick={() => onChange({ ...config, toneMode: m })}
-            className={cn('flex-1 py-1 rounded text-[10px] font-semibold uppercase tracking-wider transition-all',
-              toneMode === m ? 'bg-primary text-primary-foreground shadow-sm' : 'text-text-muted hover:text-text',
-              readOnly && 'cursor-default')}>
-            {m === 'preset' ? 'Predéfini' : 'Personnalise'}
-          </button>
-        ))}
-      </div>
-      {toneMode === 'preset' ? (
-        <select disabled={readOnly} value={tone}
-          onChange={e => onChange({ ...config, tone: e.target.value })}
-          className={cn('input-base text-xs appearance-none nodrag', readOnly && 'opacity-60')}>
-          {TONE_PRESETS.map(t => <option key={t}>{t}</option>)}
-        </select>
-      ) : (
-        <input type="text" readOnly={readOnly} placeholder="ex: Humoristique et decale..."
-          value={tone} onChange={e => onChange({ ...config, tone: e.target.value })}
-          className={cn('input-base text-xs nodrag', readOnly && 'opacity-60 cursor-default')} />
-      )}
+    <div className="space-y-1.5">
+      <input
+        type="password"
+        readOnly={readOnly}
+        placeholder="Clé API Webflow..."
+        value={(config.apiKey as string) ?? ''}
+        onChange={e => onChange({ ...config, apiKey: e.target.value })}
+        className={cn('input-base text-xs nodrag w-full', readOnly && 'opacity-60 cursor-default')}
+      />
+      <input
+        type="text"
+        readOnly={readOnly}
+        placeholder="Webflow Site ID..."
+        value={(config.siteId as string) ?? ''}
+        onChange={e => onChange({ ...config, siteId: e.target.value })}
+        className={cn('input-base text-xs nodrag w-full', readOnly && 'opacity-60 cursor-default')}
+      />
+      <input
+        type="text"
+        readOnly={readOnly}
+        placeholder="Nom de la collection CMS..."
+        value={(config.collectionName as string) ?? ''}
+        onChange={e => onChange({ ...config, collectionName: e.target.value })}
+        className={cn('input-base text-xs nodrag w-full', readOnly && 'opacity-60 cursor-default')}
+      />
     </div>
   );
+}
+
+function WebflowStructureConfig({ config, onChange, readOnly }: { config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean }) {
+  return <WebflowConnectionFields config={config} onChange={onChange} readOnly={readOnly} />;
 }
 
 function PublishConfig({ config, onChange, readOnly }: { config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean }) {
   const status = (config.status as string) ?? 'draft';
   return (
-    <div className="grid grid-cols-2 gap-1.5">
-      {(['draft', 'publish'] as const).map(s => (
-        <button key={s} type="button" disabled={readOnly}
-          onClick={() => onChange({ ...config, status: s })}
-          className={cn('flex items-center justify-center gap-1.5 py-1.5 rounded-md border text-[10px] font-semibold uppercase tracking-wider transition-all nodrag',
-            status === s ? 'bg-accent/5 text-accent border-accent/30' : 'bg-background border-border text-text-muted hover:border-text/20 hover:text-text',
-            readOnly && 'cursor-default')}>
-          {s === 'draft' ? <FileEdit size={11} /> : <Rocket size={11} />}
-          {s === 'draft' ? 'Brouillon' : 'Publier'}
-        </button>
-      ))}
+    <div className="space-y-2">
+      <WebflowConnectionFields config={config} onChange={onChange} readOnly={readOnly} />
+      <div className="grid grid-cols-2 gap-1.5">
+        {(['draft', 'publish'] as const).map(s => (
+          <button key={s} type="button" disabled={readOnly}
+            onClick={() => onChange({ ...config, status: s })}
+            className={cn('flex items-center justify-center gap-1.5 py-1.5 rounded-md border text-[10px] font-semibold uppercase tracking-wider transition-all nodrag',
+              status === s ? 'bg-accent/5 text-accent border-accent/30' : 'bg-background border-border text-text-muted hover:border-text/20 hover:text-text',
+              readOnly && 'cursor-default')}>
+            {s === 'draft' ? <FileEdit size={11} /> : <Rocket size={11} />}
+            {s === 'draft' ? 'Brouillon' : 'Publier'}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -315,13 +354,12 @@ function TextInputConfig({ config, onChange, readOnly }: { config: BlockConfig; 
   const value     = (config.value     as string) ?? '';
   return (
     <div className="space-y-2">
-      <select disabled={readOnly} value={outputKey}
-        onChange={e => onChange({ ...config, outputKey: e.target.value })}
-        className={cn('input-base text-xs appearance-none nodrag', readOnly && 'opacity-60')}>
-        {TEXT_INPUT_KEY_OPTIONS.map(o => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
+      <SelectMenu
+        value={outputKey}
+        onChange={v => !readOnly && onChange({ ...config, outputKey: v })}
+        options={TEXT_INPUT_KEY_OPTIONS}
+        className={cn('w-full nodrag [&>button]:w-full [&>button]:justify-between', readOnly && 'pointer-events-none opacity-60')}
+      />
       <input type="text" readOnly={readOnly}
         placeholder="Entrez une valeur..."
         value={value} onChange={e => onChange({ ...config, value: e.target.value })}
@@ -331,30 +369,23 @@ function TextInputConfig({ config, onChange, readOnly }: { config: BlockConfig; 
 }
 
 function ScraperConfig({ config, onChange, readOnly }: { config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean }) {
-  const url = (config.url as string) ?? '';
   const maxPages = (config.maxPages as number) ?? 6;
   return (
-    <div className="space-y-2">
-      <input type="url" readOnly={readOnly}
-        placeholder="https://monsite.fr"
-        value={url} onChange={e => onChange({ ...config, url: e.target.value })}
-        className={cn('input-base text-xs nodrag', readOnly && 'opacity-60 cursor-default')} />
-      <div className="flex items-center gap-2">
-        <label className="text-[10px] text-text-muted/60 shrink-0">Pages max</label>
-        <input type="number" readOnly={readOnly} min={1} max={20}
-          value={maxPages} onChange={e => onChange({ ...config, maxPages: Number(e.target.value) })}
-          className={cn('input-base text-xs nodrag w-16', readOnly && 'opacity-60 cursor-default')} />
-      </div>
+    <div className="flex items-center gap-2">
+      <label className="text-[10px] text-text-muted/60 shrink-0">Pages max</label>
+      <input type="number" readOnly={readOnly} min={1} max={20}
+        value={maxPages} onChange={e => onChange({ ...config, maxPages: Number(e.target.value) })}
+        className={cn('input-base text-xs nodrag w-16', readOnly && 'opacity-60 cursor-default')} />
     </div>
   );
 }
 
 type ConfigComponent = React.ComponentType<{ config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean }>;
 const CONFIG_RENDERERS: Record<string, ConfigComponent> = {
-  'text-input':         TextInputConfig,
-  'website-scraper':    ScraperConfig,
-  'content-generation': ContentConfig,
-  'webflow-publish':    PublishConfig,
+  'text-input':          TextInputConfig,
+  'website-scraper':     ScraperConfig,
+  'webflow-structure':   WebflowStructureConfig,
+  'webflow-publish':     PublishConfig,
 };
 
 // 
@@ -682,7 +713,30 @@ function PaletteCard({ def, disabled, onAdd }: { def: ModuleDef; disabled: boole
     <div className={cn('relative flex items-center gap-2.5 px-3 py-2 rounded-lg border transition-all duration-150 group/card',
       disabled
         ? 'border-border/30 bg-surface/20 opacity-40 cursor-not-allowed'
-        : 'border-border/50 bg-surface/30 hover:border-border hover:bg-surface/60 cursor-pointer')}
+        : 'border-border/50 bg-surface/30 hover:border-border hover:bg-surface/60 cursor-grab active:cursor-grabbing')}
+      draggable={!disabled}
+      onDragStart={!disabled ? e => {
+        e.dataTransfer.setData('module-type', def.type);
+        e.dataTransfer.effectAllowed = 'copy';
+        // Custom ghost: small pill with module label, rendered off-screen
+        const ghost = document.createElement('div');
+        ghost.style.cssText = [
+          'position:fixed', 'top:-1000px', 'left:-1000px',
+          'padding:6px 14px',
+          'background:var(--surface)',
+          'border:1px solid var(--border)',
+          'border-radius:8px',
+          'font-size:11px', 'font-weight:600',
+          'color:var(--text)',
+          'white-space:nowrap',
+          'pointer-events:none',
+          'box-shadow:0 4px 12px rgba(0,0,0,0.25)',
+        ].join(';');
+        ghost.textContent = def.label;
+        document.body.appendChild(ghost);
+        e.dataTransfer.setDragImage(ghost, ghost.offsetWidth / 2, ghost.offsetHeight / 2);
+        setTimeout(() => document.body.removeChild(ghost), 0);
+      } : undefined}
       onClick={!disabled ? onAdd : undefined}>
       <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-transform', def.accent.bg,
         !disabled && 'group-hover/card:scale-105')}>
@@ -720,7 +774,7 @@ const DEFAULT_MODULE_TYPES = [
   'keyword-research',
   'serp-analysis',
   'semantic-extraction',
-  'content-generation',
+  'blog-generation',
   'webflow-publish',
 ];
 const ALL_DEFAULT_TYPES = [TRIGGER_TYPE, ...DEFAULT_MODULE_TYPES];
@@ -777,7 +831,7 @@ function blocksToNodes(blocks: CanvasBlock[]): Node[] {
       return {
         id: block.instanceId,
         type: getRfNodeType(block.type),
-        position: { x: 0, y: i * NODE_GAP },
+        position: block.position ?? { x: 0, y: i * NODE_GAP },
         data: {
           block,
           def,
@@ -805,6 +859,73 @@ function blocksToEdges(nodes: Node[]): Edge[] {
 }
 
 //
+// Droppable canvas — ReactFlow + drag-drop from palette
+//
+
+function DroppableCanvas({
+  rfNodes, rfEdges, onNodesChange, onEdgesChange, onConnect, visibleCount, onDropModule,
+}: {
+  rfNodes: Node[];
+  rfEdges: Edge[];
+  onNodesChange: OnNodesChange;
+  onEdgesChange: OnEdgesChange;
+  onConnect: (params: Connection) => void;
+  visibleCount: number;
+  onDropModule: (type: string, position: { x: number; y: number }) => void;
+}) {
+  const { screenToFlowPosition } = useReactFlow();
+
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const type = e.dataTransfer.getData('module-type');
+    if (!type) return;
+    const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    onDropModule(type, pos);
+  }, [screenToFlowPosition, onDropModule]);
+
+  return (
+    <div
+      className="relative h-full"
+      onDrop={handleDrop}
+      onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
+    >
+      <ReactFlow
+        nodes={rfNodes}
+        edges={rfEdges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.35 }}
+        minZoom={0.1}
+        maxZoom={2}
+        proOptions={{ hideAttribution: true }}
+        deleteKeyCode={['Backspace', 'Delete']}
+        connectionRadius={40}
+        snapToGrid
+        snapGrid={[16, 16]}
+        connectionLineStyle={{ stroke: 'var(--accent)', strokeWidth: 2, strokeDasharray: '6 3' }}
+        className="bg-background"
+      >
+        <FixedDotBackground gap={20} dotSize={0.7} color="var(--border)" />
+        <Controls showInteractive={false}
+          className="!border-border !bg-surface !shadow-none [&>button]:!bg-surface [&>button]:!border-border [&>button]:!text-text-muted rounded-md overflow-hidden" />
+        <MiniMap nodeStrokeWidth={0} nodeColor={() => 'var(--surface)'}
+          maskColor="var(--surface)" className="!bg-background !border-border rounded-md overflow-hidden" />
+      </ReactFlow>
+      {visibleCount === 0 && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+          <p className="text-sm font-semibold text-text-muted/50 mb-1">Canvas vide</p>
+          <p className="text-[11px] text-text-muted/30">Glissez un module depuis la palette</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+//
 // WorkflowEditor
 //
 
@@ -813,10 +934,16 @@ export interface SavedEdge {
   target: string;
 }
 
+export interface WorkflowEditorActions {
+  save: () => void;
+  run: () => void;
+  getState: () => { blocks: CanvasBlock[]; edges: SavedEdge[] };
+}
+
 export interface WorkflowEditorProps {
   isRunning: boolean;
   events: LogEvent[];
-  onRun: (blocks: CanvasBlock[]) => void;
+  onRun: (blocks: CanvasBlock[], edges: SavedEdge[]) => void;
   onReset: () => void;
   monitoring?: React.ReactNode;
   /** Pre-load these blocks on mount (overrides the default pipeline). Pass [] for empty canvas. */
@@ -825,20 +952,29 @@ export interface WorkflowEditorProps {
   initialEdges?: SavedEdge[];
   /** If provided, a Save button appears in the palette. */
   onSave?: (blocks: CanvasBlock[], edges: SavedEdge[]) => Promise<void>;
+  /** If provided, an Export button appears above the canvas. */
+  onExport?: () => void;
+  /** Expose save/run triggers to the parent. */
+  actionsRef?: React.MutableRefObject<WorkflowEditorActions | null>;
+  /** Hide the Save/Run/Reset buttons from the palette (use when they live in an external header). */
+  hideActions?: boolean;
 }
 
-export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSave, initialBlocks, initialEdges }: WorkflowEditorProps) {
+export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSave, onExport, initialBlocks, initialEdges, monitoring, actionsRef, hideActions }: WorkflowEditorProps) {
   const startNodes = initialBlocks !== undefined ? blocksToNodes(initialBlocks) : INITIAL_NODES;
+  const validNodeIds = new Set(startNodes.map(n => n.id));
   const startEdges = initialEdges !== undefined
-    ? initialEdges.map((e, i) => ({
-        id: `e-saved-${i}`,
-        source: e.source,
-        target: e.target,
-        type: 'deletable' as const,
-        animated: false,
-        style: EDGE_STYLE,
-        markerEnd: MARKER_END,
-      }))
+    ? initialEdges
+        .filter(e => validNodeIds.has(e.source) && validNodeIds.has(e.target))
+        .map((e, i) => ({
+          id: `e-saved-${i}`,
+          source: e.source,
+          target: e.target,
+          type: 'deletable' as const,
+          animated: false,
+          style: EDGE_STYLE,
+          markerEnd: MARKER_END,
+        }))
     : initialBlocks !== undefined
       ? blocksToEdges(startNodes)
       : INITIAL_EDGES;
@@ -846,6 +982,27 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState(startNodes);
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState(startEdges);
   const [isSaving, setIsSaving] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
+
+  // Expose save/run to parent via ref (updated every render to always capture fresh state)
+  if (actionsRef) {
+    actionsRef.current = {
+      save: () => {
+        if (!onSave || isSaving || visibleCount === 0) return;
+        setIsSaving(true);
+        onSave(blocks, rfEdges.map(e => ({ source: e.source, target: e.target })))
+          .finally(() => setIsSaving(false));
+      },
+      run: () => {
+        if (visibleCount === 0 || isRunning) return;
+        onRun(blocks, rfEdges.map(e => ({ source: e.source, target: e.target })));
+      },
+      getState: () => ({
+        blocks,
+        edges: rfEdges.map(e => ({ source: e.source, target: e.target })),
+      }),
+    };
+  }
 
   // Stable config + remove callbacks
   const handleChangeConfig = useCallback((instanceId: string, config: BlockConfig) => {
@@ -873,9 +1030,9 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
   useEffect(() => {
     console.log(`[WorkflowEditor] status update — isRunning: ${isRunning} | events: ${events.length}`);
     setRfNodes(prev => prev.map(n => {
-      const blockType = (n.data as WorkflowNodeData).block.type;
-      const status = (isRunning || events.length > 0) ? getBlockStatus(blockType, events) : 'idle';
-      console.log(`[WorkflowEditor] node "${blockType}" → status: ${status}`);
+      const block = (n.data as WorkflowNodeData).block;
+      const status = (isRunning || events.length > 0) ? getBlockStatus(block.type, block.instanceId, events) : 'idle';
+      console.log(`[WorkflowEditor] node "${block.type}" (${block.instanceId}) → status: ${status}`);
       return {
         ...n,
         data: {
@@ -904,16 +1061,18 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
     }, eds));
   }, [setRfEdges]);
 
-  function addBlock(type: string) {
+  function addBlock(type: string, position?: { x: number; y: number }) {
     const def = MODULE_CATALOG.find(m => m.type === type);
     if (!def) return;
     const instanceId = `${type}-${Date.now()}`;
     setRfNodes(prev => {
-      const visibleNodes = prev.filter(n => !n.hidden);
-      const last = visibleNodes.length > 0
-        ? visibleNodes.reduce((b, n) => n.position.y > b.position.y ? n : b)
-        : null;
-      const pos = last ? { x: last.position.x + 40, y: last.position.y + NODE_GAP } : { x: 0, y: 0 };
+      const pos: { x: number; y: number } = position ?? (() => {
+        const visibleNodes = prev.filter(n => !n.hidden);
+        const last = visibleNodes.length > 0
+          ? visibleNodes.reduce((b, n) => n.position.y > b.position.y ? n : b)
+          : null;
+        return last ? { x: last.position.x + 40, y: last.position.y + NODE_GAP } : { x: 0, y: 0 };
+      })();
       return [...prev, {
         id: instanceId,
         type: getRfNodeType(type),
@@ -936,13 +1095,14 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
   const paletteInputs   = MODULE_CATALOG.filter(m => m.category === 'input');
   const paletteModules  = MODULE_CATALOG.filter(m => m.category !== 'trigger' && m.category !== 'input');
   const visibleCount = rfNodes.length;
-  const blocks = rfNodes.map(n => (n.data as WorkflowNodeData).block);
+  // Include canvas positions so they can be persisted and restored
+  const blocks = rfNodes.map(n => ({ ...(n.data as WorkflowNodeData).block, position: n.position }));
 
   return (
-    <div className="flex gap-6 items-start">
+    <div className="flex gap-6 h-full">
 
       {/* Palette */}
-      <div className="w-60 shrink-0 sticky top-6 space-y-2">
+      <div className="w-60 shrink-0 flex flex-col overflow-y-auto space-y-2 pr-0.5">
 
         {/* Triggers */}
         <div className="flex items-center gap-2 px-0.5 mb-2">
@@ -991,82 +1151,117 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
           />
         ))}
 
-        <div className="pt-2 space-y-2">
-          {onSave && !isRunning && (
-            <button
-              type="button"
-              disabled={isSaving || visibleCount === 0}
-              onClick={async () => {
-                setIsSaving(true);
-                try { await onSave(blocks, rfEdges.map(e => ({ source: e.source, target: e.target }))); } finally { setIsSaving(false); }
-              }}
-              className="w-full py-2 flex items-center justify-center gap-2 rounded-xl border border-border text-xs font-semibold text-text-muted hover:text-text hover:border-accent/30 transition-all disabled:opacity-40 uppercase tracking-widest"
-            >
-              {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-              Sauvegarder
-            </button>
-          )}
-          {!isRunning ? (
-            <button type="button" disabled={visibleCount === 0}
-              onClick={() => onRun(blocks)}
-              className="w-full py-2.5 flex items-center justify-center gap-2 rounded-xl text-xs font-semibold uppercase tracking-widest transition-all btn-accent disabled:opacity-40">
-              <Play size={14} />
-              Lancer le workflow
-            </button>
-          ) : (
-            <div className="w-full py-2.5 flex items-center justify-center gap-2 rounded-xl bg-accent/5 border border-accent/20 text-accent text-xs font-semibold">
-              <Spinner className="w-4 h-4" />
-              Traitement en cours...
-            </div>
-          )}
-          {events.length > 0 && !isRunning && (
-            <button type="button" onClick={onReset}
-              className="w-full py-1.5 flex items-center justify-center gap-1.5 rounded-lg border border-border text-[10px] font-semibold text-text-muted hover:text-error hover:border-error/20 transition-colors uppercase tracking-wider">
-              <RefreshCw size={11} />
-              Reinitialiser
-            </button>
-          )}
-        </div>
-
-        <p className="text-[9px] text-text-muted/30 text-center pt-2 leading-relaxed">
-          Glissez les blocs · Tirez les ronds pour connecter · Suppr pour effacer
-        </p>
       </div>
 
       {/* React Flow canvas */}
-      <div className="flex-1 min-w-0 rounded-xl border border-border overflow-hidden" style={{ height: 680 }}>
-        {visibleCount === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center bg-surface/20">
-            <p className="text-sm font-semibold text-text-muted/50 mb-1">Canvas vide</p>
-            <p className="text-[11px] text-text-muted/30">Ajoutez un module depuis la palette</p>
+      <div className={cn('flex flex-col min-w-0', monitoring && showLogs ? 'w-[520px] shrink-0' : 'flex-1')}>
+        {!hideActions && (
+          <div className="flex items-center justify-end gap-2 mb-2">
+            {onExport && !isRunning && (
+              <button type="button" onClick={onExport} className="btn-secondary gap-2">
+                <Download size={13} />
+                Exporter
+              </button>
+            )}
+            {onSave && !isRunning && (
+              <button
+                type="button"
+                disabled={isSaving || visibleCount === 0}
+                onClick={async () => {
+                  setIsSaving(true);
+                  try { await onSave(blocks, rfEdges.map(e => ({ source: e.source, target: e.target }))); } finally { setIsSaving(false); }
+                }}
+                className="btn-secondary gap-2 disabled:opacity-40"
+              >
+                {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                Sauvegarder
+              </button>
+            )}
+            {!isRunning ? (
+              <button type="button" disabled={visibleCount === 0}
+                onClick={() => onRun(blocks, rfEdges.map(e => ({ source: e.source, target: e.target })))}
+                className="btn-accent gap-2 disabled:opacity-40">
+                <Play size={14} />
+                Lancer
+              </button>
+            ) : (
+              <div className="px-3 py-1.5 flex items-center gap-2 rounded-xl bg-accent/5 border border-accent/20 text-accent text-xs font-semibold">
+                <Spinner className="w-4 h-4" />
+                En cours...
+              </div>
+            )}
+            {events.length > 0 && !isRunning && (
+              <button type="button" onClick={onReset}
+                className="btn-secondary gap-2">
+                <RefreshCw size={11} />
+                Reinitialiser
+              </button>
+            )}
           </div>
-        ) : (
-          <ReactFlow
-            nodes={rfNodes}
-            edges={rfEdges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            fitView
-            fitViewOptions={{ padding: 0.35 }}
-            proOptions={{ hideAttribution: true }}
-            deleteKeyCode={['Backspace', 'Delete']}
-            connectionRadius={40}
-            snapToGrid
-            snapGrid={[16, 16]}
-            connectionLineStyle={{ stroke: 'var(--accent)', strokeWidth: 2, strokeDasharray: '6 3' }}
-            className="bg-background"
-          >
-            <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="var(--border)" />
-            <Controls showInteractive={false}
-              className="!border-border !bg-surface !shadow-none [&>button]:!bg-surface [&>button]:!border-border [&>button]:!text-text-muted" />
-            <MiniMap nodeStrokeWidth={0} nodeColor={() => 'var(--surface)'}
-              maskColor="rgba(0,0,0,0.3)" className="!bg-background !border-border" />
-          </ReactFlow>
         )}
+        <div className="rounded-xl border border-border overflow-hidden flex-1 relative">
+          <ReactFlowProvider>
+            <DroppableCanvas
+              rfNodes={rfNodes}
+              rfEdges={rfEdges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              visibleCount={visibleCount}
+              onDropModule={(type, pos) => addBlock(type, pos)}
+            />
+          </ReactFlowProvider>
+          
+          {/* Logs toggle - bottom left */}
+          {events.length > 0 && monitoring && (
+            <div className="absolute bottom-4 left-4 z-10">
+              <label className={cn(
+                "flex items-center gap-2.5 px-4 py-2.5 rounded-lg cursor-pointer select-none transition-all duration-200",
+                "bg-surface/95 backdrop-blur-sm border shadow-lg",
+                showLogs
+                  ? "border-accent/30 shadow-accent/10 hover:border-accent/40"
+                  : "border-border/50 hover:border-border"
+              )}>
+                <div className="relative flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={showLogs}
+                    onChange={(e) => setShowLogs(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className={cn(
+                    "w-9 h-5 rounded-full transition-all duration-200",
+                    showLogs ? "bg-accent" : "bg-muted"
+                  )}>
+                    <div className={cn(
+                      "absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-all duration-200",
+                      showLogs ? "left-[19px]" : "left-0.5"
+                    )} />
+                  </div>
+                </div>
+                <div className="flex flex-col">
+                  <span className={cn(
+                    "text-xs font-semibold transition-colors",
+                    showLogs ? "text-accent" : "text-text"
+                  )}>
+                    Logs de workflow
+                  </span>
+                  <span className="text-[10px] text-text-muted">
+                    {showLogs ? "Actifs" : "Masqués"}
+                  </span>
+                </div>
+              </label>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Results panel */}
+      {monitoring && showLogs && (
+        <div className="flex-1 min-w-0 h-full overflow-y-auto">
+          {monitoring}
+        </div>
+      )}
     </div>
   );
 }

@@ -15,8 +15,6 @@ interface Site {
   id: string;
   name: string;
   url: string;
-  webflow_site_id: string;
-  webflow_collection_name: string;
   created_at: string;
   userRole: 'admin' | 'member';
 }

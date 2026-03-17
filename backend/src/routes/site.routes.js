@@ -41,19 +41,13 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, url, webflowSiteId, webflowApiKey, webflowCollectionName } = req.body;
+    const { name, url } = req.body;
 
     if (!name || !url) {
       return res.status(400).json({ error: 'Nom et URL du site requis' });
     }
 
-    const site = await createSite(req.user.id, {
-      name,
-      url,
-      webflowSiteId,
-      webflowApiKey,
-      webflowCollectionName,
-    });
+    const site = await createSite(req.user.id, { name, url });
 
     res.status(201).json({ site });
   } catch (error) {
@@ -82,14 +76,11 @@ router.get('/:id', async (req, res) => {
  */
 router.put('/:id', async (req, res) => {
   try {
-    const { name, url, webflowSiteId, webflowApiKey, webflowCollectionName } = req.body;
+    const { name, url } = req.body;
     
     const updates = {};
     if (name !== undefined) updates.name = name;
     if (url !== undefined) updates.url = url;
-    if (webflowSiteId !== undefined) updates.webflow_site_id = webflowSiteId;
-    if (webflowApiKey !== undefined) updates.webflow_api_key = webflowApiKey;
-    if (webflowCollectionName !== undefined) updates.webflow_collection_name = webflowCollectionName;
 
     const site = await updateSite(req.params.id, req.user.id, updates);
     res.json({ site });

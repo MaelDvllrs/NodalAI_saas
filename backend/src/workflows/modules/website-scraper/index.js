@@ -96,6 +96,43 @@ export const WebsiteScraperModule = {
     emitEvent(jobId, { type: 'data', key: 'siteProfile', value: siteProfile });
     emitEvent(jobId, { type: 'data', key: 'sitemapUrls', value: sitemapUrls });
 
+    // ── Push prompt snippet ────────────────────────────────────────────────
+    const snippet = buildSiteProfileSnippet(siteProfile, sitemapUrls);
+    if (snippet) ctx.promptSnippets.push(snippet);
+
     return { siteProfile, sitemapUrls };
   },
 };
+
+// ── Prompt snippet builder ─────────────────────────────────────────────────────
+function buildSiteProfileSnippet(profile, sitemapUrls = []) {
+  if (!profile) return null;
+  const titles = (profile.existingBlogTitles ?? []).slice(0, 10)
+    .map((t) => `- ${t}`).join('\n') || '- Aucun contenu existant.';
+  const mainTopics = (profile.mainTopics ?? []).join(', ') || '—';
+
+  const internalLinksBlock = sitemapUrls.length > 0
+    ? [
+        ``,
+        `### URLs internes disponibles (à utiliser pour les liens internes) :`,
+        `Ces URLs proviennent du sitemap du site. Lorsque le contenu le permet, intègre des liens internes`,
+        `vers ces pages en utilisant le format : [[INTERNE:URL|texte d'ancre descriptif]].`,
+        `Minimum 2-3 liens internes si des URLs pertinentes existent.`,
+        ``,
+        sitemapUrls.slice(0, 50).map((u) => `- ${u}`).join('\n'),
+      ].join('\n')
+    : '';
+
+  return [
+    `## PROFIL DU SITE`,
+    `Thème : "${profile.theme ?? 'non défini'}"`,
+    `Description : ${profile.description ?? '—'}`,
+    `Ton recommandé : ${profile.tone ?? '—'}`,
+    `Audience cible : ${profile.targetAudience ?? '—'}`,
+    `Sujets principaux : ${mainTopics}`,
+    ``,
+    `**Contenus existants à NE PAS dupliquer :**`,
+    titles,
+    internalLinksBlock,
+  ].join('\n');
+}

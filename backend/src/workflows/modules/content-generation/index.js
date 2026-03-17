@@ -47,11 +47,14 @@ export const ContentGenerationModule = {
     if (!mainKeyword) throw new Error('mainKeyword requis pour ContentGenerationModule');
 
     // Build optimized outline from SERP model
+    // Word count bounds from KD (needed for outline target)
+    const { min: wcMin, max: wcMax } = getWordCountBounds(serpModel?.kd ?? ctx.kd ?? null);
+
     let optimizedOutline = ctx.outline ?? '';
     if (!optimizedOutline && serpModel?.dominantSubtopics?.length > 0) {
       emitEvent(jobId, { type: 'step', message: '📌 Génération du plan optimisé SERP avec Claude...' });
       try {
-        optimizedOutline = await generateOptimizedOutline(mainKeyword, serpModel, theme, tone);
+        optimizedOutline = await generateOptimizedOutline(mainKeyword, serpModel, theme, tone, wcMax);
         if (optimizedOutline) {
           emitEvent(jobId, { type: 'step', message: `✅ Plan généré (${optimizedOutline.split('\n').length} lignes)` });
         }
@@ -59,9 +62,6 @@ export const ContentGenerationModule = {
         // Non-blocking
       }
     }
-
-    // Word count bounds from KD
-    const { min: wcMin, max: wcMax } = getWordCountBounds(serpModel?.kd ?? ctx.kd ?? null);
 
     let rawBlog  = '';
     let parsed   = null;
@@ -76,6 +76,7 @@ export const ContentGenerationModule = {
         theme,
         tone,
         existingTitles,
+        kd: serpModel?.kd ?? ctx.kd ?? null,
         serpModel,
         semanticAnalysis,
         internalUrls:     internalLinks,

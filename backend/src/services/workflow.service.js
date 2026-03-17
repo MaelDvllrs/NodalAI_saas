@@ -20,7 +20,7 @@ export async function saveWorkflow({ userId, projectId, name, workflowJson }) {
 export async function getWorkflows(userId, projectId) {
   let q = supabase
     .from('workflows')
-    .select('id, name, project_id, created_at, updated_at')
+    .select('id, name, project_id, workflow_json, created_at, updated_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
   if (projectId) q = q.eq('project_id', projectId);
@@ -65,6 +65,49 @@ export async function deleteWorkflow(id, userId) {
   if (error) throw new Error(`[workflow.service] deleteWorkflow: ${error.message}`);
 }
 
+// Returns all public workflow templates with creator profile info.
+// Uses a regular select — RLS policy "workflows_public_read" allows this for any caller.
+export async function getPublicWorkflows() {
+  const { data, error } = await supabase
+    .from('workflows')
+    .select(`
+      id, name, description, workflow_json, created_at,
+      user_id
+    `)
+    .eq('is_public', true)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(`[workflow.service] getPublicWorkflows: ${error.message}`);
+
+  // Fetch display names + avatars from auth.users via admin client if available,
+  // otherwise fall back to user metadata from profiles if present.
+  // We expose only safe public fields.
+  const userIds = [...new Set((data ?? []).map(w => w.user_id))];
+  let profileMap = {};
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('site_members')
+      .select('user_id, email')
+      .in('user_id', userIds);
+    if (profiles) {
+      profiles.forEach(p => { profileMap[p.user_id] = p; });
+    }
+  }
+
+  return (data ?? []).map(w => ({
+    id:           w.id,
+    name:         w.name,
+    description:  w.description ?? null,
+    workflow_json: w.workflow_json,
+    created_at:   w.created_at,
+    creator: {
+      id:     w.user_id,
+      email:  profileMap[w.user_id]?.email ?? null,
+      // initials derived from email for avatar fallback
+      initials: (profileMap[w.user_id]?.email ?? '?')[0].toUpperCase(),
+    },
+  }));
+}
+
 // ── Workflow runs ────────────────────────────────────────────────────────────
 
 export async function createWorkflowRun({ workflowId, projectId, userId }) {
@@ -93,7 +136,7 @@ export async function updateWorkflowRun(id, status) {
 export async function getWorkflowRuns(userId, projectId) {
   let q = supabase
     .from('workflow_runs')
-    .select('id, workflow_id, project_id, status, created_at, updated_at, workflows!workflow_id(name), sites!project_id(name)')
+    .select('id, user_id, workflow_id, project_id, status, created_at, updated_at, workflows!workflow_id(name), sites!project_id(name)')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(50);
@@ -141,4 +184,58 @@ export async function getWorkflowRunSteps(workflowRunId) {
     .order('step_index', { ascending: true });
   if (error) throw new Error(`[workflow.service] getWorkflowRunSteps: ${error.message}`);
   return data;
+}
+
+// ── Workflow run rating ──────────────────────────────────────────────────────
+
+export async function rateWorkflowRun(runId, userId, rating) {
+  if (rating < 1 || rating > 5) {
+    throw new Error('Rating must be between 1 and 5');
+  }
+
+  // Verify ownership before updating
+  const { data: run, error: fetchError } = await supabase
+    .from('workflow_runs')
+    .select('id')
+    .eq('id', runId)
+    .eq('user_id', userId)
+    .single();
+
+  if (fetchError || !run) {
+    throw new Error('Workflow run not found or access denied');
+  }
+
+  const { data, error } = await supabase
+    .from('workflow_runs')
+    .update({ rating })
+    .eq('id', runId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (error) throw new Error(`[workflow.service] rateWorkflowRun: ${error.message}`);
+  return data;
+}
+
+export async function getTopRatedWorkflowRuns(userId, projectId, limit = 5) {
+  let query = supabase
+    .from('workflow_runs')
+    .select(`
+      id, rating, created_at,
+      workflow_run_steps!inner(module_type, result_json)
+    `)
+    .eq('user_id', userId)
+    .eq('status', 'done')
+    .gte('rating', 4)
+    .order('rating', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (projectId) {
+    query = query.eq('project_id', projectId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(`[workflow.service] getTopRatedWorkflowRuns: ${error.message}`);
+  return data ?? [];
 }

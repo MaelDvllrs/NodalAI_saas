@@ -317,12 +317,15 @@ function stripHtml(html) {
   for (const re of NOISE_PHRASE_RES) filtered = filtered.replace(re, ' ');
   filtered = filtered.replace(/\s{2,}/g, ' ').trim();
 
+  // Compter les mots avant troncature (mesure réelle pour la mise à l'échelle de la densité)
+  const fullWordCount = filtered ? filtered.trim().split(/\s+/).filter(Boolean).length : 0;
+
   // Couper à la limite de caractères sur une frontière de mot (ne coupe jamais un mot)
   if (filtered.length > MAX_TEXT_CHARS) {
     const cutAt = filtered.lastIndexOf(' ', MAX_TEXT_CHARS);
-    return filtered.substring(0, cutAt > 0 ? cutAt : MAX_TEXT_CHARS);
+    return { text: filtered.substring(0, cutAt > 0 ? cutAt : MAX_TEXT_CHARS), fullWordCount };
   }
-  return filtered;
+  return { text: filtered, fullWordCount };
 }
 
 // Fetch une page avec gestion de l'encodage (UTF-8, ISO-8859-1, Windows-1252)
@@ -447,9 +450,9 @@ async function fetchPageContent(url) {
       console.warn(`[Semantic] Charset inconnu "${charset}" pour ${url}, fallback UTF-8`);
     }
 
-    const text = stripHtml(html);
-    console.log(`[Semantic] Récupéré: ${url} (${text.length} chars, charset: ${charset})`);
-    return text || null;
+    const { text, fullWordCount } = stripHtml(html);
+    console.log(`[Semantic] Récupéré: ${url} (${text.length} chars, ${fullWordCount} mots, charset: ${charset})`);
+    return text ? { text, fullWordCount } : null;
   } catch (err) {
     const isTimeout = err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT'
       || err.message?.includes('timeout');
@@ -1274,9 +1277,10 @@ export async function analyzeSemanticKeywords(keyword, serpResults) {
   const rawTokenizedDocs = []; // tokens avec stop-words (fenêtres n-gram)
   const pagesMeta = [];     // metadata for each successfully fetched page
   const pageTexts  = [];    // raw texts aligned with tokenizedDocs (for scoring)
+  const wordCounts = [];    // full word counts per crawled page (before truncation)
 
   pageContents.forEach((content, i) => {
-    if (!content) return;
+    if (!content || !content.text) return;
     const serpEntry = serpToFetch[i] || null;
     pagesMeta.push({
       idx: pagesMeta.length,
@@ -1285,10 +1289,16 @@ export async function analyzeSemanticKeywords(keyword, serpResults) {
       title: serpEntry?.title || '',
       rank: serpEntry?.rank || (i + 1),
     });
-    tokenizedDocs.push(tokenize(content));
-    rawTokenizedDocs.push(rawTokenize(content));
-    pageTexts.push(content);
+    tokenizedDocs.push(tokenize(content.text));
+    rawTokenizedDocs.push(rawTokenize(content.text));
+    pageTexts.push(content.text);
+    if (content.fullWordCount > 0) wordCounts.push(content.fullWordCount);
   });
+
+  // Nombre moyen de mots des pages SERP crawlées (mesure réelle, pas estimation IA)
+  const serpCrawledAvgWordCount = wordCounts.length > 0
+    ? Math.round(wordCounts.reduce((s, w) => s + w, 0) / wordCounts.length)
+    : null;
 
   if (tokenizedDocs.length > 0) {
     // Enrichir les docs avec bigrammes + trigrammes + 4-grams pour le TF-IDF
@@ -1358,12 +1368,14 @@ export async function analyzeSemanticKeywords(keyword, serpResults) {
 
   console.log(
     `[Semantic] Résultat final — primaryTerms: ${analysis.primaryTerms.length}, ` +
-    `longTail: ${analysis.longTailVariants.length}, contentGaps: ${analysis.contentGaps.length}`
+    `longTail: ${analysis.longTailVariants.length}, contentGaps: ${analysis.contentGaps.length}, ` +
+    `serpCrawledAvgWordCount: ${serpCrawledAvgWordCount ?? 'n/a'} mots`
   );
 
   return {
     keyword,
     pagesAnalyzed:    tokenizedDocs.length,
+    serpCrawledAvgWordCount,              // nombre moyen de mots des pages SERP réellement crawlées
     intentTopTerms:   tfidfTerms,           // tous les termes rerankés par intention (BM25 + embeddings)
     tfidfTopTerms:    tfidfTerms,           // alias for backward compat
     termDistribution,
@@ -1381,6 +1393,7 @@ function buildEmptyAnalysis(keyword) {
   return {
     keyword,
     pagesAnalyzed:     0,
+    serpCrawledAvgWordCount: null,
     intentTopTerms:    [],
     tfidfTopTerms:     [],
     termDistribution:  [],
