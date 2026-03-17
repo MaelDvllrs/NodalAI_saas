@@ -11,7 +11,7 @@ module.exports = {
     error_file: './logs/err.log',
     out_file: './logs/out.log',
     time: true,
-    max_memory_restart: '500M',
+    max_memory_restart: '1500M',
     // Redémarrage automatique en cas de crash
     autorestart: true,
     // Délai entre les redémarrages
