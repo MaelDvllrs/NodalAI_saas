@@ -9,7 +9,6 @@ import { Plus, Trash2, Layers, Clock, X, Loader2, MoreVertical, ExternalLink, Hi
 import Link from 'next/link';
 import { Skeleton } from '../components/UI';
 import { MODULE_CATALOG } from '../components/WorkflowEditor';
-import { GoogleIcon, WebflowIcon } from '../components/WorkflowBlocks';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
@@ -37,9 +36,12 @@ interface PublicWorkflow {
 function WorkflowModuleIcons({ steps }: { steps: { type: string; config: Record<string, unknown> }[] }) {
   // Mapping des modules vers leurs logos de marque (dédupliqués par marque)
   const MODULE_TO_BRAND: Record<string, string> = {
-    'serp-analysis': 'google',
-    'webflow-structure': 'webflow',
-    'webflow-publish': 'webflow',
+    'serp-analysis':        'google',
+    'webflow-structure':    'webflow',
+    'webflow-publish':      'webflow',
+    'chatgpt-analysis':     'chatgpt',
+    'gemini-analysis':      'gemini',
+    'perplexity-analysis':  'perplexity',
   };
   
   // Extraire les marques uniques utilisées dans le workflow
@@ -78,11 +80,11 @@ function WorkflowModuleIcons({ steps }: { steps: { type: string; config: Record<
         return (
           <div
             key={mod.type}
-            className={`flex items-center justify-center w-7 h-7 rounded-full border-2 border-surface bg-neutral-800 ${i > 0 ? '-ml-2' : ''}`}
+            className={`flex items-center justify-center w-5 h-5 rounded-full  bg-neutral-800 ${i > 0 ? '-ml-1' : ''}`}
             style={{ zIndex: modules.length - i }}
             title={mod.label}
           >
-            <Icon size={12} className={textColor} />
+            <Icon size={11} className={textColor} />
           </div>
         );
       })}
@@ -239,7 +241,7 @@ function WorkflowCard({ workflow, onDelete }: { workflow: Workflow; onDelete: (i
       className="bg-surface border border-border rounded-lg p-4 flex flex-col gap-4 hover:border-accent/40 transition-colors cursor-pointer"
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex gap-2">
           <WorkflowModuleIcons steps={steps} />
           <div>
             <h3 className="font-semibold text-text leading-tight">{workflow.name}</h3>
@@ -408,7 +410,7 @@ function GenerateListContent() {
       )}
 
       <div className="animate-fade-in">
-        <div className="max-w-[1400px] mx-auto py-8 px-6">
+        <div className="max-w-[1400px] mx-auto py-4 px-4">
 
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 animate-slide-up">

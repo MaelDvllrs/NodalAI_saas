@@ -17,19 +17,41 @@
  *   console.log(mod.ports.in);  // [{ key:'theme', label:'Thème', required:false }, ...]
  */
 
-import { TextInputModule }          from './modules/text-input/index.js';
-import { WebsiteScraperModule }     from './modules/website-scraper/index.js';
-import { KeywordResearchModule }    from './modules/keyword-research/index.js';
-import { SerpAnalysisModule }       from './modules/serp-analysis/index.js';
-import { SemanticExtractionModule } from './modules/semantic-extraction/index.js';
-import { ContentGenerationModule }  from './modules/content-generation/index.js';
-import { BlogGenerationModule }     from './modules/blog-generation/index.js';
-import { FaqGeneratorModule }       from './modules/faq-generator.js';
-import { InternalLinkingModule }    from './modules/internal-linking/index.js';
+import { TextInputModule }           from './modules/text-input/index.js';
+import { PromptInputModule }         from './modules/prompt-input/index.js';
+import { WebsiteScraperModule }      from './modules/website-scraper/index.js';
+import { KeywordResearchModule }     from './modules/keyword-research/index.js';
+import { SerpAnalysisModule }        from './modules/serp-analysis/index.js';
+import { SemanticExtractionModule }  from './modules/semantic-extraction/index.js';
+import { ContentGenerationModule }   from './modules/content-generation/index.js';
+import { BlogGenerationModule }      from './modules/blog-generation/index.js';
+import { FaqGeneratorModule }        from './modules/faq-generator.js';
+import { InternalLinkingModule }     from './modules/internal-linking/index.js';
 import { WebflowStructureModule }    from './modules/webflow-structure/index.js';
-import { WebflowPublishModule }     from './modules/webflow-publish/index.js';
+import { WebflowPublishModule }      from './modules/webflow-publish/index.js';
+import { GeoPromptGeneratorModule }  from './modules/geo-prompt-generator/index.js';
+import { BlogGenerationGeoModule }   from './modules/blog-generation-geo/index.js';
+import { ChatGptAnalysisModule }      from './modules/chatgpt-analysis/index.js';
+import { GeminiAnalysisModule }      from './modules/gemini-analysis/index.js';
+import { PerplexityAnalysisModule }  from './modules/perplexity-analysis/index.js';
 
 const MODULES = [
+  // ── Prompt Input ───────────────────────────────────────────────────────────
+  {
+    id:          'prompt-input',
+    label:       'Prompt GEO',
+    description: 'Injecte un prompt GEO saisi manuellement et le sauvegarde dans la base de prompts.',
+    ports: {
+      in:  [],
+      out: [
+        { key: 'geoPrompt', label: 'Prompt GEO' },
+        { key: 'geoTopic',  label: 'Sujet GEO' },
+      ],
+    },
+    defaultConfig: { prompt: '', topic: '' },
+    module:      PromptInputModule,
+  },
+
   // ── Text Input ─────────────────────────────────────────────────────────────
   {
     id:          'text-input',
@@ -226,6 +248,121 @@ const MODULES = [
     },
     defaultConfig: { apiKey: '', siteId: '', collectionName: '' },
     module:      WebflowStructureModule,
+  },
+
+  // ── ChatGPT Analysis ───────────────────────────────────────────────────────
+  {
+    id:          'chatgpt-analysis',
+    label:       'Analyse ChatGPT',
+    description: 'Envoie le prompt 3× à ChatGPT et analyse les réponses (questions, sources, résumé GEO).',
+    ports: {
+      in:  [
+        { key: 'geoPrompt', label: 'Prompt GEO', required: true },
+      ],
+      out: [
+        { key: 'chatgptResponses',      label: 'Réponses brutes (×3)' },
+        { key: 'geoQuestions',          label: 'Questions pertinentes' },
+        { key: 'geoSources',            label: 'Sources citées' },
+        { key: 'geoCommonPoints',       label: 'Points communs' },
+        { key: 'geoContentGaps',        label: 'Opportunités GEO' },
+        { key: 'geoResponseVariations', label: 'Variations de réponses' },
+        { key: 'geoAnalysis',           label: 'Résumé GEO complet' },
+      ],
+    },
+    defaultConfig: { runs: 3 },
+    module:      ChatGptAnalysisModule,
+  },
+
+  // ── Gemini Analysis ────────────────────────────────────────────────────────
+  {
+    id:          'gemini-analysis',
+    label:       'Analyse Gemini',
+    description: 'Envoie le prompt 3× à Gemini et analyse les réponses (questions, sources, résumé GEO).',
+    ports: {
+      in:  [{ key: 'geoPrompt', label: 'Prompt GEO', required: true }],
+      out: [
+        { key: 'geminiResponses',      label: 'Réponses brutes (×3)' },
+        { key: 'geoQuestions',         label: 'Questions pertinentes' },
+        { key: 'geoSources',           label: 'Sources citées' },
+        { key: 'geoCommonPoints',      label: 'Points communs' },
+        { key: 'geoContentGaps',       label: 'Opportunités GEO' },
+        { key: 'geoResponseVariations',label: 'Variations de réponses' },
+        { key: 'geoAnalysis',          label: 'Résumé GEO complet' },
+      ],
+    },
+    defaultConfig: { runs: 3 },
+    module:      GeminiAnalysisModule,
+  },
+
+  // ── Perplexity Analysis ────────────────────────────────────────────────────
+  {
+    id:          'perplexity-analysis',
+    label:       'Analyse Perplexity',
+    description: 'Envoie le prompt 3× à Perplexity et analyse les réponses (questions, sources, résumé GEO).',
+    ports: {
+      in:  [{ key: 'geoPrompt', label: 'Prompt GEO', required: true }],
+      out: [
+        { key: 'perplexityResponses',  label: 'Réponses brutes (×3)' },
+        { key: 'geoQuestions',         label: 'Questions pertinentes' },
+        { key: 'geoSources',           label: 'Sources citées' },
+        { key: 'geoCommonPoints',      label: 'Points communs' },
+        { key: 'geoContentGaps',       label: 'Opportunités GEO' },
+        { key: 'geoResponseVariations',label: 'Variations de réponses' },
+        { key: 'geoAnalysis',          label: 'Résumé GEO complet' },
+      ],
+    },
+    defaultConfig: { runs: 3 },
+    module:      PerplexityAnalysisModule,
+  },
+
+  // ── Blog Generation GEO ───────────────────────────────────────────────────
+  {
+    id:          'blog-generation-geo',
+    label:       'Génération de blog GEO',
+    description: 'Génère un article GEO-optimisé conçu pour être extrait par les IA (ChatGPT, Gemini, Perplexity).',
+    ports: {
+      in: [
+        { key: 'geoPrompt',      label: 'Prompt GEO (question)',   required: true  },
+        { key: 'geoQuestions',   label: 'Questions IA → H2s',      required: false },
+        { key: 'geoSources',     label: 'Sources citées par les IA', required: false },
+        { key: 'geoCommonPoints',label: 'Points communs IA',        required: false },
+        { key: 'geoContentGaps', label: 'Opportunités GEO',         required: false },
+        { key: 'geoAnalysis',    label: 'Synthèse IA',              required: false },
+        { key: 'sitemapUrls',    label: 'URLs sitemap (maillage)',   required: false },
+        { key: 'siteProfile',    label: 'Profil du site',           required: false },
+        { key: 'detectedFields', label: 'Champs Webflow détectés',  required: false },
+        { key: 'webflowFields',  label: 'Champs Webflow bruts',     required: false },
+      ],
+      out: [
+        { key: 'blogContent',  label: 'Contenu article' },
+        { key: 'parsedBlog',   label: 'Article parsé' },
+        { key: 'htmlBody',     label: 'HTML généré' },
+        { key: 'htmlBodyFull', label: 'HTML complet' },
+        { key: 'fieldData',    label: 'Champs Webflow' },
+      ],
+    },
+    defaultConfig: {},
+    module: BlogGenerationGeoModule,
+  },
+
+  // ── GEO Prompt Generator ───────────────────────────────────────────────────
+  {
+    id:          'geo-prompt-generator',
+    label:       'Générateur de prompt GEO',
+    description: 'Analyse le profil du site et propose via Claude Haiku un prompt sur un thème non encore couvert.',
+    ports: {
+      in:  [
+        { key: 'siteProfile',  label: 'Profil du site',  required: true  },
+        { key: 'sitemapUrls',  label: 'URLs sitemap',     required: false },
+      ],
+      out: [
+        { key: 'geoPrompt',    label: 'Prompt GEO' },
+        { key: 'geoTopic',     label: 'Sujet GEO' },
+        { key: 'geoRationale', label: 'Justification' },
+      ],
+    },
+    defaultConfig: {},
+    module:      GeoPromptGeneratorModule,
   },
 
   // ── Webflow Publish ────────────────────────────────────────────────────────

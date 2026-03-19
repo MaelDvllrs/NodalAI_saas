@@ -23,11 +23,11 @@ import '@xyflow/react/dist/style.css';
 import {
   Search, TrendingUp, Layers, Sparkles, Rocket,
   X, CheckCircle2, AlertCircle, Loader2, Check, SlidersHorizontal, MoreVertical,
-  Play, RefreshCw, FileEdit, Info, MousePointerClick, Zap, Globe, Save, Type, Download, Database,
+  Play, RefreshCw, FileEdit, Info, MousePointerClick, Zap, Globe, Save, Type, Download, Database, MessageSquarePlus, Lightbulb,
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 import type { LogEvent } from './ProgressLog';
-import { WebflowIcon, GoogleIcon } from './WorkflowBlocks';
+import { WebflowIcon, GoogleIcon, ChatGptIcon, GeminiIcon, PerplexityIcon } from './WorkflowBlocks';
 
 // Dot background that pans with the canvas but keeps dot size fixed on zoom
 function FixedDotBackground({ gap = 100, dotSize = 0.5, color = 'var(--border)' }: { gap?: number; dotSize?: number; color?: string }) {
@@ -108,6 +108,24 @@ export const MODULE_CATALOG: ModuleDef[] = [
     ports: {
       in:  [],
       out: [{ key: 'value', label: 'Valeur texte' }],
+    },
+  },
+
+  {
+    type: 'prompt-input',
+    label: 'Prompt GEO',
+    description: 'Saisie manuelle · Base de prompts',
+    details: 'Injectez directement un prompt GEO dans le pipeline. La question est sauvegardée dans votre base de prompts réels, qui alimente l\'IA pour générer des suggestions plus pertinentes.',
+    icon: MessageSquarePlus,
+    category: 'input',
+    accent: { bg: 'bg-violet-500/10', text: 'text-violet-400', border: 'border-violet-500/20' },
+    defaultConfig: { prompt: '', topic: '' },
+    ports: {
+      in:  [],
+      out: [
+        { key: 'geoPrompt', label: 'Prompt GEO' },
+        { key: 'geoTopic',  label: 'Sujet GEO' },
+      ],
     },
   },
 
@@ -214,6 +232,129 @@ export const MODULE_CATALOG: ModuleDef[] = [
       ],
     },
   },
+  // ── GEO ────────────────────────────────────────────────────────────────────
+  {
+    type: 'gemini-analysis',
+    label: 'Analyse Gemini',
+    description: 'Prompt × 3 · Questions · Sources · Résumé GEO',
+    details: 'Envoie le prompt GEO 3 fois à Google Gemini (gemini-1.5-flash), collecte les réponses, puis utilise Claude Haiku pour en extraire les questions pertinentes, les sources citées, les points communs et les opportunités de contenu GEO.',
+    icon: GeminiIcon,
+    category: 'analysis',
+    accent: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20' },
+    defaultConfig: { runs: 3 },
+    ports: {
+      in:  [{ key: 'geoPrompt', label: 'Prompt GEO', required: true }],
+      out: [
+        { key: 'geminiResponses',      label: 'Réponses brutes (×3)' },
+        { key: 'geoQuestions',         label: 'Questions pertinentes' },
+        { key: 'geoSources',           label: 'Sources citées' },
+        { key: 'geoCommonPoints',      label: 'Points communs' },
+        { key: 'geoContentGaps',       label: 'Opportunités GEO' },
+        { key: 'geoResponseVariations',label: 'Variations de réponses' },
+        { key: 'geoAnalysis',          label: 'Résumé GEO complet' },
+      ],
+    },
+  },
+  {
+    type: 'perplexity-analysis',
+    label: 'Analyse Perplexity',
+    description: 'Prompt × 3 · Questions · Sources · Résumé GEO',
+    details: 'Envoie le prompt GEO 3 fois à Perplexity (sonar), collecte les réponses avec leurs sources web, puis utilise Claude Haiku pour en extraire les questions pertinentes, les sources citées, les points communs et les opportunités de contenu GEO.',
+    icon: PerplexityIcon,
+    category: 'analysis',
+    accent: { bg: 'bg-teal-500/10', text: 'text-teal-400', border: 'border-teal-500/20' },
+    defaultConfig: { runs: 3 },
+    ports: {
+      in:  [{ key: 'geoPrompt', label: 'Prompt GEO', required: true }],
+      out: [
+        { key: 'perplexityResponses',  label: 'Réponses brutes (×3)' },
+        { key: 'geoQuestions',         label: 'Questions pertinentes' },
+        { key: 'geoSources',           label: 'Sources citées' },
+        { key: 'geoCommonPoints',      label: 'Points communs' },
+        { key: 'geoContentGaps',       label: 'Opportunités GEO' },
+        { key: 'geoResponseVariations',label: 'Variations de réponses' },
+        { key: 'geoAnalysis',          label: 'Résumé GEO complet' },
+      ],
+    },
+  },
+  {
+    type: 'chatgpt-analysis',
+    label: 'Analyse ChatGPT',
+    description: 'Prompt × 3 · Questions · Sources · Résumé GEO',
+    details: 'Envoie le prompt GEO 3 fois à ChatGPT (gpt-4o-mini), collecte les réponses, puis utilise Claude Haiku pour en extraire les questions pertinentes, les sources citées, les points communs et les opportunités de contenu GEO.',
+    icon: ChatGptIcon,
+    category: 'analysis',
+    accent: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' },
+    defaultConfig: { runs: 3 },
+    ports: {
+      in:  [{ key: 'geoPrompt', label: 'Prompt GEO', required: true }],
+      out: [
+        { key: 'chatgptResponses',      label: 'Réponses brutes (×3)' },
+        { key: 'geoQuestions',          label: 'Questions pertinentes' },
+        { key: 'geoSources',            label: 'Sources citées' },
+        { key: 'geoCommonPoints',       label: 'Points communs' },
+        { key: 'geoContentGaps',        label: 'Opportunités GEO' },
+        { key: 'geoResponseVariations', label: 'Variations de réponses' },
+        { key: 'geoAnalysis',           label: 'Résumé GEO complet' },
+      ],
+    },
+  },
+  {
+    type: 'geo-prompt-generator',
+    label: 'Générateur de prompt GEO',
+    description: 'Site scrappé · Prompt IA · Sujet non couvert',
+    details: 'Analyse le profil du site (thème, contenus existants, lacunes) et utilise Claude Haiku pour proposer une question GEO — un prompt qu\'un internaute poserait à une IA sur votre thème, qui n\'est pas encore couvert par le site.',
+    icon: Lightbulb,
+    category: 'analysis',
+    accent: { bg: 'bg-violet-500/10', text: 'text-violet-400', border: 'border-violet-500/20' },
+    defaultConfig: {},
+    ports: {
+      in:  [
+        { key: 'siteProfile',  label: 'Profil du site',  required: true  },
+        { key: 'sitemapUrls',  label: 'URLs sitemap',     required: false },
+      ],
+      out: [
+        { key: 'geoPrompt',    label: 'Prompt GEO' },
+        { key: 'geoTopic',     label: 'Sujet GEO' },
+        { key: 'geoRationale', label: 'Justification' },
+      ],
+    },
+  },
+
+  // ── Generation GEO ──────────────────────────────────────────────────────────
+  {
+    type: 'blog-generation-geo',
+    label: 'Génération de blog GEO',
+    description: 'Claude Sonnet · GEO-optimisé · Extractible IA',
+    details: 'Génère un article GEO-optimisé dont le H1 est la question GEO et les H2 sont les questions extraites par les modules d\'analyse IA. Inclut maillage interne (sitemap), liens externes fiables, FAQ thématique avec schema.org et schémas visuels.',
+    icon: Sparkles,
+    category: 'generation',
+    accent: { bg: 'bg-violet-500/10', text: 'text-violet-400', border: 'border-violet-500/20' },
+    defaultConfig: {},
+    ports: {
+      in: [
+        { key: 'geoPrompt',       label: 'Prompt GEO (question)',    required: true  },
+        { key: 'geoQuestions',    label: 'Questions IA → H2s',       required: false },
+        { key: 'geoSources',      label: 'Sources citées par les IA', required: false },
+        { key: 'geoCommonPoints', label: 'Points communs IA',         required: false },
+        { key: 'geoContentGaps',  label: 'Opportunités GEO',          required: false },
+        { key: 'geoAnalysis',     label: 'Synthèse IA',               required: false },
+        { key: 'sitemapUrls',     label: 'URLs sitemap (maillage)',    required: false },
+        { key: 'siteProfile',     label: 'Profil du site',            required: false },
+        { key: 'detectedFields',  label: 'Champs Webflow détectés',   required: false },
+        { key: 'webflowFields',   label: 'Champs Webflow bruts',      required: false },
+      ],
+      out: [
+        { key: 'blogContent',  label: 'Contenu article' },
+        { key: 'parsedBlog',   label: 'Article parsé' },
+        { key: 'htmlBody',     label: 'HTML généré' },
+        { key: 'htmlBodyFull', label: 'HTML complet (FAQ + schémas)' },
+        { key: 'fieldData',    label: 'Champs Webflow' },
+      ],
+    },
+  },
+
+  // ── Publish ─────────────────────────────────────────────────────────────────
   {
     type: 'webflow-structure',
     label: 'Structure Webflow',
@@ -380,9 +521,67 @@ function ScraperConfig({ config, onChange, readOnly }: { config: BlockConfig; on
   );
 }
 
+function PromptInputConfig({ config, onChange, readOnly }: { config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean }) {
+  const prompt = (config.prompt as string) ?? '';
+  const topic  = (config.topic  as string) ?? '';
+  return (
+    <div className="space-y-2">
+      <textarea
+        readOnly={readOnly}
+        placeholder="Quelle question voulez-vous répondre ?"
+        rows={3}
+        value={prompt}
+        onChange={e => onChange({ ...config, prompt: e.target.value })}
+        className={cn('input-base text-xs nodrag w-full resize-none leading-relaxed', readOnly && 'opacity-60 cursor-default')}
+      />
+      <input
+        type="text"
+        readOnly={readOnly}
+        placeholder="Sujet (optionnel)..."
+        value={topic}
+        onChange={e => onChange({ ...config, topic: e.target.value })}
+        className={cn('input-base text-xs nodrag w-full', readOnly && 'opacity-60 cursor-default')}
+      />
+    </div>
+  );
+}
+
+function LlmAnalysisConfig({ config, onChange, readOnly, accentClass }: { config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean; accentClass: string }) {
+  const runs = (config.runs as number) ?? 3;
+  return (
+    <div className="flex items-center gap-2">
+      <label className="text-[10px] text-text-muted/60 shrink-0">Passages</label>
+      <div className="flex gap-1">
+        {[1, 2, 3, 5].map(n => (
+          <button key={n} type="button" disabled={readOnly}
+            onClick={() => onChange({ ...config, runs: n })}
+            className={cn(
+              'w-7 h-7 rounded-md text-[11px] font-semibold border transition-all nodrag',
+              runs === n ? accentClass : 'bg-background border-border text-text-muted hover:border-text/20',
+              readOnly && 'cursor-default',
+            )}>
+            {n}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const ChatGptAnalysisConfig    = (p: { config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean }) =>
+  <LlmAnalysisConfig {...p} accentClass="bg-emerald-500/15 text-emerald-400 border-emerald-500/30" />;
+const GeminiAnalysisConfig     = (p: { config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean }) =>
+  <LlmAnalysisConfig {...p} accentClass="bg-blue-500/15 text-blue-400 border-blue-500/30" />;
+const PerplexityAnalysisConfig = (p: { config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean }) =>
+  <LlmAnalysisConfig {...p} accentClass="bg-teal-500/15 text-teal-400 border-teal-500/30" />;
+
 type ConfigComponent = React.ComponentType<{ config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean }>;
 const CONFIG_RENDERERS: Record<string, ConfigComponent> = {
   'text-input':          TextInputConfig,
+  'prompt-input':        PromptInputConfig,
+  'chatgpt-analysis':    ChatGptAnalysisConfig,
+  'gemini-analysis':     GeminiAnalysisConfig,
+  'perplexity-analysis': PerplexityAnalysisConfig,
   'website-scraper':     ScraperConfig,
   'webflow-structure':   WebflowStructureConfig,
   'webflow-publish':     PublishConfig,
@@ -710,10 +909,10 @@ const edgeTypes = { deletable: DeletableEdge };
 function PaletteCard({ def, disabled, onAdd }: { def: ModuleDef; disabled: boolean; onAdd: () => void }) {
   const Icon = def.icon;
   return (
-    <div className={cn('relative flex items-center gap-2.5 px-3 py-2 rounded-lg border transition-all duration-150 group/card',
+    <div className={cn('relative flex items-center gap-2.5 px-2  rounded-lg  transition-all duration-150 group/card',
       disabled
-        ? 'border-border/30 bg-surface/20 opacity-40 cursor-not-allowed'
-        : 'border-border/50 bg-surface/30 hover:border-border hover:bg-surface/60 cursor-grab active:cursor-grabbing')}
+        ? ' bg-neutral-800/60 opacity-40 cursor-not-allowed shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+        : ' bg-neutral-800 hover:border-border hover:bg-neutral-700 cursor-grab active:cursor-grabbing shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]')}
       draggable={!disabled}
       onDragStart={!disabled ? e => {
         e.dataTransfer.setData('module-type', def.type);
@@ -738,7 +937,7 @@ function PaletteCard({ def, disabled, onAdd }: { def: ModuleDef; disabled: boole
         setTimeout(() => document.body.removeChild(ghost), 0);
       } : undefined}
       onClick={!disabled ? onAdd : undefined}>
-      <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-transform', def.accent.bg,
+      <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-transform',
         !disabled && 'group-hover/card:scale-105')}>
         <Icon size={13} className={def.accent.text} />
       </div>
@@ -963,7 +1162,7 @@ export interface WorkflowEditorProps {
 export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSave, onExport, initialBlocks, initialEdges, monitoring, actionsRef, hideActions }: WorkflowEditorProps) {
   const startNodes = initialBlocks !== undefined ? blocksToNodes(initialBlocks) : INITIAL_NODES;
   const validNodeIds = new Set(startNodes.map(n => n.id));
-  const startEdges = initialEdges !== undefined
+  const startEdges: Edge[] = initialEdges !== undefined
     ? initialEdges
         .filter(e => validNodeIds.has(e.source) && validNodeIds.has(e.target))
         .map((e, i) => ({
@@ -980,7 +1179,7 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
       : INITIAL_EDGES;
 
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState(startNodes);
-  const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState(startEdges);
+  const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState<Edge>(startEdges);
   const [isSaving, setIsSaving] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
 
@@ -1093,7 +1292,30 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
   const usedTypes = new Set(rfNodes.map(n => (n.data as WorkflowNodeData).block.type));
   const paletteTriggers = MODULE_CATALOG.filter(m => m.category === 'trigger');
   const paletteInputs   = MODULE_CATALOG.filter(m => m.category === 'input');
-  const paletteModules  = MODULE_CATALOG.filter(m => m.category !== 'trigger' && m.category !== 'input');
+
+  const PALETTE_GROUPS = [
+    {
+      id: 'seo', label: 'SEO', color: '#60a5fa99',
+      types: ['keyword-research', 'serp-analysis', 'semantic-extraction', 'blog-generation'],
+    },
+    {
+      id: 'website', label: 'Website', color: '#22d3ee99',
+      types: ['website-scraper'],
+    },
+    {
+      id: 'geo', label: 'GEO', color: '#a78bfa99',
+      types: ['geo-prompt-generator', 'chatgpt-analysis', 'gemini-analysis', 'perplexity-analysis', 'blog-generation-geo'],
+    },
+    {
+      id: 'webflow', label: 'Webflow', color: '#146EF599',
+      types: ['webflow-structure', 'webflow-publish'],
+    },
+  ] as const;
+
+  const paletteGroups = PALETTE_GROUPS.map(g => ({
+    ...g,
+    modules: g.types.map(t => MODULE_CATALOG.find(m => m.type === t)).filter(Boolean) as ModuleDef[],
+  }));
   const visibleCount = rfNodes.length;
   // Include canvas positions so they can be persisted and restored
   const blocks = rfNodes.map(n => ({ ...(n.data as WorkflowNodeData).block, position: n.position }));
@@ -1135,20 +1357,22 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
           </div>
         )}
 
-        <div className="border-t border-border/40 pt-3 mt-3">
-          <div className="flex items-center justify-between px-0.5 mb-2">
-            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-text-muted">Modules</p>
-            <span className="text-[9px] text-text-muted/40">{paletteModules.length}</span>
+        {paletteGroups.map((group, gi) => (
+          <div key={group.id} className={gi === 0 ? 'border-t border-border/40 pt-3 mt-3' : 'pt-3 mt-1'}>
+            <div className="flex items-center gap-2 px-0.5 mb-2">
+              <p className="text-[9px] font-bold uppercase tracking-[0.18em]">{group.label}</p>
+            </div>
+            <div className="space-y-1">
+              {group.modules.map(def => (
+                <PaletteCard
+                  key={def.type}
+                  def={def}
+                  disabled={isRunning || (!!def.unique && usedTypes.has(def.type))}
+                  onAdd={() => addBlock(def.type)}
+                />
+              ))}
+            </div>
           </div>
-        </div>
-
-        {paletteModules.map(def => (
-          <PaletteCard
-            key={def.type}
-            def={def}
-            disabled={isRunning || (!!def.unique && usedTypes.has(def.type))}
-            onAdd={() => addBlock(def.type)}
-          />
         ))}
 
       </div>

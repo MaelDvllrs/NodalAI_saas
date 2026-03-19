@@ -9,8 +9,10 @@ import {
   ArrowLeft, CheckCircle2, AlertCircle, Loader2, Clock,
   Search, TrendingUp, Layers, Sparkles, Rocket, Globe,
   MousePointerClick, Zap, ExternalLink, BarChart2, Link as LinkIcon, Type,
-  Copy, Check, ChevronDown, Star,
+  Copy, Check, ChevronDown, ThumbsUp, ThumbsDown,
+  Lightbulb, MessageSquare, Database,
 } from 'lucide-react';
+import { WebflowIcon, GoogleIcon, CountryFlag, ChatGptIcon, GeminiIcon, PerplexityIcon } from '../../components/WorkflowBlocks';
 import { Skeleton } from '../../components/UI';
 import { cn } from '../../utils/cn';
 
@@ -40,16 +42,24 @@ interface RunStep {
 
 // ─── Module meta ──────────────────────────────────────────────────────────────
 
-const MODULE_META: Record<string, { label: string; icon: React.ElementType; accent: string }> = {
-  'trigger-manual':      { label: 'Déclencheur',            icon: MousePointerClick, accent: 'text-amber-400' },
-  'text-input':          { label: 'Entrée texte',            icon: Type,              accent: 'text-slate-400' },
-  'website-scraper':     { label: 'Scraping de site',        icon: Globe,             accent: 'text-cyan-400' },
-  'keyword-research':    { label: 'Recherche mots-clés',    icon: Search,            accent: 'text-blue-400' },
-  'serp-analysis':       { label: 'Analyse SERP',            icon: TrendingUp,        accent: 'text-violet-400' },
-  'semantic-extraction': { label: 'Extraction sémantique',  icon: Layers,            accent: 'text-green-400' },
-  'blog-generation':     { label: 'Génération de blog',      icon: Sparkles,          accent: 'text-accent' },
-  'content-generation':  { label: 'Génération de contenu',  icon: Sparkles,          accent: 'text-accent' },
-  'webflow-publish':     { label: 'Publication Webflow',     icon: Rocket,            accent: 'text-orange-400' },
+
+const MODULE_META: Record<string, { label: string; icon?: React.ElementType; accent?: string; brandIcon?: React.ElementType }> = {
+  'trigger-manual':        { label: 'Déclencheur',              icon: MousePointerClick, accent: 'text-amber-400' },
+  'text-input':            { label: 'Entrée texte',              icon: Type,              accent: 'text-slate-400' },
+  'prompt-input':          { label: 'Prompt GEO',               icon: MessageSquare,     accent: 'text-violet-400' },
+  'website-scraper':       { label: 'Scraping de site',          icon: Globe,             accent: 'text-cyan-400' },
+  'keyword-research':      { label: 'Recherche mots-clés',      icon: Search,            accent: 'text-blue-400' },
+  'serp-analysis':         { label: 'Analyse SERP',              brandIcon: GoogleIcon },
+  'semantic-extraction':   { label: 'Extraction sémantique',    icon: Layers,            accent: 'text-green-400' },
+  'blog-generation':       { label: 'Génération de blog',        icon: Sparkles,          accent: 'text-accent' },
+  'content-generation':    { label: 'Génération de contenu',    icon: Sparkles,          accent: 'text-accent' },
+  'webflow-publish':       { label: 'Publication Webflow',       brandIcon: WebflowIcon },
+  'webflow-structure':     { label: 'Structure Webflow',         brandIcon: WebflowIcon },
+  'geo-prompt-generator':   { label: 'Générateur de prompt GEO',  icon: Lightbulb,  accent: 'text-yellow-400' },
+  'blog-generation-geo':   { label: 'Blog GEO',                  icon: Sparkles,   accent: 'text-violet-400' },
+  'chatgpt-analysis':      { label: 'Analyse ChatGPT',            brandIcon: ChatGptIcon },
+  'gemini-analysis':       { label: 'Analyse Gemini',            brandIcon: GeminiIcon },
+  'perplexity-analysis':   { label: 'Analyse Perplexity',        brandIcon: PerplexityIcon },
 };
 
 function getModuleMeta(type: string) {
@@ -63,6 +73,52 @@ function StepStatusIcon({ status }: { status: RunStep['status'] }) {
   if (status === 'error')   return <AlertCircle size={14} className="text-red-400 shrink-0" />;
   return <Clock size={14} className="text-text-muted shrink-0" />;
 }
+
+function FeedbackButtons({ runId, stepId, section, token }: { runId?: string; stepId?: string; section: string; token?: string | null }) {
+  const [vote, setVote] = useState<'like' | 'dislike' | null>(null);
+
+  useEffect(() => {
+    if (!runId || !stepId) return;
+    fetch(`${API_URL}/feedback?runId=${runId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then(r => r.json())
+      .then((votes: Record<string, 'like' | 'dislike'>) => {
+        if (votes[stepId]) setVote(votes[stepId]);
+      })
+      .catch(() => {});
+  }, [runId, stepId, token]);
+
+  async function sendFeedback(v: 'like' | 'dislike') {
+    setVote(v);
+    try {
+      await fetch(`${API_URL}/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ runId, stepId, section, rating: v }),
+      });
+    } catch (e) {
+      // ignore errors
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <button aria-label="like" onClick={() => sendFeedback('like')} className={cn('p-1 rounded', vote === 'like' ? 'bg-green-500/10' : 'hover:bg-background/50')}>
+        <ThumbsUp size={14} className={cn(vote === 'like' ? 'text-green-400' : 'text-text-muted')} />
+      </button>
+      <button aria-label="dislike" onClick={() => sendFeedback('dislike')} className={cn('p-1 rounded', vote === 'dislike' ? 'bg-red-500/10' : 'hover:bg-background/50')}>
+        <ThumbsDown size={14} className={cn(vote === 'dislike' ? 'text-red-400' : 'text-text-muted')} />
+      </button>
+    </div>
+  );
+}
+
+// small helper to show a flag emoji for common languages
+// replaced by `CountryFlag` component from WorkflowBlocks
 
 // ─── Result renderers ─────────────────────────────────────────────────────────
 
@@ -117,9 +173,37 @@ function KeywordResult({ data }: { data: Record<string, unknown> }) {
 
 function SerpResult({ data }: { data: Record<string, unknown> }) {
   const results = (data.serpResults as { url?: string; title?: string; description?: string; position?: number }[]) ?? [];
+  function getFavicon(url?: string) {
+    if (!url) return '/favicon.ico';
+    try {
+      const host = new URL(url).hostname;
+      return `https://www.google.com/s2/favicons?sz=64&domain=${host}`;
+    } catch {
+      return '/favicon.ico';
+    }
+  }
+
+  const favicons = results.slice(0, 4).map(r => getFavicon(r.url));
+
   return (
     <div className="space-y-2">
-      <p className="text-xs font-bold uppercase tracking-widest text-text-muted mb-3">{results.length} résultats SERP</p>
+      <div className="flex items-center gap-3 mb-3">
+        <p className="text-[12px] font-medium tracking-widest text-text-muted">{results.length} Résultats</p>
+        <div className="flex items-center">
+          <div className="flex items-center">
+            {favicons.map((src, i) => (
+              <img
+                key={i}
+                src={src}
+                alt={`favicon-${i}`}
+                className={cn('rounded-full object-cover w-4 h-4 border', i !== 0 ? '-ml-1' : '')}
+                style={{ zIndex: 20 - i }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
       {results.slice(0, 15).map((r, i) => (
         <div key={i} className="bg-background border border-border rounded-lg p-3 flex items-start gap-3">
           <span className="text-[10px] font-bold text-text-muted/40 w-5 shrink-0 mt-0.5">{r.position ?? i + 1}</span>
@@ -332,69 +416,8 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-// ── StarRating Component ─────────────────────────────────────────────────────
 
-function StarRating({ runId, initialRating, token }: { runId: string; initialRating?: number | null; token: string | null }) {
-  const [rating, setRating] = useState<number>(initialRating ?? 0);
-  const [hover, setHover] = useState<number>(0);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  async function handleRate(value: number) {
-    if (!token) return;
-    setRating(value);
-    setSaving(true);
-    setSaved(false);
-    try {
-      await fetch(`${API_URL}/workflow/runs/${runId}/rate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ rating: value }),
-      });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch {
-      // ignore
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const active = hover || rating;
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-1">
-        {[1, 2, 3, 4, 5].map((v) => (
-          <button
-            key={v}
-            disabled={saving || !token}
-            onClick={() => handleRate(v)}
-            onMouseEnter={() => setHover(v)}
-            onMouseLeave={() => setHover(0)}
-            className={cn(
-              'transition-all disabled:opacity-50',
-              v <= active ? 'text-amber-400 scale-110' : 'text-border hover:text-amber-300',
-            )}
-            aria-label={`${v} étoile${v > 1 ? 's' : ''}`}
-          >
-            <Star size={16} fill={v <= active ? 'currentColor' : 'none'} />
-          </button>
-        ))}
-        <span className="text-[10px] text-text-muted ml-2 font-mono">
-          {saved ? '✅ Enregistré' : rating ? `${rating}/5` : 'Non noté'}
-        </span>
-      </div>
-      {rating >= 4 && (
-        <p className="text-[9px] text-success font-medium">
-          ⭐ Cette génération sera utilisée comme référence pour les futures générations
-        </p>
-      )}
-    </div>
-  );
-}
-
-function BlogGenerationResult({ data, semanticData, runId, rating, token }: { data: Record<string, unknown>; semanticData?: Record<string, unknown>; runId: string; rating?: number | null; token: string | null }) {
+function BlogGenerationResult({ data, semanticData }: { data: Record<string, unknown>; semanticData?: Record<string, unknown> }) {
   const [tab, setTab] = useState<'meta' | 'html' | 'outline' | 'schema' | 'tfidf'>('meta');
   const parsedBlog = (data.parsedBlog as Record<string, unknown>) ?? {};
   const fieldData = (data.fieldData as Record<string, unknown>) ?? {};
@@ -441,13 +464,6 @@ function BlogGenerationResult({ data, semanticData, runId, rating, token }: { da
 
   return (
     <div className="space-y-4">
-      {token && (
-        <div className="bg-background border border-border rounded-lg p-4">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-2">Notation de la génération</p>
-          <p className="text-[10px] text-text-muted mb-2">Évaluez la qualité de cette génération. Les générations ≥ 4★ seront utilisées comme référence lors des prochaines générations.</p>
-          <StarRating runId={runId} initialRating={rating} token={token} />
-        </div>
-      )}
       {wordCount != null && (
         <div className="flex items-center gap-2 text-xs text-text-muted bg-background border border-border rounded-lg px-3 py-2 w-fit">
           <Sparkles size={12} className="text-accent" />
@@ -525,17 +541,36 @@ function BlogGenerationResult({ data, semanticData, runId, rating, token }: { da
               </pre>
             </div>
           ))}
-          {faqEmbed && (
-            <div className="border border-border rounded-lg overflow-hidden">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-[#1e1e1e]">
-                <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">FAQ (HTML)</p>
-                <CopyButton text={faqEmbed} />
+          {faqEmbed && (() => {
+            const scriptIdx = faqEmbed.indexOf('<script');
+            const faqHtml   = scriptIdx !== -1 ? faqEmbed.slice(0, scriptIdx).trim() : faqEmbed.trim();
+            const faqJsonLd = scriptIdx !== -1 ? faqEmbed.slice(scriptIdx).trim()    : '';
+            return (
+              <div className="border border-border rounded-lg overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-[#1e1e1e]">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">
+                    FAQ <span className="text-text-muted/50 normal-case font-normal tracking-normal">(HTML accordéon + schema.org JSON-LD)</span>
+                  </p>
+                  <CopyButton text={faqEmbed} />
+                </div>
+                {faqHtml && (
+                  <pre className="text-[11px] font-mono text-sky-300/80 bg-[#1e1e1e] px-4 pt-4 overflow-auto max-h-72 whitespace-pre-wrap break-words leading-relaxed">
+                    {faqHtml}
+                  </pre>
+                )}
+                {faqJsonLd && (
+                  <>
+                    <div className="px-4 py-1.5 bg-[#1e1e1e] border-t border-white/5">
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-green-400/60">schema.org JSON-LD</span>
+                    </div>
+                    <pre className="text-[11px] font-mono text-green-300/80 bg-[#1e1e1e] px-4 pb-4 overflow-auto max-h-60 whitespace-pre-wrap break-words leading-relaxed">
+                      {faqJsonLd}
+                    </pre>
+                  </>
+                )}
               </div>
-              <pre className="text-[11px] font-mono text-sky-300/80 bg-[#1e1e1e] p-4 overflow-auto max-h-72 whitespace-pre-wrap break-words leading-relaxed">
-                {faqEmbed}
-              </pre>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
       {tab === 'tfidf' && (
@@ -671,122 +706,201 @@ function ScraperResult({ data }: { data: Record<string, unknown> }) {
 
   return (
     <div className="space-y-4">
-      {/* Theme + description */}
-      {theme && (
-        <div className="bg-background border border-border rounded-lg p-3">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-1">Thème</p>
-          <p className="text-sm font-bold text-text">{theme}</p>
-          {description && <p className="text-xs text-text-muted mt-1 leading-relaxed">{description}</p>}
-        </div>
-      )}
+      {/* 1) Profile card: theme, tone, language, audience, writing style, recommended tone */}
+      {/* Profile — wrapped in a card with stacked blocks */}
+      <>
+        {theme && (
+          <div className="bg-background/50 border border-border/50 rounded-md p-3 mb-3">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-1">Thème</p>
+            <h3 className="text-lg font-bold text-text mb-1">{theme}</h3>
+            {description && <p className="text-sm text-text-muted leading-relaxed">{description}</p>}
+          </div>
+        )}
 
-      {/* Tone / language / audience */}
-      <div className="grid grid-cols-2 gap-2.5">
-        {tone && (
-          <div className="bg-background border border-border rounded-lg p-2.5">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-0.5">Ton détecté</p>
-            <p className="text-xs font-semibold text-text">{tone}</p>
-          </div>
-        )}
-        {language && (
-          <div className="bg-background border border-border rounded-lg p-2.5">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-0.5">Langue</p>
-            <p className="text-xs font-semibold text-text uppercase">{language}</p>
-          </div>
-        )}
-        {targetAudience && (
-          <div className="bg-background border border-border rounded-lg p-2.5 col-span-2">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-0.5">Audience cible</p>
-            <p className="text-xs text-text">{targetAudience}</p>
-          </div>
-        )}
+        <div className="grid gap-3">
+          {tone && (
+            <div className="bg-background border border-border rounded-md p-3">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Ton détecté</p>
+              <p className="text-sm font-semibold text-text mt-1">{tone}</p>
+            </div>
+          )}
+
+          {language && (
+            <div className="bg-background border border-border rounded-md p-3 flex items-center gap-3">
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Langue</p>
+                <p className="text-sm font-semibold text-text uppercase flex items-center gap-2 mt-1">
+                  <span className="shrink-0"><CountryFlag code={language} size={16} /></span>
+                  <span>{language}</span>
+                </p>
+              </div>
+            </div>
+          )}
+
+          {targetAudience && (
+            <div className="bg-background border border-border rounded-md p-3">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Audience cible</p>
+              <p className="text-sm text-text-muted leading-relaxed mt-1">{targetAudience}</p>
+            </div>
+          )}
+
+          {writingStyle && (
+            <div className="bg-background border border-border rounded-md p-3">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Style rédactionnel</p>
+              <p className="text-sm text-text-muted leading-relaxed mt-1">{writingStyle}</p>
+            </div>
+          )}
+
+          {recommendedTone && (
+            <div className="bg-accent/5 border border-accent/15 rounded-md p-3">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-accent">Ton recommandé</p>
+              <div className="mt-1 text-sm text-text-muted">{recommendedTone}</div>
+            </div>
+          )}
+        </div>
+      </>
+
+      {/* 2) Topics & Keywords */}
+      <div className="bg-background border border-border rounded-lg p-4">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-3">Sujets & mots-clés</p>
+        <div className="flex flex-col gap-3">
+          {mainTopics.length > 0 && (
+            <div>
+              <div className="flex flex-wrap gap-2">
+                {mainTopics.map((t, i) => (
+                  <span key={i} className="text-sm text-text px-2 py-1 rounded bg-border/40">{t}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {keywords.length > 0 && (
+            <div>
+              <div className="flex flex-wrap gap-2">
+                {keywords.map((k, i) => (
+                  <span key={i} className="text-xs text-text-muted font-mono px-2 py-1 rounded bg-background border border-border">{k}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Writing style */}
-      {writingStyle && (
-        <div className="bg-background border border-border rounded-lg p-2.5">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-0.5">Style rédactionnel</p>
-          <p className="text-xs text-text-muted leading-relaxed">{writingStyle}</p>
-        </div>
-      )}
+      {/* 3) Existing articles / Gaps / Sitemap — grouped in one card with details */}
+      <div className="bg-background border border-border rounded-lg p-4">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-3">Audit contenu</p>
 
-      {/* Recommended tone */}
-      {recommendedTone && (
-        <div className="bg-accent/5 border border-accent/15 rounded-lg p-2.5">
-          <p className="text-[9px] font-bold uppercase tracking-widest text-accent mb-0.5">Ton recommandé pour la génération</p>
-          <p className="text-xs text-text-muted leading-relaxed">{recommendedTone}</p>
-        </div>
-      )}
+        <div className="space-y-3">
+          <details className="group">
+            <summary className="flex items-center justify-between cursor-pointer select-none text-[12px] font-medium">
+              <span>Articles existants ({existingTitles.length})</span>
+              <ChevronDown size={13} className="text-text-muted transition-transform duration-200 group-open:rotate-180" />
+            </summary>
+            <div className="mt-2 space-y-1">
+              {existingTitles.map((t, i) => (
+                <div key={i} className="text-sm text-text-muted">
+                  {i + 1}. {t}
+                </div>
+              ))}
+            </div>
+          </details>
 
-      {/* Main topics */}
-      {mainTopics.length > 0 && (
+          <details className="group">
+            <summary className="flex items-center justify-between cursor-pointer select-none text-[12px] font-medium">
+              <span>Gaps de contenu ({contentGaps.length})</span>
+              <ChevronDown size={13} className="text-text-muted transition-transform duration-200 group-open:rotate-180" />
+            </summary>
+            <div className="mt-2 space-y-1">
+              {contentGaps.map((g, i) => (
+                <div key={i} className="text-sm text-text-muted">{i + 1}. {g}</div>
+              ))}
+            </div>
+          </details>
+
+          <details className="group">
+            <summary className="flex items-center justify-between cursor-pointer select-none text-[12px] font-medium">
+              <span>URLs sitemap ({sitemapUrls.length})</span>
+              <ChevronDown size={13} className="text-text-muted transition-transform duration-200 group-open:rotate-180" />
+            </summary>
+            <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
+              {sitemapUrls.map((url, i) => (
+                <div key={i} className="text-[13px] text-text-muted font-mono truncate">{url}</div>
+              ))}
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WebflowStructureResult({ data }: { data: Record<string, unknown> }) {
+  const collectionId = data.collectionId as string ?? '—';
+  const detectedFields = (data.detectedFields as Record<string, string>) ?? {};
+  type WfField = { id?: string; slug?: string; displayName?: string; type?: string; required?: boolean };
+  const webflowFields = (data.webflowFields as WfField[]) ?? [];
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-background border border-border rounded-lg px-4 py-3 flex items-center gap-3">
+        <Database size={16} className="text-orange-400 shrink-0" />
         <div>
-          <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-2">Sujets principaux</p>
-          <div className="flex flex-wrap gap-1.5">
-            {mainTopics.map((t, i) => (
-              <span key={i} className="text-xs bg-cyan-500/5 border border-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full">{t}</span>
-            ))}
-          </div>
+          <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-0.5">Collection ID</p>
+          <p className="text-sm font-mono text-text">{collectionId}</p>
         </div>
-      )}
+      </div>
 
-      {/* Keywords */}
-      {keywords.length > 0 && (
+      {Object.keys(detectedFields).length > 0 && (
         <div>
-          <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-2">Mots-clés détectés</p>
-          <div className="flex flex-wrap gap-1.5">
-            {keywords.map((k, i) => (
-              <span key={i} className="text-[10px] bg-background border border-border text-text-muted px-2 py-0.5 rounded font-mono">{k}</span>
-            ))}
+          <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-2">Champs détectés</p>
+          <div className="rounded-xl overflow-hidden border border-border">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-background/80 border-b border-border">
+                  <th className="text-left px-3 py-2 text-[9px] font-bold uppercase tracking-widest text-text-muted">Rôle</th>
+                  <th className="text-left px-3 py-2 text-[9px] font-bold uppercase tracking-widest text-text-muted">Slug Webflow</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(detectedFields).map(([role, slug], i) => (
+                  <tr key={role} className={cn('border-b border-border/50 last:border-0', i % 2 === 0 ? 'bg-surface' : 'bg-background/30')}>
+                    <td className="px-3 py-2 text-text-muted uppercase tracking-wider text-[10px] font-semibold">{role}</td>
+                    <td className="px-3 py-2 font-mono text-accent/80">{slug}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
-      {/* Existing titles */}
-      {existingTitles.length > 0 && (
-        <details className="border-t border-border pt-3">
-          <summary className="text-[9px] font-bold uppercase tracking-widest text-amber-400/80 cursor-pointer select-none">
-            Articles existants ({existingTitles.length}) — à ne pas dupliquer
+      {webflowFields.length > 0 && (
+        <details className="border border-border rounded-xl overflow-hidden group">
+          <summary className="flex items-center justify-between px-4 py-2.5 bg-background/80 cursor-pointer select-none list-none">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">
+              Tous les champs ({webflowFields.length})
+            </p>
+            <ChevronDown size={13} className="text-text-muted transition-transform duration-200 group-open:rotate-180" />
           </summary>
-          <div className="mt-2 space-y-0.5">
-            {existingTitles.map((t, i) => (
-              <div key={i} className="flex items-start gap-1.5 text-xs text-text-muted">
-                <span className="text-amber-500/50 font-mono text-[9px] shrink-0 mt-0.5">{i + 1}.</span>
-                <span>{t}</span>
-              </div>
-            ))}
-          </div>
-        </details>
-      )}
-
-      {/* Content gaps */}
-      {contentGaps.length > 0 && (
-        <details className="border-t border-border pt-3">
-          <summary className="text-[9px] font-bold uppercase tracking-widest text-green-400/80 cursor-pointer select-none">
-            Gaps de contenu ({contentGaps.length}) — opportunités
-          </summary>
-          <div className="mt-2 space-y-1">
-            {contentGaps.map((g, i) => (
-              <div key={i} className="flex items-start gap-1.5 text-xs text-text-muted bg-green-500/5 border border-green-500/15 rounded px-2 py-1">
-                <span className="text-green-400 font-bold shrink-0">{i + 1}.</span>
-                <span>{g}</span>
-              </div>
-            ))}
-          </div>
-        </details>
-      )}
-
-      {/* Sitemap URLs */}
-      {sitemapUrls.length > 0 && (
-        <details className="border-t border-border pt-3">
-          <summary className="text-[9px] font-bold uppercase tracking-widest text-text-muted cursor-pointer select-none flex items-center gap-1.5">
-            <LinkIcon size={9} />
-            URLs sitemap ({sitemapUrls.length})
-          </summary>
-          <div className="mt-2 space-y-0.5 max-h-48 overflow-y-auto">
-            {sitemapUrls.map((url, i) => (
-              <div key={i} className="text-[10px] text-text-muted font-mono truncate px-1 py-0.5 hover:bg-border/30 rounded">{url}</div>
-            ))}
+          <div className="border-t border-border">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-background/80 border-b border-border">
+                  <th className="text-left px-3 py-2 text-[9px] font-bold uppercase tracking-widest text-text-muted">Slug</th>
+                  <th className="text-left px-3 py-2 text-[9px] font-bold uppercase tracking-widest text-text-muted">Nom</th>
+                  <th className="text-left px-3 py-2 text-[9px] font-bold uppercase tracking-widest text-text-muted">Type</th>
+                </tr>
+              </thead>
+              <tbody>
+                {webflowFields.map((f, i) => (
+                  <tr key={i} className={cn('border-b border-border/50 last:border-0', i % 2 === 0 ? 'bg-surface' : 'bg-background/30')}>
+                    <td className="px-3 py-2 font-mono text-accent/80">{f.slug ?? '—'}</td>
+                    <td className="px-3 py-2 text-text">{f.displayName ?? '—'}</td>
+                    <td className="px-3 py-2 text-text-muted text-[10px]">{f.type ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </details>
       )}
@@ -794,7 +908,223 @@ function ScraperResult({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function StepResult({ step, steps, token, runId, rating }: { step: RunStep; steps: RunStep[]; token: string | null; runId: string; rating?: number | null }) {
+function GeoPromptResult({ data }: { data: Record<string, unknown> }) {
+  const prompt = data.geoPrompt as string ?? '—';
+  const topic = data.geoTopic as string ?? null;
+  const rationale = data.geoRationale as string ?? null;
+
+  return (
+    <div className="space-y-3">
+      {topic && (
+        <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-lg px-4 py-3">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-yellow-400 mb-1">Sujet</p>
+          <p className="text-sm font-semibold text-text">{topic}</p>
+        </div>
+      )}
+      <div className="bg-background border border-border rounded-lg p-4">
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Prompt GEO généré</p>
+          <CopyButton text={prompt} />
+        </div>
+        <p className="text-sm text-text leading-relaxed">{prompt}</p>
+      </div>
+      {rationale && (
+        <div className="bg-background/50 border border-border/50 rounded-lg px-4 py-3">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-1">Rationale</p>
+          <p className="text-sm text-text-muted leading-relaxed">{rationale}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PromptInputResult({ data }: { data: Record<string, unknown> }) {
+  const prompt = data.prompt as string ?? data.geoPrompt as string ?? '—';
+  const topic = data.topic as string ?? data.geoTopic as string ?? null;
+
+  return (
+    <div className="space-y-3">
+      {topic && (
+        <div className="bg-violet-500/5 border border-violet-500/20 rounded-lg px-4 py-3">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-violet-400 mb-1">Sujet</p>
+          <p className="text-sm font-semibold text-text">{topic}</p>
+        </div>
+      )}
+      <div className="bg-background border border-border rounded-lg p-4">
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Prompt</p>
+          <CopyButton text={prompt} />
+        </div>
+        <p className="text-sm text-text leading-relaxed">{prompt}</p>
+      </div>
+    </div>
+  );
+}
+
+function GeoLlmAnalysisResult({ data, responsesKey }: { data: Record<string, unknown>; responsesKey: string }) {
+  const [tab, setTab] = useState<'questions' | 'sources' | 'gaps' | 'summary' | 'raw'>('summary');
+  type GeoSource = { url?: string | null; name?: string; type?: string; frequency?: number };
+  const questions          = Array.isArray(data.geoQuestions)           ? (data.geoQuestions as string[])           : [];
+  const sources            = Array.isArray(data.geoSources)             ? (data.geoSources as GeoSource[])          : [];
+  const commonPoints       = Array.isArray(data.geoCommonPoints)        ? (data.geoCommonPoints as string[])        : [];
+  const contentGaps        = Array.isArray(data.geoContentGaps)         ? (data.geoContentGaps as string[])         : [];
+  const responseVariations = Array.isArray(data.geoResponseVariations)  ? (data.geoResponseVariations as string[])  : [];
+  const summary            = data.geoAnalysis as string                 ?? '';
+  const rawResponses       = Array.isArray(data[responsesKey])          ? (data[responsesKey] as string[])          : [];
+
+  const tabs = [
+    { id: 'summary' as const,   label: 'Synthèse' },
+    { id: 'questions' as const, label: `Questions (${questions.length})` },
+    { id: 'sources' as const,   label: `Sources (${sources.length})` },
+    { id: 'gaps' as const,      label: `Opportunités (${contentGaps.length})` },
+    ...(rawResponses.length > 0 ? [{ id: 'raw' as const, label: `Réponses brutes (${rawResponses.length})` }] : []),
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="p-0.5 bg-background rounded-lg flex flex-wrap gap-0.5 w-fit">
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={cn('px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-all',
+              tab === t.id ? 'bg-surface text-text shadow-sm' : 'text-text-muted hover:text-text')}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'summary' && (
+        <div className="space-y-3">
+          {summary && (
+            <div className="bg-background border border-border rounded-lg p-4">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-2">Analyse GEO</p>
+              <p className="text-sm text-text leading-relaxed whitespace-pre-wrap">{summary}</p>
+            </div>
+          )}
+          {commonPoints.length > 0 && (
+            <div>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-2">Points communs</p>
+              <div className="space-y-1">
+                {commonPoints.map((p, i) => (
+                  <div key={i} className="flex items-start gap-2 text-sm text-text-muted bg-background border border-border rounded-lg px-3 py-2">
+                    <span className="text-accent font-bold shrink-0 text-xs">{i + 1}.</span>
+                    <span>{p}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {responseVariations.length > 0 && (
+            <div>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-2">Variations observées</p>
+              <div className="space-y-1">
+                {responseVariations.map((v, i) => (
+                  <div key={i} className="text-sm text-text-muted bg-background/50 border border-border/50 rounded px-3 py-1.5">{v}</div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'questions' && (
+        <div className="space-y-1.5">
+          {questions.length === 0 ? (
+            <p className="text-sm text-text-muted italic">Aucune question identifiée.</p>
+          ) : questions.map((q, i) => (
+            <div key={i} className="flex items-start gap-2.5 bg-background border border-border rounded-lg px-3 py-2.5">
+              <span className="text-blue-400 font-bold shrink-0 text-xs mt-0.5">Q{i + 1}</span>
+              <p className="text-sm text-text">{q}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === 'sources' && (
+        <div className="space-y-2">
+          {sources.length === 0 ? (
+            <p className="text-sm text-text-muted italic">Aucune source identifiée.</p>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 mb-1">
+                <p className="text-[12px] font-medium tracking-widest text-text-muted">{sources.length} source{sources.length > 1 ? 's' : ''}</p>
+                <div className="flex items-center">
+                  {sources.filter(src => !!src.url).slice(0, 3).map((src, i) => {
+                    let favicon = '';
+                    try { if (src.url) favicon = `https://www.google.com/s2/favicons?sz=64&domain=${new URL(src.url).hostname}`; } catch {}
+                    if (!favicon) return null;
+                    return (
+                      <img key={i} src={favicon} alt="" className={cn('rounded-full object-cover w-4 h-4 border', i !== 0 ? '-ml-1' : '')} style={{ zIndex: 20 - i }} />
+                    );
+                  })}
+                </div>
+              </div>
+              {sources.map((src, i) => {
+                let favicon: string | null = null;
+                let hostname: string | null = null;
+                try { if (src.url) { const u = new URL(src.url); favicon = `https://www.google.com/s2/favicons?sz=64&domain=${u.hostname}`; hostname = u.hostname; } } catch {}
+                return (
+                  <div key={i} className="flex items-center gap-2.5 bg-background border border-border rounded-lg px-3 py-2">
+                    {favicon && <img src={favicon} alt="" className="w-4 h-4 rounded-full object-cover shrink-0" />}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-text font-medium truncate">{src.name ?? '—'}</p>
+                        {src.type && <span className="text-[9px] uppercase tracking-wider text-text-muted/60 border border-border rounded px-1.5 py-0.5 shrink-0">{src.type}</span>}
+                      </div>
+                      {hostname && <p className="text-[10px] text-text-muted font-mono truncate">{hostname}</p>}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {(src.frequency ?? 0) > 1 && (
+                        <span className="text-[10px] font-bold text-accent/70">×{src.frequency}</span>
+                      )}
+                      {src.url && (
+                        <a href={src.url} target="_blank" rel="noopener noreferrer" className="text-text-muted/40 hover:text-accent">
+                          <ExternalLink size={12} />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+      )}
+
+      {tab === 'gaps' && (
+        <div className="space-y-2">
+          {contentGaps.length === 0 ? (
+            <p className="text-sm text-text-muted italic">Aucune opportunité identifiée.</p>
+          ) : contentGaps.map((g, i) => (
+            <div key={i} className="flex items-start gap-2 bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2.5">
+              <span className="text-amber-400 font-bold shrink-0 text-xs mt-0.5">{i + 1}.</span>
+              <p className="text-sm text-text">{g}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === 'raw' && (
+        <div className="space-y-3">
+          {rawResponses.map((resp, i) => (
+            <div key={i} className="border border-border rounded-lg overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-[#1e1e1e]">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Réponse {i + 1}</p>
+                <CopyButton text={resp} />
+              </div>
+              <pre className="text-[11px] font-mono text-text-muted/70 bg-[#1e1e1e] p-4 overflow-auto max-h-[300px] leading-relaxed whitespace-pre-wrap break-words">
+                {resp}
+              </pre>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const AI_MODULES = new Set(['blog-generation', 'content-generation']);
+
+function StepResult({ step, steps, token, runId }: { step: RunStep; steps: RunStep[]; token: string | null; runId: string }) {
   if (step.status === 'error') {
     return (
       <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4">
@@ -813,16 +1143,31 @@ function StepResult({ step, steps, token, runId, rating }: { step: RunStep; step
 
   const data = step.result_json as Record<string, unknown>;
 
+  let content: React.ReactNode;
   switch (step.module_type) {
-    case 'keyword-research':    return <KeywordResult data={data} />;
-    case 'serp-analysis':       return <SerpResult data={data} />;
-    case 'semantic-extraction': return <SemanticResult data={data} />;
-    case 'blog-generation':     return <BlogGenerationResult data={data} semanticData={steps.find(s => s.module_type === 'semantic-extraction')?.result_json ?? undefined} runId={runId} rating={rating} token={token} />;
-    case 'content-generation':  return <BlogGenerationResult data={data} semanticData={steps.find(s => s.module_type === 'semantic-extraction')?.result_json ?? undefined} runId={runId} rating={rating} token={token} />;
-    case 'webflow-publish':     return <WebflowResult data={data} />;
-    case 'website-scraper':     return <ScraperResult data={data} />;
-    default:                    return <JsonViewer data={data} />;
+    case 'keyword-research':      content = <KeywordResult data={data} />; break;
+    case 'serp-analysis':         content = <SerpResult data={data} />; break;
+    case 'semantic-extraction':   content = <SemanticResult data={data} />; break;
+    case 'blog-generation':       content = <BlogGenerationResult data={data} semanticData={steps.find(s => s.module_type === 'semantic-extraction')?.result_json ?? undefined} />; break;
+    case 'content-generation':    content = <BlogGenerationResult data={data} semanticData={steps.find(s => s.module_type === 'semantic-extraction')?.result_json ?? undefined} />; break;
+    case 'webflow-publish':       content = <WebflowResult data={data} />; break;
+    case 'website-scraper':       content = <ScraperResult data={data} />; break;
+    case 'webflow-structure':     content = <WebflowStructureResult data={data} />; break;
+    case 'blog-generation-geo':   content = <BlogGenerationResult data={data} semanticData={undefined} />; break;
+    case 'geo-prompt-generator':  content = <GeoPromptResult data={data} />; break;
+    case 'prompt-input':          content = <PromptInputResult data={data} />; break;
+    case 'chatgpt-analysis':      content = <GeoLlmAnalysisResult data={data} responsesKey="chatgptResponses" />; break;
+    case 'gemini-analysis':       content = <GeoLlmAnalysisResult data={data} responsesKey="geminiResponses" />; break;
+    case 'perplexity-analysis':   content = <GeoLlmAnalysisResult data={data} responsesKey="perplexityResponses" />; break;
+    default:                      content = <JsonViewer data={data} />; break;
   }
+
+  return (
+    <div className="space-y-4">
+      {content}
+      {token && null}
+    </div>
+  );
 }
 
 // ─── Page ────────────────────────────────────────────────────────────────────
@@ -881,23 +1226,24 @@ function RunDetailContent() {
 
   return (
     <AppLayout>
-      <div className="max-w-[1400px] mx-auto py-8 px-6">
+      <div className="max-w-[1400px] mx-auto py-4 px-4">
         {/* Header */}
-        <Link href="/runs" className="inline-flex items-center gap-2 text-sm text-text-muted hover:text-text mb-5 transition-colors">
+        <Link href="/runs" className="inline-flex items-center gap-2 text-sm text-text-muted hover:text-text mb-4 transition-colors">
           <ArrowLeft size={14} />
           Retour à l'historique
         </Link>
-        <div className="mb-6 flex items-start justify-between">
+        <div className="mb-6 flex items-start justify-between border-b pb-2">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight mb-1">
+            <h1 className="text-xl font-bold tracking-tight mb-1 ">
               {run?.workflows?.name ?? 'Exécution'}
             </h1>
             <div className="flex items-center gap-3 text-sm text-text-muted">
               {run?.sites?.name && <span>{run.sites.name}</span>}
-              {run?.sites?.name && <span>·</span>}
-              <Clock size={13} />
-              <span>{run ? new Date(run.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
-              {run?.status && <span className={cn('font-semibold', statusColor)}>· {run.status === 'done' ? 'Terminé' : run.status === 'error' ? 'Erreur' : 'En cours'}</span>}
+              <div className='flex items-center gap-1'>
+                <Clock size={11} />
+                <span  className='text-[11px]'>{run ? new Date(run.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
+              </div>
+              {run?.status && <span className={cn('font-semibold', statusColor)}>{run.status === 'done' ? 'Terminé' : run.status === 'error' ? 'Erreur' : 'En cours'}</span>}
             </div>
           </div>
         </div>
@@ -909,25 +1255,30 @@ function RunDetailContent() {
         ) : (
           <div className="flex gap-6 items-start">
             {/* Module list */}
-            <div className="w-64 shrink-0 bg-surface border border-border rounded-xl overflow-hidden sticky top-6">
-              <div className="px-4 py-3 border-b border-border bg-background/50">
-                <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Modules exécutés</p>
+            <div className="w-64 shrink-0 bg-surface shadow-xl rounded-none overflow-hidden sticky top-6">
+              <div className="px-4 py-3 border-b border-border bg-background/70 backdrop-blur">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-accent">Modules exécutés</p>
               </div>
               <div className="py-1">
                 {steps.map((step) => {
                   const meta = getModuleMeta(step.module_type);
                   const Icon = meta.icon;
+                  const BrandIcon = meta.brandIcon;
                   const isSelected = selectedStep?.id === step.id;
                   return (
                     <button
                       key={step.id}
                       onClick={() => selectStep(step)}
                       className={cn(
-                        'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors',
+                        'w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors group',
                         isSelected ? 'bg-accent/10' : 'hover:bg-background/60'
                       )}
                     >
-                      <Icon size={14} className={cn(meta.accent, 'shrink-0')} />
+                      {BrandIcon ? (
+                        <BrandIcon size={17} className="shrink-0" />
+                      ) : (
+                        Icon && <Icon size={15} className={cn(meta.accent, 'shrink-0')} />
+                      )}
                       <span className={cn('flex-1 text-xs font-medium truncate', isSelected ? 'text-text' : 'text-text-muted')}>
                         {meta.label}
                       </span>
@@ -938,29 +1289,38 @@ function RunDetailContent() {
               </div>
             </div>
 
-            {/* Result panel */}
-            <div className="flex-1 min-w-0 bg-surface border border-border rounded-xl overflow-hidden">
+            {/* Result panel (no outer card) */}
+            <div className="flex-1 min-w-0">
               {selectedStep ? (
                 <>
-                  <div className="px-5 py-4 border-b border-border bg-background/50 flex items-center gap-3">
+                  {/* Title rendered directly on the page */}
+                  <div className="mb-4 flex items-center gap-3">
                     {(() => {
                       const meta = getModuleMeta(selectedStep.module_type);
                       const Icon = meta.icon;
+                      const BrandIcon = meta.brandIcon;
                       return (
                         <>
-                          <Icon size={16} className={meta.accent} />
-                          <h2 className="font-bold text-text">{meta.label}</h2>
-                          <StepStatusIcon status={selectedStep.status} />
+                          {BrandIcon ? (
+                            <BrandIcon size={18} className="shrink-0" />
+                          ) : (
+                            Icon && <Icon size={18} className={meta.accent} />
+                          )}
+                          <h2 className="text-l font-bold text-text">{meta.label}</h2>
+                          <div className="ml-auto">
+                            <FeedbackButtons key={selectedStep.id} runId={run?.id ?? id} stepId={selectedStep.id} section={selectedStep.module_type} token={token} />
+                          </div>
                         </>
                       );
                     })()}
                   </div>
-                  <div className="p-5">
-                    <StepResult step={selectedStep} steps={steps} token={token} runId={id} rating={run?.rating} />
+
+                  <div>
+                    <StepResult step={selectedStep} steps={steps} token={token} runId={id} />
                   </div>
                 </>
               ) : (
-                <div className="p-10 text-center text-text-muted text-sm">
+                <div className="p-6 text-center text-text-muted text-sm">
                   Sélectionnez un module pour voir ses résultats.
                 </div>
               )}

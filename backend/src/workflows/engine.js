@@ -31,7 +31,7 @@ export class WorkflowEngine {
    */
   // Module types that are "input sources": they inject static values into ctx
   // immediately and are never treated as blocking dependencies.
-  static INPUT_TYPES = new Set(['text-input']);
+  static INPUT_TYPES = new Set(['text-input', 'prompt-input']);
 
   async run(template, initialInput = {}, edges = []) {
     const ctx = this._buildContext(initialInput);

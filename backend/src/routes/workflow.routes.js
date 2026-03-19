@@ -32,6 +32,9 @@ import {
   getWorkflowRunSteps,
   getWorkflowRun,
   rateWorkflowRun,
+  saveStepFeedback,
+  getRunFeedback,
+  getGeoPrompts,
 } from '../services/workflow.service.js';
 
 const router = express.Router();
@@ -106,6 +109,20 @@ router.delete('/workflows/:id', requireAuth, async (req, res) => {
   try {
     await deleteWorkflow(req.params.id, req.user.id);
     res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GEO Prompts ──────────────────────────────────────────────────────────────
+
+// GET /api/workflows/geo-prompts — list saved GEO prompts for the current user
+router.get('/workflows/geo-prompts', requireAuth, async (req, res) => {
+  try {
+    const limit  = Math.min(parseInt(req.query.limit  || '30', 10), 100);
+    const source = req.query.source || undefined;
+    const prompts = await getGeoPrompts(req.user.id, { limit, source });
+    res.json(prompts);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -234,7 +251,7 @@ router.get('/workflow/runs/:runId/steps', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/workflow/runs/:runId/rate — rate a workflow run (1-5 stars)
+// POST /api/workflow/runs/:runId/rate — rate a workflow run (1-5 stars) [legacy]
 router.post('/workflow/runs/:runId/rate', requireAuth, async (req, res) => {
   try {
     const { rating } = req.body;
@@ -243,6 +260,35 @@ router.post('/workflow/runs/:runId/rate', requireAuth, async (req, res) => {
     }
     const updated = await rateWorkflowRun(req.params.runId, req.user.id, rating);
     res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/feedback?runId=... — fetch all votes for a run
+router.get('/feedback', requireAuth, async (req, res) => {
+  try {
+    const { runId } = req.query;
+    if (!runId) return res.status(400).json({ error: 'runId is required' });
+    const votes = await getRunFeedback(req.user.id, runId);
+    res.json(votes);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/feedback — like / dislike a workflow step (all module types)
+router.post('/feedback', requireAuth, async (req, res) => {
+  try {
+    const { runId, stepId, section: moduleType, rating: vote } = req.body;
+    if (!vote || !['like', 'dislike'].includes(vote)) {
+      return res.status(400).json({ error: 'vote must be "like" or "dislike"' });
+    }
+    if (!moduleType) {
+      return res.status(400).json({ error: 'section (moduleType) is required' });
+    }
+    await saveStepFeedback(req.user.id, { runId, stepId, moduleType, vote });
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

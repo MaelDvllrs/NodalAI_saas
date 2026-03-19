@@ -107,8 +107,8 @@ function extractShort(lines, { start, end }) {
     // Skip lines that look like instructions echoed from the system prompt
     if (/^(Rédige|Génère|Crée|Écris|Inclus|Intègre|Formulez|Produire|Contrainte|Il doit|Elle doit|Format)/i.test(t)) continue;
 
-    // This is the actual content — clean it up
-    const cleaned = cleanMarkdown(t);
+    // This is the actual content — clean it up (strip all markdown for plain-text fields)
+    const cleaned = cleanMarkdownPlain(t);
     if (cleaned.length > 4) return cleaned;
   }
   return '';
@@ -228,9 +228,14 @@ function extractSchemasList(lines, { start, end }) {
 
 function cleanMarkdown(text) {
   return text
-    .replace(/\*\*/g, '')        // remove bold **
+    // Do NOT strip ** here — htmlBuilder.processLinks converts ** → <strong>
     .replace(/(?<!\w)\*(?!\w)/g, '') // remove lonely italic *
     .replace(/\[.*?\]\(.*?\)/g, (m) => m.replace(/\[(.+?)\]\(.+?\)/, '$1')) // keep link text
     .replace(/\[.*?\]/g, '')     // remove remaining [markers]
     .trim();
+}
+
+/** For plain-text fields (title, meta, H1) — strips all markdown formatting */
+function cleanMarkdownPlain(text) {
+  return cleanMarkdown(text).replace(/\*\*/g, '');
 }

@@ -179,6 +179,9 @@ function convertContentToHtml(content) {
     // Skip raw HTML tags and code fence markers (tables/schemas Claude may inline in section 5)
     if (t.startsWith('<') || /^```/.test(t)) continue;
 
+    // Skip markdown table rows (| col1 | col2 |) — tables must use [[SCHEMA:table]] markers
+    if (/^\|.+\|/.test(t)) continue;
+
     // Regular text → accumulate in paragraph buffer
     paraBuffer.push(cleanMarkdown(t));
   }
@@ -196,8 +199,11 @@ function convertContentToHtml(content) {
  * Also handles standard markdown links [text](url).
  */
 function processLinks(text) {
-  // Bold: **text** → <strong>text</strong> (before link processing)
+  // Bold: **text** → <strong>text</strong> (must be before italic)
   text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+  // Italic: *text* (single asterisk, not part of **bold**)
+  text = text.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>');
 
   // Internal: [[INTERNE:URL|anchor text]]
   text = text.replace(/\[\[INTERNE:(https?:\/\/[^\|]+)\|([^\]]+)\]\]/g,

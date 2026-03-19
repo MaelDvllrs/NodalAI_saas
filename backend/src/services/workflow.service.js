@@ -217,6 +217,60 @@ export async function rateWorkflowRun(runId, userId, rating) {
   return data;
 }
 
+// ── Step feedback (like / dislike) ───────────────────────────────────────────
+
+const AI_MODULES = new Set(['blog-generation', 'content-generation']);
+
+/**
+ * Save a like/dislike vote for a workflow step.
+ * For AI modules a "like" also bumps workflow_runs.rating = 5 so the
+ * existing ratingExamples pipeline keeps working without changes.
+ */
+export async function saveStepFeedback(userId, { runId, stepId, moduleType, vote }) {
+  // Upsert so the user can change their mind
+  const { error } = await supabase
+    .from('step_feedback')
+    .upsert(
+      { user_id: userId, run_id: runId ?? null, step_id: stepId ?? null, module_type: moduleType, vote },
+      { onConflict: 'user_id,step_id' },
+    );
+  if (error) throw new Error(`[workflow.service] saveStepFeedback: ${error.message}`);
+
+  // For AI modules update workflow_runs.rating so ratingExamples keeps working
+  if (runId && AI_MODULES.has(moduleType)) {
+    const rating = vote === 'like' ? 5 : 1;
+    await supabase.from('workflow_runs').update({ rating }).eq('id', runId).eq('user_id', userId);
+  }
+}
+
+export async function getRunFeedback(userId, runId) {
+  const { data, error } = await supabase
+    .from('step_feedback')
+    .select('step_id, vote')
+    .eq('user_id', userId)
+    .eq('run_id', runId);
+  if (error) throw new Error(`[workflow.service] getRunFeedback: ${error.message}`);
+  // Return a map { stepId -> vote }
+  return Object.fromEntries((data ?? []).map(r => [r.step_id, r.vote]));
+}
+
+// ── GEO Prompts ──────────────────────────────────────────────────────────────
+
+export async function getGeoPrompts(userId, { limit = 30, source } = {}) {
+  let q = supabase
+    .from('geo_prompts')
+    .select('id, prompt, topic, source, site_theme, created_at')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (userId) q = q.eq('user_id', userId);
+  if (source)  q = q.eq('source', source);
+
+  const { data, error } = await q;
+  if (error) throw new Error(`[workflow.service] getGeoPrompts: ${error.message}`);
+  return data ?? [];
+}
+
 export async function getTopRatedWorkflowRuns(userId, projectId, limit = 5) {
   let query = supabase
     .from('workflow_runs')

@@ -202,11 +202,7 @@ function BuilderPageContent() {
     localStorage.removeItem(STORAGE_KEY);
     setIsLoading(true);
 
-    console.group('[Workflow] Lancement');
-    console.log('Steps (%d):', steps.length, steps.map(s => ({ instanceId: s.instanceId, type: s.type, config: s.config })));
-    console.log('Edges (%d):', filteredEdges.length, filteredEdges);
-    console.log('Input:', input);
-    console.groupEnd();
+
 
     try {
       const _projectName = selectedSite?.name ?? 'Projet';

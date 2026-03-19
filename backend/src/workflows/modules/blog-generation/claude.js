@@ -670,7 +670,7 @@ export async function generateFaqAndSchemas({ mainKeyword, bodyContent, faqQuest
     ? `Traite en priorité ces questions :\n${faqQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}`
     : `Génère 8 à 10 questions fréquentes pertinentes sur le sujet.`;
 
-  const prompt = `Tu es un expert SEO. Génère exactement deux blocs HTML pour un article sur "${mainKeyword}".
+  const prompt = `Tu es un expert SEO. Génère exactement trois blocs pour un article sur "${mainKeyword}".
 
 Ton : ${tone ?? 'expert et pédagogique'}. Langue : français.
 
@@ -679,7 +679,7 @@ ${bodyContent.slice(0, 2000)}
 
 ---
 
-## BLOC 1 — FAQ (CODE HTML)
+## BLOC 1 — FAQ (CODE HTML ACCORDÉON)
 ${faqQuestionsBlock}
 
 Règles :
@@ -700,7 +700,33 @@ Règles :
 
 ---
 
-## BLOC 2 — SCHÉMAS VISUELS (3 blocs HTML)
+## BLOC 2 — SCHEMA.ORG FAQ (JSON-LD)
+
+Génère le balisage structuré schema.org pour la même FAQ du BLOC 1.
+Format exact :
+
+\`\`\`json-ld
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Question ?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Réponse complète."
+      }
+    }
+  ]
+}
+</script>
+\`\`\`
+
+---
+
+## BLOC 3 — SCHÉMAS VISUELS (3 blocs HTML)
 
 Génère exactement 3 schémas adaptés au contenu :
 - SCHÉMA 1 : tableau comparatif ou checklist (<table> avec <tr>/<th>/<td>)
@@ -713,15 +739,15 @@ Règles absolues :
 - Responsive (max-width, flexbox inline)
 
 Format exact :
-📌 SCHÉMA 1 - À insérer après : [H2/H3 concerné]
+📌 SCHEMA 1 - À insérer après : [H2/H3 concerné]
 \`\`\`html
 <div style="font-family:sans-serif;max-width:800px;margin:24px auto">...</div>
 \`\`\`
-📌 SCHÉMA 2 - À insérer après : [H2/H3 concerné]
+📌 SCHEMA 2 - À insérer après : [H2/H3 concerné]
 \`\`\`html
 ...
 \`\`\`
-📌 SCHÉMA 3 - À insérer après : [H2/H3 concerné]
+📌 SCHEMA 3 - À insérer après : [H2/H3 concerné]
 \`\`\`html
 ...
 \`\`\``;
@@ -734,23 +760,44 @@ Format exact :
 
   const raw = message.content[0].text;
 
-  // ── Parse FAQ ─────────────────────────────────────────────────────────────
-  const bloc2Start = raw.indexOf('📌 SCH');
-  const faqSection = bloc2Start !== -1 ? raw.slice(0, bloc2Start) : raw;
+  // ── Parse FAQ HTML (BLOC 1) ────────────────────────────────────────────────
+  const bloc2Start = raw.search(/##\s*BLOC\s*2|##\s*SCHEMA\.ORG/i);
+  const bloc3Start = raw.search(/##\s*BLOC\s*3|##\s*SCH[EÉ]MAS\s*VISUELS|📌\s*SCH/i);
+
+  const faqSection = bloc2Start !== -1 ? raw.slice(0, bloc2Start) : (bloc3Start !== -1 ? raw.slice(0, bloc3Start) : raw);
   const faqFenced = faqSection.match(/```(?:html)?\s*([\s\S]*?)```/);
-  const faqEmbed = faqFenced
+  const faqHtml = faqFenced
     ? faqFenced[1].trim()
     : (() => {
         const idx = faqSection.indexOf('<div');
         return idx !== -1 ? faqSection.slice(idx).trim() : '';
       })();
 
-  // ── Parse schemas ─────────────────────────────────────────────────────────
-  const schemasSection = bloc2Start !== -1 ? raw.slice(bloc2Start) : '';
+  // ── Parse schema.org JSON-LD (BLOC 2) ─────────────────────────────────────
+  let faqJsonLd = '';
+  if (bloc2Start !== -1) {
+    const bloc2End = bloc3Start !== -1 ? bloc3Start : raw.length;
+    const jsonLdSection = raw.slice(bloc2Start, bloc2End);
+    // Match ```json-ld ... ``` or ```html ... ``` containing <script>
+    const jsonFenced = jsonLdSection.match(/```(?:json-ld|html)?\s*([\s\S]*?)```/);
+    if (jsonFenced) {
+      faqJsonLd = jsonFenced[1].trim();
+    } else {
+      const scriptIdx = jsonLdSection.indexOf('<script');
+      if (scriptIdx !== -1) faqJsonLd = jsonLdSection.slice(scriptIdx).trim();
+    }
+  }
+
+  // Combine FAQ HTML + JSON-LD into a single copyable block
+  const faqEmbed = [faqHtml, faqJsonLd].filter(Boolean).join('\n\n');
+
+  // ── Parse visual schemas (BLOC 3) ─────────────────────────────────────────
+  const schemasSection = bloc3Start !== -1 ? raw.slice(bloc3Start) : '';
   const schemas = [];
-  for (const part of schemasSection.split(/(?=📌 SCHÉMA \d+)/)) {
+  // Split on schema markers — handle both accented (SCHÉMA) and plain (SCHEMA)
+  for (const part of schemasSection.split(/(?=📌\s*SCH[EÉ]MA?\s*\d+)/i)) {
     if (!part.includes('📌')) continue;
-    const insertMatch = part.match(/📌 SCHÉMA \d+[^:]*:\s*(.+)/);
+    const insertMatch = part.match(/📌\s*SCH[EÉ]MA?\s*\d+[^:]*:\s*(.+)/i);
     const position = insertMatch ? insertMatch[1].trim() : '';
     const fenced = part.match(/```(?:html)?\s*([\s\S]*?)```/);
     let code = fenced ? fenced[1].trim() : '';

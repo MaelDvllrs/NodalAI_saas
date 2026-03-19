@@ -156,13 +156,12 @@ function RunsListContent() {
 
   return (
     <AppLayout>
-      <div className="max-w-7xl mx-auto py-8 px-6">
+      <div className="max-w-7xl mx-auto py-4 px-4">
 
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 animate-slide-up">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 animate-slide-up">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-text-muted mb-1">Exécutions</p>
-            <h1 className="text-2xl font-bold tracking-tight">Historique des exécutions</h1>
           </div>
         </div>
 
