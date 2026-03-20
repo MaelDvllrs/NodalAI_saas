@@ -20,6 +20,7 @@
 import {
   generateBlogContent,
   generateFaqAndSchemas,
+  generateTableSchemas,
   generateOptimizedOutline,
   getWordCountBounds,
   getLengthFromKd,
@@ -179,6 +180,22 @@ export const BlogGenerationModule = {
         emitEvent(jobId, { type: 'step', message: `✅ FAQ (${faqEmbed ? 'OK' : 'vide'}) + ${schemas?.length ?? 0} schéma(s) générés` });
       } catch (faqErr) {
         emitEvent(jobId, { type: 'step', message: `⚠️ FAQ/schémas ignorés : ${faqErr.message}` });
+      }
+
+      // ── 5c. Generate 2 visual table schemas (focused dedicated call) ──────────
+      emitEvent(jobId, { type: 'step', message: '📊 Génération des tableaux visuels...' });
+      try {
+        const tableSchemas = await generateTableSchemas({
+          mainKeyword,
+          bodyContent: parsed.planMece || rawBlog,
+          tone,
+        });
+        if (tableSchemas.length) {
+          parsed.schemas = [...(parsed.schemas ?? []), ...tableSchemas];
+          emitEvent(jobId, { type: 'step', message: `✅ ${tableSchemas.length} tableau(x) généré(s)` });
+        }
+      } catch (tableErr) {
+        emitEvent(jobId, { type: 'step', message: `⚠️ Tableaux ignorés : ${tableErr.message}` });
       }
     }
 

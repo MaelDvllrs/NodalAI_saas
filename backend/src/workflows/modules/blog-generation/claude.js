@@ -761,7 +761,7 @@ Format exact :
   const raw = message.content[0].text;
 
   // ── Parse FAQ HTML (BLOC 1) ────────────────────────────────────────────────
-  const bloc2Start = raw.search(/##\s*BLOC\s*2|##\s*SCHEMA\.ORG/i);
+  const bloc2Start = raw.search(/##\s*BLOC\s*2|##\s*SCHEMA(?:\.ORG)?/i);
   const bloc3Start = raw.search(/##\s*BLOC\s*3|##\s*SCH[EÉ]MAS\s*VISUELS|📌\s*SCH/i);
 
   const faqSection = bloc2Start !== -1 ? raw.slice(0, bloc2Start) : (bloc3Start !== -1 ? raw.slice(0, bloc3Start) : raw);
@@ -778,13 +778,21 @@ Format exact :
   if (bloc2Start !== -1) {
     const bloc2End = bloc3Start !== -1 ? bloc3Start : raw.length;
     const jsonLdSection = raw.slice(bloc2Start, bloc2End);
-    // Match ```json-ld ... ``` or ```html ... ``` containing <script>
-    const jsonFenced = jsonLdSection.match(/```(?:json-ld|html)?\s*([\s\S]*?)```/);
+    // Match ```json-ld ... ```, ```json ... ```, ```html ... ``` or bare <script>
+    const jsonFenced = jsonLdSection.match(/```(?:json-ld|json|html)?\s*([\s\S]*?)```/);
     if (jsonFenced) {
       faqJsonLd = jsonFenced[1].trim();
     } else {
       const scriptIdx = jsonLdSection.indexOf('<script');
       if (scriptIdx !== -1) faqJsonLd = jsonLdSection.slice(scriptIdx).trim();
+    }
+  }
+  // Fallback: if BLOC 2 wasn't found but raw contains a JSON-LD script, extract it
+  if (!faqJsonLd) {
+    const globalScriptIdx = raw.indexOf('<script type="application/ld+json">');
+    if (globalScriptIdx !== -1) {
+      const scriptEnd = raw.indexOf('</script>', globalScriptIdx);
+      faqJsonLd = scriptEnd !== -1 ? raw.slice(globalScriptIdx, scriptEnd + 9).trim() : raw.slice(globalScriptIdx).trim();
     }
   }
 
@@ -809,4 +817,120 @@ Format exact :
   }
 
   return { faqEmbed, schemas };
+}
+
+/**
+ * Third focused call: generate 2 visual HTML schemas (table/comparison/process).
+ * Separated from FAQ generation to avoid token exhaustion and improve reliability.
+ *
+ * @param {object} params
+ * @param {string} params.mainKeyword
+ * @param {string} params.bodyContent  - Article body (excerpt used for context)
+ * @param {string} params.tone
+ * @returns {Promise<Array<{ position: string, type: string, code: string }>>}
+ */
+export async function generateTableSchemas({ mainKeyword, bodyContent, tone = 'expert et pédagogique' }) {
+  const client = getClient();
+
+  const excerpt = bodyContent.slice(0, 2500);
+
+  const prompt = `Tu es un expert en design de contenu web. Génère exactement 2 schémas visuels HTML pour un article sur "${mainKeyword}".
+
+TON : ${tone}. LANGUE : français.
+
+EXTRAIT DE L'ARTICLE (pour adapter le contenu des schémas) :
+${excerpt}
+
+---
+
+## RÈGLES ABSOLUES
+- Styles inline style="..." UNIQUEMENT — INTERDIT : class=, id=, <style>, CSS externe
+- Données RÉELLES tirées du contenu de l'article (pas de placeholders génériques)
+- max-width sur chaque div racine (responsive)
+- Couleurs : fond #f9fafb, texte #111827, accent #2563eb, bordures #e5e7eb
+
+---
+
+## FORMAT DE SORTIE
+
+Génère exactement 2 schémas avec ce format :
+
+📌 SCHEMA 1 - Type : [tableau comparatif | checklist | processus | synthèse chiffrée] - Position : [après quel H2]
+\`\`\`html
+<div style="...">...</div>
+\`\`\`
+
+📌 SCHEMA 2 - Type : [...] - Position : [après quel H2]
+\`\`\`html
+...
+\`\`\`
+
+---
+
+## EXEMPLES DE STRUCTURES ACCEPTÉES
+
+**Tableau comparatif (adapte les colonnes et données au contenu) :**
+\`\`\`html
+<div style="font-family:sans-serif;max-width:800px;margin:24px auto;overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:0.9rem">
+    <thead>
+      <tr style="background:#2563eb;color:#fff">
+        <th style="padding:12px 16px;text-align:left;font-weight:600">Critère</th>
+        <th style="padding:12px 16px;text-align:left;font-weight:600">Option A</th>
+        <th style="padding:12px 16px;text-align:left;font-weight:600">Option B</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td style="padding:10px 16px;border-bottom:1px solid #e5e7eb;font-weight:600;background:#f9fafb">Critère 1</td><td style="padding:10px 16px;border-bottom:1px solid #e5e7eb;background:#f9fafb">Valeur A</td><td style="padding:10px 16px;border-bottom:1px solid #e5e7eb;background:#f9fafb">Valeur B</td></tr>
+    </tbody>
+  </table>
+</div>
+\`\`\`
+
+**Processus numéroté :**
+\`\`\`html
+<div style="font-family:sans-serif;max-width:700px;margin:24px auto">
+  <div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:12px">
+    <div style="min-width:32px;height:32px;border-radius:50%;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;flex-shrink:0">1</div>
+    <div style="padding-top:4px"><strong style="color:#111827;display:block;margin-bottom:2px">Titre de l'étape</strong><span style="color:#374151;font-size:0.875rem">Description.</span></div>
+  </div>
+</div>
+\`\`\`
+
+**Checklist :**
+\`\`\`html
+<div style="font-family:sans-serif;max-width:680px;margin:24px auto;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px 24px">
+  <p style="margin:0 0 12px;font-weight:700;color:#166534">Points essentiels</p>
+  <ul style="margin:0;padding:0;list-style:none">
+    <li style="display:flex;gap:10px;margin-bottom:8px;font-size:0.9rem;color:#374151"><span style="color:#16a34a;font-weight:700;flex-shrink:0">✓</span>Point 1</li>
+  </ul>
+</div>
+\`\`\`
+
+Génère maintenant les 2 schémas avec des données concrètes tirées de l'article.`;
+
+  const message = await claudeCreate(client, {
+    model:      'claude-sonnet-4-6',
+    max_tokens: 4000,
+    messages:   [{ role: 'user', content: prompt }],
+  });
+
+  const raw = message.content[0].text;
+  const schemas = [];
+
+  for (const part of raw.split(/(?=📌\s*SCHEMA\s*\d+)/i)) {
+    if (!/📌/i.test(part)) continue;
+    const headerMatch = part.match(/📌\s*SCHEMA\s*\d+\s*-\s*Type\s*:\s*([^-\n]+)(?:\s*-\s*Position\s*:\s*([^\n]+))?/i);
+    const type     = headerMatch?.[1]?.trim() ?? 'tableau';
+    const position = headerMatch?.[2]?.trim() ?? '';
+    const fenced   = part.match(/```(?:html)?\s*([\s\S]*?)```/);
+    let code = fenced ? fenced[1].trim() : '';
+    if (!code) {
+      const htmlStart = part.search(/<(div|table|ul)/);
+      if (htmlStart !== -1) code = part.slice(htmlStart).trim();
+    }
+    if (code) schemas.push({ type, position, code });
+  }
+
+  return schemas;
 }

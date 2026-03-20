@@ -54,13 +54,18 @@ function buildSiteContext(siteProfile, sitemapUrls = []) {
 /**
  * Ask Claude Haiku to propose a GEO prompt not yet covered by the site.
  *
- * @param {object} siteProfile - SiteProfile from website-scraper
+ * @param {object}   siteProfile     - SiteProfile from website-scraper
  * @param {string[]} sitemapUrls
+ * @param {string[]} existingPrompts - Already-generated prompts to avoid duplicating
  * @returns {Promise<{ geoPrompt: string; geoTopic: string; geoRationale: string }>}
  */
-export async function generateGeoPrompt(siteProfile, sitemapUrls = []) {
+export async function generateGeoPrompt(siteProfile, sitemapUrls = [], existingPrompts = []) {
   const client = getClient();
   const siteContext = buildSiteContext(siteProfile, sitemapUrls);
+
+  const existingBlock = existingPrompts.length > 0
+    ? `\n\n⚠️ PROMPTS DÉJÀ GÉNÉRÉS POUR CE SITE (à ne PAS reproduire, ni paraphraser) :\n${existingPrompts.map((p, i) => `${i + 1}. "${p}"`).join('\n')}\n\nLe nouveau prompt doit explorer un angle DIFFÉRENT — nouveau sujet, nouvelle intention, nouveau public cible.`
+    : '';
 
   const systemPrompt = `Tu es un expert en GEO (Generative Engine Optimization) et en stratégie de contenu.
 Ton rôle est d'identifier des questions précises que les internautes posent à des IA (ChatGPT, Claude, Perplexity, Gemini...)
@@ -77,7 +82,7 @@ Tu dois répondre UNIQUEMENT en JSON valide, sans markdown, sans texte avant ou 
 
   const userPrompt = `Voici le profil du site à analyser :
 
-${siteContext}
+${siteContext}${existingBlock}
 
 En te basant sur ce profil, propose UNE seule question GEO pertinente que ce site devrait traiter.
 

@@ -394,9 +394,9 @@ function BlockCard({
       {/* ── Block card ── */}
       <div className={cn(
         'flex-1 rounded-lg border px-3 py-2 mb-1.5 transition-all duration-300',
-        status === 'done'   && 'border-green-500/15 bg-green-500/[0.03]',
+        status === 'done'   && 'border-green-500 bg-green-500/[0.03]',
         status === 'active' && 'border-accent/25 bg-accent/[0.04]',
-        status === 'error'  && 'border-red-500/25 bg-red-500/[0.04]',
+        status === 'error'  && 'border-red-500 bg-red-500/[0.04]',
         status === 'idle'   && 'border-border/40 bg-surface/20',
       )}>
         <div className="flex items-center justify-between gap-2">

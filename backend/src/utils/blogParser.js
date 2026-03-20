@@ -120,28 +120,22 @@ function extractShort(lines, { start, end }) {
  */
 function extractParagraphs(lines, { start, end }) {
   const out = [];
-  let pastHeader = false;
 
   for (let i = start; i < end; i++) {
     const t = lines[i].trim();
 
-    // Skip the section header line
-    if (!pastHeader) {
-      if (/^#{1,4}/.test(t) || /^\*{1,2}\d/.test(t)) {
-        pastHeader = true;
-        continue;
-      }
-    }
-    pastHeader = true;
+    // Skip ALL heading lines (section markers, BLOC sub-labels like #### BLOC A)
+    if (/^#{1,4}/.test(t)) continue;
+    if (/^\*{1,2}\d/.test(t)) continue;
 
     if (/^\[.*\]$/.test(t)) continue;
     if (/^-{3,}$/.test(t)) continue;
 
-    // Skip obvious instruction lines at start
-    if (
-      out.length === 0 &&
-      /^(Rédige|Génère|Crée|Après le H1|Elle doit|La section|Accrocher)/i.test(t)
-    ) continue;
+    // Skip BLOC sub-header labels echoed without hashes (e.g. "BLOC B — INTRODUCTION", "**BLOC B**")
+    if (/^(?:\*{1,2})?BLOC\s+[A-Z]/i.test(t)) continue;
+
+    // Skip obvious instruction lines
+    if (/^(Rédige|Génère|Crée|Après le H1|Elle doit|La section|Accrocher)/i.test(t)) continue;
 
     out.push(cleanMarkdown(lines[i]));
   }
@@ -172,6 +166,9 @@ function extractBlock(lines, { start, end }) {
 
     if (/^\[.*\]$/.test(t)) continue;
     if (/^-{3,}$/.test(t)) continue;
+
+    // Skip BLOC sub-header labels (with or without bold markers)
+    if (/^(?:\*{1,2})?BLOC\s+[A-Z]/i.test(t)) continue;
 
     out.push(line);
   }

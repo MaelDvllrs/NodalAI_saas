@@ -321,6 +321,7 @@ export const MODULE_CATALOG: ModuleDef[] = [
     },
   },
 
+
   // ── Generation GEO ──────────────────────────────────────────────────────────
   {
     type: 'blog-generation-geo',
@@ -640,8 +641,8 @@ function WorkflowNode({ data }: NodeProps) {
         'w-64 rounded-xl border shadow-md transition-all duration-300 group',
         status === 'idle'   && 'border-border bg-surface',
         status === 'active' && cn(def.accent.border, 'bg-surface'),
-        status === 'done'   && 'border-green-500/30 bg-surface',
-        status === 'error'  && 'border-red-500/30 bg-surface',
+        status === 'done'   && 'border-green-500 bg-surface',
+        status === 'error'  && 'border-red-500 bg-surface',
       )}>
         {/* Target handle — only when the module accepts inputs */}
         {def.ports.in.length > 0 && (
@@ -1157,9 +1158,11 @@ export interface WorkflowEditorProps {
   actionsRef?: React.MutableRefObject<WorkflowEditorActions | null>;
   /** Hide the Save/Run/Reset buttons from the palette (use when they live in an external header). */
   hideActions?: boolean;
+  /** Controlled show/hide of the monitoring panel. When provided, the internal toggle is hidden. */
+  showLogs?: boolean;
 }
 
-export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSave, onExport, initialBlocks, initialEdges, monitoring, actionsRef, hideActions }: WorkflowEditorProps) {
+export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSave, onExport, initialBlocks, initialEdges, monitoring, actionsRef, hideActions, showLogs: showLogsProp }: WorkflowEditorProps) {
   const startNodes = initialBlocks !== undefined ? blocksToNodes(initialBlocks) : INITIAL_NODES;
   const validNodeIds = new Set(startNodes.map(n => n.id));
   const startEdges: Edge[] = initialEdges !== undefined
@@ -1181,7 +1184,9 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState(startNodes);
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState<Edge>(startEdges);
   const [isSaving, setIsSaving] = useState(false);
-  const [showLogs, setShowLogs] = useState(false);
+  const [showLogsInternal, setShowLogsInternal] = useState(false);
+  const showLogs = showLogsProp !== undefined ? showLogsProp : showLogsInternal;
+  const setShowLogs = showLogsProp !== undefined ? () => {} : setShowLogsInternal;
 
   // Expose save/run to parent via ref (updated every render to always capture fresh state)
   if (actionsRef) {
@@ -1321,15 +1326,15 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
   const blocks = rfNodes.map(n => ({ ...(n.data as WorkflowNodeData).block, position: n.position }));
 
   return (
-    <div className="flex gap-6 h-full">
+    <div className="flex h-full">
 
       {/* Palette */}
-      <div className="w-60 shrink-0 flex flex-col overflow-y-auto space-y-2 pr-0.5">
+      <div className="w-60 shrink-0 flex flex-col overflow-auto space-y-2 p-2 border-r">
 
         {/* Triggers */}
         <div className="flex items-center gap-2 px-0.5 mb-2">
-          <Zap size={9} className="text-amber-400/60" />
-          <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-amber-400/60">Déclencheurs</p>
+          <Zap size={9} />
+          <p className="text-[9px] font-bold uppercase tracking-[0.18em]">Déclencheurs</p>
         </div>
         {paletteTriggers.map(def => (
           <PaletteCard
@@ -1343,8 +1348,8 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
         {paletteInputs.length > 0 && (
           <div className="border-t border-border/40 pt-3 mt-3">
             <div className="flex items-center gap-2 px-0.5 mb-2">
-              <Type size={9} className="text-slate-400/60" />
-              <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400/60">Entrées</p>
+              <Type size={9} />
+              <p className="text-[9px] font-bold uppercase tracking-[0.18em]">Entrées</p>
             </div>
             {paletteInputs.map(def => (
               <PaletteCard
@@ -1423,7 +1428,7 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
             )}
           </div>
         )}
-        <div className="rounded-xl border border-border overflow-hidden flex-1 relative">
+        <div className="overflow-hidden flex-1 relative">
           <ReactFlowProvider>
             <DroppableCanvas
               rfNodes={rfNodes}
@@ -1436,8 +1441,8 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
             />
           </ReactFlowProvider>
           
-          {/* Logs toggle - bottom left */}
-          {events.length > 0 && monitoring && (
+          {/* Logs toggle - bottom left (only shown when not controlled by parent) */}
+          {showLogsProp === undefined && events.length > 0 && monitoring && (
             <div className="absolute bottom-4 left-4 z-10">
               <label className={cn(
                 "flex items-center gap-2.5 px-4 py-2.5 rounded-lg cursor-pointer select-none transition-all duration-200",
@@ -1482,7 +1487,7 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
 
       {/* Results panel */}
       {monitoring && showLogs && (
-        <div className="flex-1 min-w-0 h-full overflow-y-auto">
+        <div className="flex-1 min-w-0 h-full overflow-y-auto p-2 border-l">
           {monitoring}
         </div>
       )}

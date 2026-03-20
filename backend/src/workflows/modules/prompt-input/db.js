@@ -35,10 +35,10 @@ export async function saveGeoPrompt({ prompt, topic, source = 'manual', siteThem
 
 /**
  * List recent prompts for a user (or all prompts if no userId).
- * @param {{ userId?: string, limit?: number, source?: string }} opts
+ * @param {{ userId?: string, limit?: number, source?: string, siteTheme?: string }} opts
  * @returns {Promise<Array<{ id: string, prompt: string, topic: string, source: string, site_theme: string, created_at: string }>>}
  */
-export async function listGeoPrompts({ userId, limit = 30, source } = {}) {
+export async function listGeoPrompts({ userId, limit = 30, source, siteTheme } = {}) {
   try {
     const supabase = getSupabase();
     let q = supabase
@@ -47,8 +47,9 @@ export async function listGeoPrompts({ userId, limit = 30, source } = {}) {
       .order('created_at', { ascending: false })
       .limit(limit);
 
-    if (userId) q = q.eq('user_id', userId);
-    if (source) q = q.eq('source', source);
+    if (userId)    q = q.eq('user_id',    userId);
+    if (source)    q = q.eq('source',     source);
+    if (siteTheme) q = q.ilike('site_theme', `%${siteTheme}%`);
 
     const { data, error } = await q;
     if (error) {

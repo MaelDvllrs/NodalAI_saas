@@ -18,6 +18,7 @@
  */
 
 import { generateGeoBlogContent, generateFaqAndSchemas } from './claude.js';
+import { generateTableSchemas } from '../blog-generation/claude.js';
 import { parseBlogContent }                              from '../../../utils/blogParser.js';
 import { buildBodyHtml, buildFieldData, buildFullHtml }  from '../../../utils/htmlBuilder.js';
 
@@ -120,6 +121,22 @@ export const BlogGenerationGeoModule = {
       });
     } catch (faqErr) {
       emitEvent(jobId, { type: 'step', message: `⚠️ FAQ/schémas ignorés : ${faqErr.message}` });
+    }
+
+    // ── 3b. Generate 2 visual table schemas ───────────────────────────────────
+    emitEvent(jobId, { type: 'step', message: '📊 Génération des tableaux visuels...' });
+    try {
+      const tableSchemas = await generateTableSchemas({
+        mainKeyword: geoPrompt,
+        bodyContent: parsed.planMece || rawBlog,
+        tone,
+      });
+      if (tableSchemas.length) {
+        parsed.schemas = [...(parsed.schemas ?? []), ...tableSchemas];
+        emitEvent(jobId, { type: 'step', message: `✅ ${tableSchemas.length} tableau(x) généré(s)` });
+      }
+    } catch (tableErr) {
+      emitEvent(jobId, { type: 'step', message: `⚠️ Tableaux ignorés : ${tableErr.message}` });
     }
 
     // ── 4. Build HTML ─────────────────────────────────────────────────────────

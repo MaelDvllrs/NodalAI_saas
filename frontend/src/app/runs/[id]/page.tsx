@@ -11,6 +11,7 @@ import {
   MousePointerClick, Zap, ExternalLink, BarChart2, Link as LinkIcon, Type,
   Copy, Check, ChevronDown, ThumbsUp, ThumbsDown,
   Lightbulb, MessageSquare, Database,
+  ChevronLeft,
 } from 'lucide-react';
 import { WebflowIcon, GoogleIcon, CountryFlag, ChatGptIcon, GeminiIcon, PerplexityIcon } from '../../components/WorkflowBlocks';
 import { Skeleton } from '../../components/UI';
@@ -107,11 +108,11 @@ function FeedbackButtons({ runId, stepId, section, token }: { runId?: string; st
 
   return (
     <div className="flex items-center gap-2">
-      <button aria-label="like" onClick={() => sendFeedback('like')} className={cn('p-1 rounded', vote === 'like' ? 'bg-green-500/10' : 'hover:bg-background/50')}>
-        <ThumbsUp size={14} className={cn(vote === 'like' ? 'text-green-400' : 'text-text-muted')} />
+      <button aria-label="like" onClick={() => sendFeedback('like')} className={cn('p-0.5 rounded', vote === 'like' ? 'bg-green-500/10' : 'hover:bg-background/50')}>
+        <ThumbsUp size={12} className={cn(vote === 'like' ? 'text-green-400' : 'text-text-muted')} />
       </button>
-      <button aria-label="dislike" onClick={() => sendFeedback('dislike')} className={cn('p-1 rounded', vote === 'dislike' ? 'bg-red-500/10' : 'hover:bg-background/50')}>
-        <ThumbsDown size={14} className={cn(vote === 'dislike' ? 'text-red-400' : 'text-text-muted')} />
+      <button aria-label="dislike" onClick={() => sendFeedback('dislike')} className={cn('p-0.5 rounded', vote === 'dislike' ? 'bg-red-500/10' : 'hover:bg-background/50')}>
+        <ThumbsDown size={12} className={cn(vote === 'dislike' ? 'text-red-400' : 'text-text-muted')} />
       </button>
     </div>
   );
@@ -418,7 +419,7 @@ function CopyButton({ text }: { text: string }) {
 
 
 function BlogGenerationResult({ data, semanticData }: { data: Record<string, unknown>; semanticData?: Record<string, unknown> }) {
-  const [tab, setTab] = useState<'meta' | 'html' | 'outline' | 'schema' | 'tfidf'>('meta');
+  const [tab, setTab] = useState<'meta' | 'rendu' | 'html' | 'outline' | 'schema' | 'tfidf'>('meta');
   const parsedBlog = (data.parsedBlog as Record<string, unknown>) ?? {};
   const fieldData = (data.fieldData as Record<string, unknown>) ?? {};
   const htmlBody = (data.htmlBody as string) ?? (fieldData['body'] as string) ?? '';
@@ -427,7 +428,7 @@ function BlogGenerationResult({ data, semanticData }: { data: Record<string, unk
   const h1 = (parsedBlog.h1 as string) ?? (fieldData['title'] as string) ?? (data.title as string) ?? '—';
   const metaTitle = (parsedBlog.titleTag as string) ?? (fieldData['meta-title'] as string) ?? (fieldData['metaTitle'] as string) ?? '—';
   const metaDesc = (parsedBlog.metaDescription as string) ?? (fieldData['meta-description'] as string) ?? (fieldData['metaDescription'] as string) ?? '—';
-  const schemas = (parsedBlog.schemas as string[]) ?? [];
+  const schemas = (parsedBlog.schemas as (string | { code: string; type?: string; position?: string })[]) ?? [];
   const faqEmbed = (parsedBlog.faqEmbed as string) ?? '';
   const hasSchema = schemas.length > 0 || !!faqEmbed;
   const blogContent = data.blogContent as string | undefined;
@@ -457,20 +458,21 @@ function BlogGenerationResult({ data, semanticData }: { data: Record<string, unk
   const tabs = [
     { id: 'meta' as const, label: 'Métadonnées' },
     ...(outline ? [{ id: 'outline' as const, label: 'Plan' }] : []),
+    { id: 'rendu' as const, label: 'Rendu' },
     { id: 'html' as const, label: 'HTML' },
     ...(hasSchema ? [{ id: 'schema' as const, label: 'Schéma' }] : []),
     ...(hasTfidf ? [{ id: 'tfidf' as const, label: 'TF-IDF' }] : []),
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col flex-1 min-h-0 gap-4">
       {wordCount != null && (
-        <div className="flex items-center gap-2 text-xs text-text-muted bg-background border border-border rounded-lg px-3 py-2 w-fit">
+        <div className="flex items-center gap-2 text-xs text-text-muted bg-background border border-border rounded-lg px-3 py-2 w-fit shrink-0">
           <Sparkles size={12} className="text-accent" />
           <span><span className="font-bold text-text">{wordCount.toLocaleString('fr-FR')}</span> mots générés</span>
         </div>
       )}
-      <div className="p-0.5 bg-background rounded-lg flex w-fit">
+      <div className="p-0.5 bg-background rounded-lg flex w-fit shrink-0">
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={cn('px-4 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-all',
@@ -480,7 +482,7 @@ function BlogGenerationResult({ data, semanticData }: { data: Record<string, unk
         ))}
       </div>
       {tab === 'meta' && (
-        <div className="space-y-3">
+        <div className="space-y-3 overflow-auto flex-1">
           <div className="bg-background border border-border rounded-lg p-3">
             <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-1">H1</p>
             <p className="text-sm font-semibold text-text">{h1}</p>
@@ -496,12 +498,36 @@ function BlogGenerationResult({ data, semanticData }: { data: Record<string, unk
         </div>
       )}
       {tab === 'outline' && (
-        <pre className="text-[11px] font-mono text-text-muted/80 bg-background rounded-lg p-4 overflow-auto max-h-[500px] leading-relaxed whitespace-pre-wrap">
+        <pre className="text-[11px] font-mono text-text-muted/80 bg-background rounded-lg p-4 overflow-auto flex-1 leading-relaxed whitespace-pre-wrap">
           {outline}
         </pre>
       )}
+      {tab === 'rendu' && (
+        <div className="flex flex-col flex-1 min-h-0 gap-3">
+          <div className="flex items-center justify-between shrink-0">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">
+              Aperçu rendu <span className="normal-case font-normal tracking-normal text-text-muted/60">(copiez le HTML ci-dessous pour le coller dans un rich text)</span>
+            </p>
+            <CopyButton text={htmlBody} />
+          </div>
+          <style>{`
+            .blog-render h2 { font-size: 1.3rem; font-weight: 700; margin: 1.5em 0 0.5em; }
+            .blog-render h3 { font-size: 1.1rem; font-weight: 600; margin: 1.2em 0 0.4em; }
+            .blog-render p  { margin: 0.6em 0; }
+            .blog-render a  { color: #2563eb; text-decoration: underline; }
+            .blog-render ul, .blog-render ol { padding-left: 1.5em; margin: 0.6em 0; }
+            .blog-render li { margin: 0.3em 0; }
+            .blog-render strong { font-weight: 700; }
+          `}</style>
+          <div
+            className="blog-render bg-white rounded-lg p-6 overflow-auto flex-1 min-h-0 text-sm leading-relaxed"
+            style={{ fontFamily: 'Georgia, serif', color: '#1a1a1a' }}
+            dangerouslySetInnerHTML={{ __html: htmlBody }}
+          />
+        </div>
+      )}
       {tab === 'html' && (
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-auto flex-1">
           {/* Corps seul — pour Webflow et CMS avec rich-text */}
           <div className="border border-border rounded-lg overflow-hidden">
             <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-[#1e1e1e]">
@@ -527,20 +553,29 @@ function BlogGenerationResult({ data, semanticData }: { data: Record<string, unk
         </div>
       )}
       {tab === 'schema' && (
-        <div className="space-y-4">
-          {schemas.map((schema, i) => (
+        <div className="space-y-4 overflow-auto flex-1">
+          {schemas.map((schema, i) => {
+            const code     = typeof schema === 'string' ? schema : (schema as Record<string,string>).code ?? '';
+            const type     = typeof schema === 'string' ? null   : (schema as Record<string,string>).type ?? null;
+            const position = typeof schema === 'string' ? null   : (schema as Record<string,string>).position ?? null;
+            return (
             <div key={i} className="border border-border rounded-lg overflow-hidden">
               <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-[#1e1e1e]">
-                <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">
-                  {schemas.length > 1 ? `Schéma ${i + 1}` : 'Schéma JSON-LD'}
-                </p>
-                <CopyButton text={schema} />
+                <div className="flex items-center gap-2">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">
+                    Schéma {i + 1}
+                  </p>
+                  {type && <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase tracking-widest font-bold">{type}</span>}
+                  {position && <span className="text-[10px] text-text-muted/50 italic">après : {position}</span>}
+                </div>
+                <CopyButton text={code} />
               </div>
               <pre className="text-[11px] font-mono text-green-300/80 bg-[#1e1e1e] p-4 overflow-auto max-h-72 whitespace-pre-wrap break-words leading-relaxed">
-                {schema}
+                {code}
               </pre>
             </div>
-          ))}
+            );
+          })}
           {faqEmbed && (() => {
             const scriptIdx = faqEmbed.indexOf('<script');
             const faqHtml   = scriptIdx !== -1 ? faqEmbed.slice(0, scriptIdx).trim() : faqEmbed.trim();
@@ -938,6 +973,47 @@ function GeoPromptResult({ data }: { data: Record<string, unknown> }) {
   );
 }
 
+function VisualSchemasResult({ data }: { data: Record<string, unknown> }) {
+  type Schema = { type?: string; position?: string; code: string };
+  const schemas = (data.visualSchemas as Schema[]) ?? [];
+
+  if (schemas.length === 0) {
+    return <p className="text-xs text-text-muted italic">Aucun schéma généré.</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 text-xs text-text-muted bg-background border border-border rounded-lg px-3 py-2 w-fit">
+        <Sparkles size={12} className="text-sky-400" />
+        <span><span className="font-bold text-text">{schemas.length}</span> schéma(s) visuel(s) généré(s)</span>
+      </div>
+      {schemas.map((schema, i) => (
+        <div key={i} className="border border-border rounded-lg overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-[#1e1e1e]">
+            <div className="flex items-center gap-2">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">
+                Schéma {i + 1}
+              </p>
+              {schema.type && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase tracking-widest font-bold">
+                  {schema.type}
+                </span>
+              )}
+              {schema.position && (
+                <span className="text-[10px] text-text-muted/60 italic">après : {schema.position}</span>
+              )}
+            </div>
+            <CopyButton text={schema.code} />
+          </div>
+          <pre className="text-[11px] font-mono text-sky-300/80 bg-[#1e1e1e] p-4 overflow-auto max-h-72 whitespace-pre-wrap break-words leading-relaxed">
+            {schema.code}
+          </pre>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function PromptInputResult({ data }: { data: Record<string, unknown> }) {
   const prompt = data.prompt as string ?? data.geoPrompt as string ?? '—';
   const topic = data.topic as string ?? data.geoTopic as string ?? null;
@@ -1159,11 +1235,12 @@ function StepResult({ step, steps, token, runId }: { step: RunStep; steps: RunSt
     case 'chatgpt-analysis':      content = <GeoLlmAnalysisResult data={data} responsesKey="chatgptResponses" />; break;
     case 'gemini-analysis':       content = <GeoLlmAnalysisResult data={data} responsesKey="geminiResponses" />; break;
     case 'perplexity-analysis':   content = <GeoLlmAnalysisResult data={data} responsesKey="perplexityResponses" />; break;
+    case 'visual-schemas':        content = <VisualSchemasResult data={data} />; break;
     default:                      content = <JsonViewer data={data} />; break;
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col">
       {content}
       {token && null}
     </div>
@@ -1226,40 +1303,35 @@ function RunDetailContent() {
 
   return (
     <AppLayout>
-      <div className="max-w-[1400px] mx-auto py-4 px-4">
+      <div className="flex flex-col h-full">
         {/* Header */}
-        <Link href="/runs" className="inline-flex items-center gap-2 text-sm text-text-muted hover:text-text mb-4 transition-colors">
-          <ArrowLeft size={14} />
-          Retour à l'historique
-        </Link>
-        <div className="mb-6 flex items-start justify-between border-b pb-2">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight mb-1 ">
-              {run?.workflows?.name ?? 'Exécution'}
-            </h1>
-            <div className="flex items-center gap-3 text-sm text-text-muted">
+        <div className='flex items-center gap-2 p-2 border-b shrink-0'>
+          <Link href="/runs" className="inline-flex items-center gap-2 text-sm text-text-muted hover:text-text transition-colors">
+            <ChevronLeft size={14} />
+          </Link>
+          <span className='text-sm font-medium'>{run?.workflows?.name ?? 'Exécution'}</span>
+          <div className="flex items-center gap-3 text-sm text-text-muted">
               {run?.sites?.name && <span>{run.sites.name}</span>}
               <div className='flex items-center gap-1'>
                 <Clock size={11} />
                 <span  className='text-[11px]'>{run ? new Date(run.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
               </div>
               {run?.status && <span className={cn('font-semibold', statusColor)}>{run.status === 'done' ? 'Terminé' : run.status === 'error' ? 'Erreur' : 'En cours'}</span>}
-            </div>
           </div>
         </div>
 
         {steps.length === 0 ? (
-          <div className="bg-surface border border-dashed border-border rounded-xl p-16 text-center">
+          <div className="flex-1 bg-surface border border-dashed border-border rounded-xl p-16 text-center">
             <p className="text-text-muted">Aucun module enregistré pour cette exécution.</p>
           </div>
         ) : (
-          <div className="flex gap-6 items-start">
+          <div className="flex flex-1 overflow-hidden">
             {/* Module list */}
-            <div className="w-64 shrink-0 bg-surface shadow-xl rounded-none overflow-hidden sticky top-6">
-              <div className="px-4 py-3 border-b border-border bg-background/70 backdrop-blur">
+            <div className="w-64 shrink-0 bg-surface shadow-xl rounded-none flex flex-col border-r">
+              <div className="px-4 py-3 border-b border-border bg-background/70 backdrop-blur shrink-0">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-accent">Modules exécutés</p>
               </div>
-              <div className="py-1">
+              <div className="py-1 overflow-y-auto flex-1">
                 {steps.map((step) => {
                   const meta = getModuleMeta(step.module_type);
                   const Icon = meta.icon;
@@ -1290,11 +1362,11 @@ function RunDetailContent() {
             </div>
 
             {/* Result panel (no outer card) */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
               {selectedStep ? (
                 <>
                   {/* Title rendered directly on the page */}
-                  <div className="mb-4 flex items-center gap-3">
+                  <div className="flex items-center gap-3 border-b p-2.5">
                     {(() => {
                       const meta = getModuleMeta(selectedStep.module_type);
                       const Icon = meta.icon;
@@ -1302,11 +1374,11 @@ function RunDetailContent() {
                       return (
                         <>
                           {BrandIcon ? (
-                            <BrandIcon size={18} className="shrink-0" />
+                            <BrandIcon size={19} className="shrink-0" />
                           ) : (
-                            Icon && <Icon size={18} className={meta.accent} />
+                            Icon && <Icon size={19} className={meta.accent} />
                           )}
-                          <h2 className="text-l font-bold text-text">{meta.label}</h2>
+                          <h2 className="text-[12px] uppercase font-bold text-text tracking-widest">{meta.label}</h2>
                           <div className="ml-auto">
                             <FeedbackButtons key={selectedStep.id} runId={run?.id ?? id} stepId={selectedStep.id} section={selectedStep.module_type} token={token} />
                           </div>
@@ -1315,7 +1387,7 @@ function RunDetailContent() {
                     })()}
                   </div>
 
-                  <div>
+                  <div className='p-2 flex-1 flex flex-col overflow-auto min-h-0'>
                     <StepResult step={selectedStep} steps={steps} token={token} runId={id} />
                   </div>
                 </>

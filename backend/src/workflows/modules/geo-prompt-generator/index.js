@@ -11,6 +11,7 @@
  */
 
 import { generateGeoPrompt } from './claude.js';
+import { listGeoPrompts, saveGeoPrompt } from '../prompt-input/db.js';
 
 export const GeoPromptGeneratorModule = {
   /**
@@ -25,12 +26,28 @@ export const GeoPromptGeneratorModule = {
       throw new Error('GeoPromptGenerator : siteProfile requis — connectez le module "Scraping de site" en amont.');
     }
 
+    // ── Fetch existing prompts for this site to avoid duplicates ──────────────
+    const siteTheme = siteProfile.theme ?? null;
+    let existingPrompts = [];
+    try {
+      const rows = await listGeoPrompts({ siteTheme, limit: 50 });
+      existingPrompts = rows.map(r => r.prompt).filter(Boolean);
+      if (existingPrompts.length > 0) {
+        emitEvent(jobId, {
+          type: 'step',
+          message: `📚 ${existingPrompts.length} prompt(s) déjà générés pour ce site — génération d'un angle différent...`,
+        });
+      }
+    } catch {
+      // Non-blocking — continue without existing prompts
+    }
+
     emitEvent(jobId, {
       type: 'step',
       message: `🔍 Analyse du profil site pour générer un prompt GEO...`,
     });
 
-    const result = await generateGeoPrompt(siteProfile, sitemapUrls);
+    const result = await generateGeoPrompt(siteProfile, sitemapUrls, existingPrompts);
 
     emitEvent(jobId, {
       type: 'step',
@@ -51,6 +68,19 @@ export const GeoPromptGeneratorModule = {
     emitEvent(jobId, { type: 'data', key: 'geoPrompt',    value: result.geoPrompt });
     emitEvent(jobId, { type: 'data', key: 'geoTopic',     value: result.geoTopic });
     emitEvent(jobId, { type: 'data', key: 'geoRationale', value: result.geoRationale });
+
+    // ── Persist the generated prompt to avoid repeats in future runs ──────────
+    try {
+      await saveGeoPrompt({
+        prompt:    result.geoPrompt,
+        topic:     result.geoTopic,
+        source:    'generated',
+        siteTheme: siteTheme ?? undefined,
+        runId:     jobId,
+      });
+    } catch {
+      // Non-blocking
+    }
 
     return {
       geoPrompt:    result.geoPrompt,

@@ -43,8 +43,17 @@ export function buildFullHtml(parsed) {
 
   if (parsed.schemas?.length > 0) {
     parsed.schemas.forEach((schema, i) => {
-      parts.push(`\n<!-- === SCH\u00c9MA ${i + 1} === -->\n${schema}`);
+      const code = typeof schema === 'string' ? schema : (schema?.code ?? '');
+      parts.push(`\n<!-- === SCHÉMA ${i + 1} === -->\n${code}`);
     });
+  } else {
+    parts.push(
+      `\n<!-- === SCHÉMAS VISUELS === -->\n` +
+      `<div style="border:2px dashed #d1d5db;border-radius:8px;padding:24px;text-align:center;color:#6b7280;margin:24px 0;">` +
+      `<p style="font-size:1.5rem;margin:0 0 8px;">📊</p>` +
+      `<p style="margin:0;font-style:italic;">Emplacement réservé aux tableaux et schémas visuels — aucun schéma généré pour cet article.</p>` +
+      `</div>`
+    );
   }
 
   return parts.join('\n');
@@ -139,8 +148,9 @@ function convertContentToHtml(content) {
       continue;
     }
 
-    // Description line → bold intro paragraph
-    const desc = t.match(/^→\s*(?:Description\s*:\s*)?(.+)/i);
+    // Description / direct-answer line → bold intro paragraph
+    // Strips any "→ Label :" prefix (Description, Réponse directe, etc.)
+    const desc = t.match(/^→\s*(?:[^:]{1,30}:\s*)?(.+)/i);
     if (desc) {
       flushPara(); flushList();
       const text = processLinks(cleanMarkdown(desc[1].trim()));
@@ -176,6 +186,9 @@ function convertContentToHtml(content) {
     if (/^\[.*\]$/.test(t)) continue;
     if (/^-{3,}$/.test(t)) continue;
 
+    // Skip BLOC sub-header labels echoed by Claude (with or without bold markers)
+    if (/^(?:\*{1,2})?BLOC\s+[A-Z]/i.test(t)) continue;
+
     // Skip raw HTML tags and code fence markers (tables/schemas Claude may inline in section 5)
     if (t.startsWith('<') || /^```/.test(t)) continue;
 
@@ -204,6 +217,9 @@ function processLinks(text) {
 
   // Italic: *text* (single asterisk, not part of **bold**)
   text = text.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em>$1</em>');
+
+  // Remove any unmatched/remaining asterisks (bold/italic markers not converted above)
+  text = text.replace(/\*+/g, '');
 
   // Internal: [[INTERNE:URL|anchor text]]
   text = text.replace(/\[\[INTERNE:(https?:\/\/[^\|]+)\|([^\]]+)\]\]/g,
@@ -576,7 +592,7 @@ export function injectImageUrls(content, images) {
 
   const imageMap = new Map(images.map(img => [img.description.toLowerCase().trim(), img.url]));
 
-  return content.replace(/\[\[IMAGE:([^\]]+)\]\]/g, (match, description) => {
+  return content.replace(/\[\[IMAGE:([^\]]+)\]\]/g, (_match, description) => {
     const url = imageMap.get(description.toLowerCase().trim());
     if (url) {
       // Use [[IMAGE:url|description]] — handled as a block element in convertContentToHtml

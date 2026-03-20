@@ -410,7 +410,7 @@ function GenerateListContent() {
       )}
 
       <div className="animate-fade-in">
-        <div className="max-w-[1400px] mx-auto py-4 px-4">
+        <div className="mx-auto py-4 px-4">
 
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 animate-slide-up">

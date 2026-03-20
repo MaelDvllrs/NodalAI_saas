@@ -8,7 +8,7 @@ import AppLayout from '../../components/AppLayout';
 import { LogEvent } from '../../components/ProgressLog';
 import ProgressLog from '../../components/ProgressLog';
 import { useTasks } from '../../contexts/TaskContext';
-import { Globe, ArrowLeft } from 'lucide-react';
+import { Globe, ArrowDownLeft, Save, Play, Download, RefreshCw, Loader2, ChevronLeft, Pencil, Check, X } from 'lucide-react';
 import Link from 'next/link';
 import { Skeleton } from '../../components/UI';
 import WorkflowEditor, { CanvasBlock, SavedEdge } from '../../components/WorkflowEditor';
@@ -273,8 +273,48 @@ function BuilderPageContent() {
     }
   }
 
+  const [isSaving, setIsSaving] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
   const isWorkflowLoading = !!workflowId && workflowLoading;
   const editorActionsRef = useRef<WorkflowEditorActions | null>(null);
+
+  // Inline name editing
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editName, setEditName] = useState('');
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  function startEditName() {
+    setEditName(workflow?.name ?? '');
+    setIsEditingName(true);
+    setTimeout(() => nameInputRef.current?.select(), 0);
+  }
+
+  async function commitEditName() {
+    const trimmed = editName.trim();
+    if (!trimmed || !workflowId || !token) { setIsEditingName(false); return; }
+    setIsEditingName(false);
+    if (trimmed === workflow?.name) return;
+    try {
+      const state = editorActionsRef.current?.getState();
+      await fetch(`${API_URL}/workflows/${workflowId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: trimmed, workflowJson: state ? { steps: state.blocks, edges: state.edges } : workflow?.workflow_json }),
+      });
+      setWorkflow((prev) => prev ? { ...prev, name: trimmed } : prev);
+    } catch { /* ignore */ }
+  }
+
+  function cancelEditName() {
+    setIsEditingName(false);
+  }
+
+  function handleSaveClick() {
+    if (isSaving) return;
+    setIsSaving(true);
+    editorActionsRef.current?.save?.();
+    setTimeout(() => setIsSaving(false), 1200);
+  }
 
   function handleExport() {
     const state = editorActionsRef.current?.getState();
@@ -293,18 +333,89 @@ function BuilderPageContent() {
   return (
     <AppLayout>
       <div className="animate-fade-in h-full flex flex-col">
-        <div className="max-w-[1400px] w-full mx-auto py-8 px-6 flex flex-col flex-1 min-h-0">
+        <div className="w-full mx-auto flex flex-col flex-1 min-h-0">
           {/* Header */}
-          <div className="flex items-center gap-3 mb-8 animate-slide-up">
-            <Link
-              href="/generate"
-              className="p-2 rounded-lg border border-border text-text-muted hover:text-text hover:border-accent/30 transition-all shrink-0"
-            >
-              <ArrowLeft size={16} />
-            </Link>
-            <h1 className="text-2xl font-bold tracking-tight flex-1 truncate">
-              {workflow?.name ?? 'Workflow Builder'}
-            </h1>
+          <div className="flex items-center justify-between gap-3 p-2 animate-slide-up border-b">
+            <div className="flex items-center gap-3">
+              <Link
+                href="/generate"
+                className="inline-flex items-center gap-2 text-sm text-text-muted hover:text-text transition-colors"
+              >
+                <ChevronLeft size={14} />
+              </Link>
+              {isEditingName ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    ref={nameInputRef}
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onBlur={commitEditName}
+                    onKeyDown={(e) => { if (e.key === 'Enter') commitEditName(); if (e.key === 'Escape') cancelEditName(); }}
+                    className="text-sm font-medium bg-background border border-accent rounded px-2 py-0.5 outline-none w-52"
+                    autoFocus
+                  />
+                  <button onClick={commitEditName} className="text-green-400 hover:text-green-300 transition-colors"><Check size={13} /></button>
+                  <button onClick={cancelEditName} className="text-text-muted hover:text-text transition-colors"><X size={13} /></button>
+                </div>
+              ) : (
+                <button
+                  onClick={workflowId ? startEditName : undefined}
+                  className="group flex items-center gap-1.5 text-sm font-medium hover:text-text transition-colors"
+                >
+                  {workflow?.name ?? 'Workflow Builder'}
+                  {workflowId && <Pencil size={11} className="text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" />}
+                </button>
+              )}
+            </div>
+
+            {!isWorkflowLoading && sites.length > 0 && (
+              <div className="flex items-center gap-2">
+                {events.length > 0 && (
+                  <label className="flex items-center gap-1.5 cursor-pointer select-none group">
+                    <div className="relative flex items-center">
+                      <input type="checkbox" checked={showLogs} onChange={(e) => setShowLogs(e.target.checked)} className="sr-only" />
+                      <div className={`w-7 h-4 rounded-full transition-colors duration-200 ${showLogs ? 'bg-accent' : 'bg-border'}`}>
+                        <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow-sm transition-all duration-200 ${showLogs ? 'left-[15px]' : 'left-0.5'}`} />
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-text-muted group-hover:text-text transition-colors">Logs</span>
+                  </label>
+                )}
+                {!isLoading && (
+                  <button type="button" onClick={handleExport} className="btn-secondary gap-2 text-xs">
+                    <Download size={13} />
+                    Exporter
+                  </button>
+                )}
+                {workflowId && !isLoading && (
+                  <button type="button" onClick={handleSaveClick} disabled={isSaving} className="btn-secondary gap-2 text-xs disabled:opacity-40">
+                    {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                    Sauvegarder
+                  </button>
+                )}
+                {!isLoading ? (
+                  <button
+                    type="button"
+                    onClick={() => editorActionsRef.current?.run?.()}
+                    className="btn-accent gap-2 text-xs"
+                  >
+                    <Play size={13} />
+                    Lancer
+                  </button>
+                ) : (
+                  <div className="px-3 py-1.5 flex items-center gap-2 rounded-xl bg-accent/5 border border-accent/20 text-accent text-xs font-semibold">
+                    <Loader2 size={13} className="animate-spin" />
+                    En cours...
+                  </div>
+                )}
+                {events.length > 0 && !isLoading && (
+                  <button type="button" onClick={handleReset} className="btn-secondary gap-2 text-xs">
+                    <RefreshCw size={11} />
+                    Réinitialiser
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {sitesLoading || isWorkflowLoading ? (
@@ -335,6 +446,8 @@ function BuilderPageContent() {
                 onSave={workflowId ? handleSave : undefined}
                 onExport={handleExport}
                 actionsRef={editorActionsRef}
+                hideActions
+                showLogs={showLogs}
                 monitoring={events.length > 0 ? <ProgressLog events={events} /> : undefined}
               />
             </div>
