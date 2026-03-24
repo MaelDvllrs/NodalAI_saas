@@ -55,7 +55,7 @@ export default function BlogForm({ onSubmit, isLoading }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in">
       {/* Webflow credentials */}
-      <fieldset className="border border-border rounded-2xl p-6 space-y-5 bg-surface/50">
+      <fieldset className="border border-border rounded-2xl p-6 space-y-5 bg-card/50">
         <legend className="px-3 py-0.5 text-[10px] font-semibold text-text-muted uppercase tracking-[0.1em] border border-border bg-bg rounded-full">
           Webflow
         </legend>
@@ -112,7 +112,7 @@ export default function BlogForm({ onSubmit, isLoading }: Props) {
       </fieldset>
 
       {/* Content settings */}
-      <fieldset className="border border-border rounded-2xl p-6 space-y-5 bg-surface/50">
+      <fieldset className="border border-border rounded-2xl p-6 space-y-5 bg-card/50">
         <legend className="px-3 py-0.5 text-[10px] font-semibold text-text-muted uppercase tracking-[0.1em] border border-border bg-bg rounded-full">
           Contenu
         </legend>
@@ -178,7 +178,7 @@ export default function BlogForm({ onSubmit, isLoading }: Props) {
       <button
         type="submit"
         disabled={isLoading}
-        className="btn-accent w-full py-3.5 text-sm font-semibold gap-3"
+        className="btn-primary w-full py-3.5 text-sm font-semibold gap-3"
       >
         {isLoading ? (
           <>

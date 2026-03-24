@@ -124,7 +124,7 @@ export default function ProgressLog({ events }: Props) {
 
       {/* Generation Prompt Panel */}
       {generationPrompt && (
-        <details className="group border border-border rounded-xl bg-surface overflow-hidden transition-all">
+        <details className="group border border-border rounded-xl bg-card overflow-hidden transition-all">
           <summary className="flex items-center justify-between px-5 py-3 cursor-pointer select-none text-xs font-bold text-text-muted uppercase tracking-wider hover:bg-border/30">
             <div className="flex items-center gap-2">
               <Code2 size={14} />
@@ -142,7 +142,7 @@ export default function ProgressLog({ events }: Props) {
 
       {/* Site Profile Panel */}
       {siteProfileData && (
-        <div className="bg-surface border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="bg-card border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
 
           {/* Header */}
           <div className="flex items-center justify-between">
@@ -286,7 +286,7 @@ export default function ProgressLog({ events }: Props) {
 
       {/* Dynamic Data Panel */}
       {(mainKeyword || secondaryKeywords) && (
-        <div className="bg-surface border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="bg-card border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="flex items-center gap-2 text-text-muted mb-2">
             <Info size={14} />
             <span className="text-[10px] font-bold uppercase tracking-wider">Analyse Sémantique</span>
@@ -314,7 +314,7 @@ export default function ProgressLog({ events }: Props) {
 
       {/* SERP Semantic Model */}
       {serpModelData && (
-        <div className="bg-surface border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="bg-card border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="flex items-center gap-2 text-text-muted mb-2">
             <Target size={14} />
             <span className="text-[10px] font-bold uppercase tracking-wider">Modèle SERP Concurrent</span>
@@ -362,7 +362,7 @@ export default function ProgressLog({ events }: Props) {
 
       {/* Semantic Analysis Panel */}
       {semanticData && (
-        <div className="bg-surface border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="bg-card border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-text-muted">
               <Search size={14} />
@@ -510,7 +510,7 @@ export default function ProgressLog({ events }: Props) {
 
       {/* SEO Coverage Score */}
       {coverageEvent && (
-        <div className="bg-surface border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="bg-card border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2 text-text-muted">
               <BarChart2 size={14} />
@@ -554,7 +554,7 @@ export default function ProgressLog({ events }: Props) {
 
       {/* Images Panel */}
       {imagesEvent && (
-        <div className="bg-surface border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="bg-card border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="flex items-center gap-2 text-text-muted">
             <Image size={14} />
             <span className="text-[10px] font-bold uppercase tracking-wider">Images Générées</span>
@@ -620,7 +620,7 @@ export default function ProgressLog({ events }: Props) {
 
       {/* Content Preview */}
       {previewEvent && (
-        <div className="bg-surface border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="bg-card border border-border rounded-xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="flex items-center gap-2 text-text-muted mb-2">
             <Eye size={14} />
             <span className="text-[10px] font-bold uppercase tracking-wider">Aperçu Métadonnées</span>
@@ -649,7 +649,7 @@ export default function ProgressLog({ events }: Props) {
 
       {/* Debug details */}
       {debugEvents.length > 0 && (
-        <details className="group border border-border rounded-xl bg-surface overflow-hidden transition-all">
+        <details className="group border border-border rounded-xl bg-card overflow-hidden transition-all">
           <summary className="flex items-center justify-between px-5 py-3 cursor-pointer select-none text-xs font-bold text-text-muted uppercase tracking-wider hover:bg-border/30">
             <div className="flex items-center gap-2">
               <Code2 size={14} />
@@ -732,7 +732,7 @@ function EmbedsPanel({ faqEmbed, schemas = [] }: { faqEmbed: string | null; sche
   if (blocks.length === 0) return null;
 
   return (
-    <div className="bg-surface border border-border rounded-xl overflow-hidden shadow-sm animate-in fade-in duration-700">
+    <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm animate-in fade-in duration-700">
       <div className="bg-accent/10 border-b border-border px-5 py-4 flex items-center gap-3">
         <Code2 size={20} className="text-accent" />
         <div>

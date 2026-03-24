@@ -221,7 +221,7 @@ function SettingsPageContent() {
 
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="p-2 bg-surface border border-border rounded-xl">
+        <div className="p-2 bg-card border border-border rounded-xl">
           <Settings size={18} className="text-text-muted" />
         </div>
         <div>
@@ -231,7 +231,7 @@ function SettingsPageContent() {
       </div>
 
       {/* ── Informations générales ── */}
-      <section className="bg-surface border border-border rounded-2xl overflow-hidden">
+      <section className="bg-card border border-border rounded-2xl overflow-hidden">
         <div className="px-6 py-4 border-b border-border bg-background/40">
           <h2 className="text-[10px] font-bold uppercase tracking-[0.15em] text-text-muted flex items-center gap-2">
             <Globe size={12} /> Informations générales
@@ -275,7 +275,7 @@ function SettingsPageContent() {
       </section>
 
       {/* ── Membres ── */}
-      <section className="bg-surface border border-border rounded-2xl overflow-hidden">
+      <section className="bg-card border border-border rounded-2xl overflow-hidden">
         <div className="px-6 py-4 border-b border-border bg-background/40">
           <h2 className="text-[10px] font-bold uppercase tracking-[0.15em] text-text-muted flex items-center gap-2">
             <UserPlus size={12} /> Membres ({members.length})
@@ -317,7 +317,7 @@ function SettingsPageContent() {
             <button
               type="submit"
               disabled={inviting}
-              className="btn-accent px-4 py-2 text-xs font-semibold uppercase tracking-widest whitespace-nowrap"
+              className="btn-primary px-4 py-2 text-xs font-semibold uppercase tracking-widest whitespace-nowrap"
             >
               {inviting ? <Spinner className="w-4 h-4" /> : 'Inviter'}
             </button>
@@ -339,7 +339,7 @@ function SettingsPageContent() {
           )}
 
           {!loadingMembers && members.map(member => (
-            <div key={member.id} className="group flex items-center gap-4 px-6 py-4 hover:bg-background/40 transition-colors">
+            <div key={member.id} className="group flex items-center gap-4 px-6 py-4 hover:bg-accent-hover transition-colors">
               <div className="w-9 h-9 rounded-full bg-border/40 border border-border flex items-center justify-center text-xs font-bold shrink-0">
                 {member.invited_email[0].toUpperCase()}
               </div>

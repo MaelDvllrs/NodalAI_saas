@@ -44,7 +44,7 @@ export default function AccountPage() {
           <p className="text-text-muted text-sm">Gérez vos informations personnelles.</p>
         </div>
 
-        <div className="bg-surface border border-border rounded-xl overflow-hidden">
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
           {/* Email — lecture seule */}
           <div className="px-6 py-5 border-b border-border">
             <label className="block text-[10px] font-bold uppercase tracking-widest text-text-muted mb-2">

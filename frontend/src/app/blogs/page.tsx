@@ -101,7 +101,7 @@ export default function BlogsPage() {
           </div>
 
           {/* Filters Bar */}
-          <div className="bg-surface border border-border rounded-lg p-3 mb-6 flex flex-col md:flex-row gap-4 items-start md:items-center">
+          <div className="bg-card border border-border rounded-lg p-3 mb-6 flex flex-col md:flex-row gap-4 items-start md:items-center">
             <div className="flex items-center gap-2">
               <Filter size={14} className="text-text-muted mr-1" />
               {[
@@ -131,7 +131,7 @@ export default function BlogsPage() {
 
           {/* Main Content */}
           {loading ? (
-            <div className="bg-surface border border-border rounded-lg overflow-hidden">
+            <div className="bg-card border border-border rounded-lg overflow-hidden">
               <div className="px-4 py-3 border-b border-border bg-background/50">
                 <div className="grid grid-cols-5 gap-4">
                   {[1, 2, 3, 4, 5].map((i) => (
@@ -161,14 +161,14 @@ export default function BlogsPage() {
               </div>
             </div>
           ) : filteredBlogs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 bg-surface border border-dashed border-border rounded-lg">
+            <div className="flex flex-col items-center justify-center py-20 bg-card border border-dashed border-border rounded-lg">
               <FileText className="text-text-muted mb-4 opacity-20" size={48} />
               <h3 className="text-lg font-bold mb-1">Aucun article trouvé</h3>
               <p className="text-text-muted text-sm mb-6">Ajustez vos filtres ou lancez une nouvelle génération.</p>
               <Link href="/generate" className="btn-primary">Lancer un workflow</Link>
             </div>
           ) : (
-            <div className="bg-surface border border-border rounded-lg overflow-hidden">
+            <div className="bg-card border border-border rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
@@ -181,7 +181,7 @@ export default function BlogsPage() {
                   </thead>
                   <tbody className="divide-y divide-border">
                     {filteredBlogs.map((blog) => (
-                      <tr key={blog.id} className="group hover:bg-background/50 transition-colors">
+                      <tr key={blog.id} className="group hover:bg-accent-hover transition-colors">
                         <td className="px-4 py-3">
                           <Link href={`/blogs/${blog.id}`} className="flex items-start gap-3">
                             <div className="mt-1 p-1.5 bg-background border border-border rounded-md group-hover:bg-primary group-hover:text-primary-foreground transition-colors shrink-0">

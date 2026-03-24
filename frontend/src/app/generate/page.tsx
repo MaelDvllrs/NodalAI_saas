@@ -42,6 +42,7 @@ function WorkflowModuleIcons({ steps }: { steps: { type: string; config: Record<
     'chatgpt-analysis':     'chatgpt',
     'gemini-analysis':      'gemini',
     'perplexity-analysis':  'perplexity',
+    'reddit-analyzer':      'reddit',
   };
   
   // Extraire les marques uniques utilisées dans le workflow
@@ -80,7 +81,7 @@ function WorkflowModuleIcons({ steps }: { steps: { type: string; config: Record<
         return (
           <div
             key={mod.type}
-            className={`flex items-center justify-center w-5 h-5 rounded-full  bg-neutral-800 ${i > 0 ? '-ml-1' : ''}`}
+            className={`flex items-center justify-center w-5 h-5 rounded-full  bg-background ${i > 0 ? '-ml-1' : ''}`}
             style={{ zIndex: modules.length - i }}
             title={mod.label}
           >
@@ -145,7 +146,7 @@ function CreateWorkflowModal({ onClose, onCreate, initialImport, initialName }: 
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Card */}
-      <div className="relative z-10 bg-surface border border-border rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6 animate-slide-up">
+      <div className="relative z-10 bg-card border border-border rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6 animate-slide-up">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-bold">Nouveau workflow</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg text-text-muted hover:text-text hover:bg-bg transition-colors">
@@ -186,7 +187,7 @@ function CreateWorkflowModal({ onClose, onCreate, initialImport, initialName }: 
             <button
               type="submit"
               disabled={!name.trim() || loading}
-              className="btn-accent flex-1 gap-2 disabled:opacity-40"
+              className="btn-primary flex-1 gap-2 disabled:opacity-40"
             >
               {loading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
               Créer
@@ -238,7 +239,7 @@ function WorkflowCard({ workflow, onDelete }: { workflow: Workflow; onDelete: (i
   return (
     <Link
       href={`/generate/builder?workflowId=${workflow.id}`}
-      className="bg-surface border border-border rounded-lg p-4 flex flex-col gap-4 hover:border-accent/40 transition-colors cursor-pointer"
+      className="bg-card border border-border rounded-lg p-4 flex flex-col gap-4 hover:border-accent/40 transition-colors cursor-pointer"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex gap-2">
@@ -317,7 +318,7 @@ function TemplateCard({ template, onUse }: { template: PublicWorkflow; onUse: (t
     <button
       type="button"
       onClick={() => onUse(template)}
-      className="bg-surface border border-border rounded-xl p-4 flex flex-col gap-3 text-left hover:border-accent/40 transition-colors w-full"
+      className="bg-card border border-border rounded-xl p-4 flex flex-col gap-3 text-left hover:border-accent/40 transition-colors w-full"
     >
       <div className="flex items-start gap-3">
         <WorkflowModuleIcons steps={template.workflow_json?.steps ?? []} />
@@ -415,12 +416,11 @@ function GenerateListContent() {
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 animate-slide-up">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-text-muted mb-1">Workflow</p>
-              <h1 className="text-2xl font-bold tracking-tight mb-3">Gérer mes workflows</h1>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-text-muted mb-1">Gérer mes workflows</p>
             </div>
             <button
               onClick={() => setShowModal(true)}
-              className="btn-accent gap-2"
+              className="btn-primary gap-2"
             >
               <Plus size={16} />
               Nouveau workflow
@@ -435,7 +435,7 @@ function GenerateListContent() {
               ))}
             </div>
           ) : workflows.length === 0 ? (
-            <div className="bg-surface border border-border border-dashed rounded-xl p-16 text-center animate-slide-up">
+            <div className="bg-card border border-border border-dashed rounded-xl p-16 text-center animate-slide-up">
               <div className="w-16 h-16 bg-accent/5 rounded-full flex items-center justify-center mx-auto mb-5">
                 <Layers className="text-accent" size={32} />
               </div>
@@ -445,7 +445,7 @@ function GenerateListContent() {
               </p>
               <button
                 onClick={() => setShowModal(true)}
-                className="btn-accent uppercase tracking-widest text-sm inline-flex items-center gap-2"
+                className="btn-primary uppercase tracking-widest text-sm inline-flex items-center gap-2"
               >
                 <Plus size={14} />
                 Créer un workflow
@@ -463,8 +463,7 @@ function GenerateListContent() {
           {(publicLoading || publicWorkflows.length > 0) && (
             <div className="mt-12">
               <div className="mb-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-text-muted mb-1">Communauté</p>
-                <h2 className="text-xl font-bold tracking-tight">Templates de workflow</h2>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-text-muted mb-1">Templates de workflow</p>
               </div>
               {publicLoading ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

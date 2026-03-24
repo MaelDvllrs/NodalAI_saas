@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import AppLayout from '../../components/AppLayout';
@@ -13,7 +13,7 @@ import {
   Lightbulb, MessageSquare, Database,
   ChevronLeft,
 } from 'lucide-react';
-import { WebflowIcon, GoogleIcon, CountryFlag, ChatGptIcon, GeminiIcon, PerplexityIcon } from '../../components/WorkflowBlocks';
+import { WebflowIcon, GoogleIcon, CountryFlag, ChatGptIcon, GeminiIcon, PerplexityIcon, RedditIcon } from '../../components/WorkflowBlocks';
 import { Skeleton } from '../../components/UI';
 import { cn } from '../../utils/cn';
 
@@ -61,6 +61,7 @@ const MODULE_META: Record<string, { label: string; icon?: React.ElementType; acc
   'chatgpt-analysis':      { label: 'Analyse ChatGPT',            brandIcon: ChatGptIcon },
   'gemini-analysis':       { label: 'Analyse Gemini',            brandIcon: GeminiIcon },
   'perplexity-analysis':   { label: 'Analyse Perplexity',        brandIcon: PerplexityIcon },
+  'reddit-analyzer':       { label: 'Analyseur Reddit',           brandIcon: RedditIcon },
 };
 
 function getModuleMeta(type: string) {
@@ -144,13 +145,13 @@ function KeywordResult({ data }: { data: Record<string, unknown> }) {
           <span className="font-bold text-lg text-text">{kw}</span>
         </div>
         {kd != null && (
-          <div className="bg-background border border-border rounded-lg px-3 py-2 text-center">
+          <div className="bg-card border border-border rounded-lg px-3 py-2 text-center">
             <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-0.5">KD</p>
             <p className="text-lg font-bold text-text">{kd}</p>
           </div>
         )}
         {vol != null && (
-          <div className="bg-background border border-border rounded-lg px-3 py-2 text-center">
+          <div className="bg-card border border-border rounded-lg px-3 py-2 text-center">
             <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-0.5">Volume</p>
             <p className="text-lg font-bold text-text">{vol.toLocaleString('fr-FR')}</p>
           </div>
@@ -206,7 +207,7 @@ function SerpResult({ data }: { data: Record<string, unknown> }) {
       </div>
 
       {results.slice(0, 15).map((r, i) => (
-        <div key={i} className="bg-background border border-border rounded-lg p-3 flex items-start gap-3">
+        <div key={i} className="bg-card border border-border rounded-lg p-3 flex items-start gap-3">
           <span className="text-[10px] font-bold text-text-muted/40 w-5 shrink-0 mt-0.5">{r.position ?? i + 1}</span>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-text truncate">{r.title ?? '—'}</p>
@@ -319,7 +320,7 @@ function SemanticResult({ data }: { data: Record<string, unknown> }) {
               </thead>
               <tbody>
                 {intentTopTerms.map((t, i) => (
-                  <tr key={i} className={cn('border-b border-border/50 last:border-0', i % 2 === 0 ? 'bg-surface' : 'bg-background/30')}>
+                  <tr key={i} className={cn('border-b border-border/50 last:border-0', i % 2 === 0 ? 'bg-card' : 'bg-background/30')}>
                     <td className="px-3 py-1.5 text-text-muted/40 tabular-nums text-[10px]">{i + 1}</td>
                     <td className="px-3 py-1.5 font-mono text-accent/90">{t.display || t.term}</td>
                     <td className="px-3 py-1.5 text-center text-text-muted tabular-nums">{t.target != null ? `~${t.target}` : '—'}</td>
@@ -467,7 +468,7 @@ function BlogGenerationResult({ data, semanticData }: { data: Record<string, unk
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-4">
       {wordCount != null && (
-        <div className="flex items-center gap-2 text-xs text-text-muted bg-background border border-border rounded-lg px-3 py-2 w-fit shrink-0">
+        <div className="flex items-center gap-2 text-xs text-text-muted bg-card border border-border rounded-lg px-3 py-2 w-fit shrink-0">
           <Sparkles size={12} className="text-accent" />
           <span><span className="font-bold text-text">{wordCount.toLocaleString('fr-FR')}</span> mots générés</span>
         </div>
@@ -483,16 +484,25 @@ function BlogGenerationResult({ data, semanticData }: { data: Record<string, unk
       </div>
       {tab === 'meta' && (
         <div className="space-y-3 overflow-auto flex-1">
-          <div className="bg-background border border-border rounded-lg p-3">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-1">H1</p>
+          <div className="bg-card border border-border rounded-lg p-3">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">H1</p>
+              <CopyButton text={h1} />
+            </div>
             <p className="text-sm font-semibold text-text">{h1}</p>
           </div>
-          <div className="bg-background border border-border rounded-lg p-3">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-1">Title Tag</p>
+          <div className="bg-card border border-border rounded-lg p-3">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Title Tag</p>
+              <CopyButton text={metaTitle} />
+            </div>
             <p className="text-sm text-text">{metaTitle}</p>
           </div>
-          <div className="bg-background border border-border rounded-lg p-3">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-1">Meta Description</p>
+          <div className="bg-card border border-border rounded-lg p-3">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Meta Description</p>
+              <CopyButton text={metaDesc} />
+            </div>
             <p className="text-sm text-text">{metaDesc}</p>
           </div>
         </div>
@@ -530,22 +540,22 @@ function BlogGenerationResult({ data, semanticData }: { data: Record<string, unk
         <div className="space-y-4 overflow-auto flex-1">
           {/* Corps seul — pour Webflow et CMS avec rich-text */}
           <div className="border border-border rounded-lg overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-[#1e1e1e]">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-background">
               <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Corps seul <span className="text-accent/60 normal-case font-normal tracking-normal">(sans FAQ ni schémas — compatible API Webflow)</span></p>
               <CopyButton text={htmlBody} />
             </div>
-            <pre className="text-[11px] font-mono text-text-muted/70 bg-[#1e1e1e] p-4 overflow-auto max-h-[400px] leading-relaxed whitespace-pre-wrap break-words">
+            <pre className="text-[11px] font-mono text-text-muted/70 bg-background p-4 overflow-auto max-h-[400px] leading-relaxed whitespace-pre-wrap break-words">
               {htmlBody || '(aucun contenu HTML)'}
             </pre>
           </div>
           {/* Version complète — corps + FAQ + schémas concaténés */}
           {htmlBodyFull && (
             <div className="border border-border rounded-lg overflow-hidden">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-[#1e1e1e]">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-background">
                 <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Version complète <span className="text-amber-400/70 normal-case font-normal tracking-normal">(corps + FAQ + schémas — copier-coller manuel)</span></p>
                 <CopyButton text={htmlBodyFull} />
               </div>
-              <pre className="text-[11px] font-mono text-text-muted/70 bg-[#1e1e1e] p-4 overflow-auto max-h-[400px] leading-relaxed whitespace-pre-wrap break-words">
+              <pre className="text-[11px] font-mono text-text-muted/70 bg-background p-4 overflow-auto max-h-[400px] leading-relaxed whitespace-pre-wrap break-words">
                 {htmlBodyFull}
               </pre>
             </div>
@@ -560,7 +570,7 @@ function BlogGenerationResult({ data, semanticData }: { data: Record<string, unk
             const position = typeof schema === 'string' ? null   : (schema as Record<string,string>).position ?? null;
             return (
             <div key={i} className="border border-border rounded-lg overflow-hidden">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-[#1e1e1e]">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-background">
                 <div className="flex items-center gap-2">
                   <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">
                     Schéma {i + 1}
@@ -570,7 +580,7 @@ function BlogGenerationResult({ data, semanticData }: { data: Record<string, unk
                 </div>
                 <CopyButton text={code} />
               </div>
-              <pre className="text-[11px] font-mono text-green-300/80 bg-[#1e1e1e] p-4 overflow-auto max-h-72 whitespace-pre-wrap break-words leading-relaxed">
+              <pre className="text-[11px] font-mono text-text-muted/80 bg-background p-4 overflow-auto max-h-72 whitespace-pre-wrap break-words leading-relaxed">
                 {code}
               </pre>
             </div>
@@ -582,23 +592,23 @@ function BlogGenerationResult({ data, semanticData }: { data: Record<string, unk
             const faqJsonLd = scriptIdx !== -1 ? faqEmbed.slice(scriptIdx).trim()    : '';
             return (
               <div className="border border-border rounded-lg overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-[#1e1e1e]">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-background">
                   <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">
                     FAQ <span className="text-text-muted/50 normal-case font-normal tracking-normal">(HTML accordéon + schema.org JSON-LD)</span>
                   </p>
                   <CopyButton text={faqEmbed} />
                 </div>
                 {faqHtml && (
-                  <pre className="text-[11px] font-mono text-sky-300/80 bg-[#1e1e1e] px-4 pt-4 overflow-auto max-h-72 whitespace-pre-wrap break-words leading-relaxed">
+                  <pre className="text-[11px] font-mono text-text-muted/80 bg-background px-4 pt-4 overflow-auto max-h-72 whitespace-pre-wrap break-words leading-relaxed">
                     {faqHtml}
                   </pre>
                 )}
                 {faqJsonLd && (
                   <>
-                    <div className="px-4 py-1.5 bg-[#1e1e1e] border-t border-white/5">
+                    <div className="px-4 py-1.5 bg-background border-t border-white/5">
                       <span className="text-[9px] font-bold uppercase tracking-widest text-green-400/60">schema.org JSON-LD</span>
                     </div>
-                    <pre className="text-[11px] font-mono text-green-300/80 bg-[#1e1e1e] px-4 pb-4 overflow-auto max-h-60 whitespace-pre-wrap break-words leading-relaxed">
+                    <pre className="text-[11px] font-mono text-text-muted/80 bg-background px-4 pb-4 overflow-auto max-h-60 whitespace-pre-wrap break-words leading-relaxed">
                       {faqJsonLd}
                     </pre>
                   </>
@@ -636,7 +646,7 @@ function BlogGenerationResult({ data, semanticData }: { data: Record<string, unk
                   const barColor = row.status === 'ok' ? 'bg-green-500' : row.status === 'low' ? 'bg-amber-400' : row.status === 'high' ? 'bg-red-400' : 'bg-border';
                   const textColor = row.status === 'ok' ? 'text-green-400' : row.status === 'low' ? 'text-amber-400' : row.status === 'high' ? 'text-red-400' : 'text-text-muted/40';
                   return (
-                    <tr key={i} className={cn('border-b border-border/50 last:border-0', i % 2 === 0 ? 'bg-surface' : 'bg-background/30')}>
+                    <tr key={i} className={cn('border-b border-border/50 last:border-0', i % 2 === 0 ? 'bg-card' : 'bg-background/30')}>
                       <td className="px-3 py-2 font-mono text-text">{row.label}</td>
                       <td className={cn('px-3 py-2 text-center font-bold tabular-nums', textColor)}>{row.count}</td>
                       <td className="px-3 py-2 text-center text-text-muted tabular-nums">~{row.target}</td>
@@ -679,16 +689,25 @@ function ContentResult({ data }: { data: Record<string, unknown> }) {
       </div>
       {tab === 'meta' ? (
         <div className="space-y-3">
-          <div className="bg-background border border-border rounded-lg p-3">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-1">Titre</p>
+          <div className="bg-card border border-border rounded-lg p-3">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Titre</p>
+              <CopyButton text={title} />
+            </div>
             <p className="text-sm font-semibold text-text">{title}</p>
           </div>
-          <div className="bg-background border border-border rounded-lg p-3">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-1">Meta Title</p>
+          <div className="bg-card border border-border rounded-lg p-3">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Meta Title</p>
+              <CopyButton text={metaTitle} />
+            </div>
             <p className="text-sm text-text">{metaTitle}</p>
           </div>
-          <div className="bg-background border border-border rounded-lg p-3">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-1">Meta Description</p>
+          <div className="bg-card border border-border rounded-lg p-3">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Meta Description</p>
+              <CopyButton text={metaDesc} />
+            </div>
             <p className="text-sm text-text">{metaDesc}</p>
           </div>
         </div>
@@ -706,7 +725,7 @@ function WebflowResult({ data }: { data: Record<string, unknown> }) {
   const itemUrl = data.webflowItemUrl as string ?? null;
   return (
     <div className="space-y-3">
-      <div className="bg-background border border-border rounded-lg p-4 flex items-center gap-3">
+      <div className="bg-card border border-border rounded-lg p-4 flex items-center gap-3">
         <Rocket size={18} className="text-orange-400 shrink-0" />
         <div>
           <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-0.5">Item ID Webflow</p>
@@ -754,14 +773,14 @@ function ScraperResult({ data }: { data: Record<string, unknown> }) {
 
         <div className="grid gap-3">
           {tone && (
-            <div className="bg-background border border-border rounded-md p-3">
+            <div className="bg-card border border-border rounded-md p-3">
               <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Ton détecté</p>
               <p className="text-sm font-semibold text-text mt-1">{tone}</p>
             </div>
           )}
 
           {language && (
-            <div className="bg-background border border-border rounded-md p-3 flex items-center gap-3">
+            <div className="bg-card border border-border rounded-md p-3 flex items-center gap-3">
               <div>
                 <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Langue</p>
                 <p className="text-sm font-semibold text-text uppercase flex items-center gap-2 mt-1">
@@ -773,14 +792,14 @@ function ScraperResult({ data }: { data: Record<string, unknown> }) {
           )}
 
           {targetAudience && (
-            <div className="bg-background border border-border rounded-md p-3">
+            <div className="bg-card border border-border rounded-md p-3">
               <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Audience cible</p>
               <p className="text-sm text-text-muted leading-relaxed mt-1">{targetAudience}</p>
             </div>
           )}
 
           {writingStyle && (
-            <div className="bg-background border border-border rounded-md p-3">
+            <div className="bg-card border border-border rounded-md p-3">
               <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Style rédactionnel</p>
               <p className="text-sm text-text-muted leading-relaxed mt-1">{writingStyle}</p>
             </div>
@@ -796,7 +815,7 @@ function ScraperResult({ data }: { data: Record<string, unknown> }) {
       </>
 
       {/* 2) Topics & Keywords */}
-      <div className="bg-background border border-border rounded-lg p-4">
+      <div className="bg-card border border-border rounded-lg p-4">
         <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-3">Sujets & mots-clés</p>
         <div className="flex flex-col gap-3">
           {mainTopics.length > 0 && (
@@ -822,7 +841,7 @@ function ScraperResult({ data }: { data: Record<string, unknown> }) {
       </div>
 
       {/* 3) Existing articles / Gaps / Sitemap — grouped in one card with details */}
-      <div className="bg-background border border-border rounded-lg p-4">
+      <div className="bg-card border border-border rounded-lg p-4">
         <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-3">Audit contenu</p>
 
         <div className="space-y-3">
@@ -877,7 +896,7 @@ function WebflowStructureResult({ data }: { data: Record<string, unknown> }) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-background border border-border rounded-lg px-4 py-3 flex items-center gap-3">
+      <div className="bg-card border border-border rounded-lg px-4 py-3 flex items-center gap-3">
         <Database size={16} className="text-orange-400 shrink-0" />
         <div>
           <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-0.5">Collection ID</p>
@@ -898,7 +917,7 @@ function WebflowStructureResult({ data }: { data: Record<string, unknown> }) {
               </thead>
               <tbody>
                 {Object.entries(detectedFields).map(([role, slug], i) => (
-                  <tr key={role} className={cn('border-b border-border/50 last:border-0', i % 2 === 0 ? 'bg-surface' : 'bg-background/30')}>
+                  <tr key={role} className={cn('border-b border-border/50 last:border-0', i % 2 === 0 ? 'bg-card' : 'bg-background/30')}>
                     <td className="px-3 py-2 text-text-muted uppercase tracking-wider text-[10px] font-semibold">{role}</td>
                     <td className="px-3 py-2 font-mono text-accent/80">{slug}</td>
                   </tr>
@@ -928,7 +947,7 @@ function WebflowStructureResult({ data }: { data: Record<string, unknown> }) {
               </thead>
               <tbody>
                 {webflowFields.map((f, i) => (
-                  <tr key={i} className={cn('border-b border-border/50 last:border-0', i % 2 === 0 ? 'bg-surface' : 'bg-background/30')}>
+                  <tr key={i} className={cn('border-b border-border/50 last:border-0', i % 2 === 0 ? 'bg-card' : 'bg-background/30')}>
                     <td className="px-3 py-2 font-mono text-accent/80">{f.slug ?? '—'}</td>
                     <td className="px-3 py-2 text-text">{f.displayName ?? '—'}</td>
                     <td className="px-3 py-2 text-text-muted text-[10px]">{f.type ?? '—'}</td>
@@ -956,7 +975,7 @@ function GeoPromptResult({ data }: { data: Record<string, unknown> }) {
           <p className="text-sm font-semibold text-text">{topic}</p>
         </div>
       )}
-      <div className="bg-background border border-border rounded-lg p-4">
+      <div className="bg-card border border-border rounded-lg p-4">
         <div className="flex items-start justify-between gap-2 mb-1">
           <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Prompt GEO généré</p>
           <CopyButton text={prompt} />
@@ -983,13 +1002,13 @@ function VisualSchemasResult({ data }: { data: Record<string, unknown> }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 text-xs text-text-muted bg-background border border-border rounded-lg px-3 py-2 w-fit">
+      <div className="flex items-center gap-2 text-xs text-text-muted bg-card border border-border rounded-lg px-3 py-2 w-fit">
         <Sparkles size={12} className="text-sky-400" />
         <span><span className="font-bold text-text">{schemas.length}</span> schéma(s) visuel(s) généré(s)</span>
       </div>
       {schemas.map((schema, i) => (
         <div key={i} className="border border-border rounded-lg overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-[#1e1e1e]">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-background">
             <div className="flex items-center gap-2">
               <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">
                 Schéma {i + 1}
@@ -1005,7 +1024,7 @@ function VisualSchemasResult({ data }: { data: Record<string, unknown> }) {
             </div>
             <CopyButton text={schema.code} />
           </div>
-          <pre className="text-[11px] font-mono text-sky-300/80 bg-[#1e1e1e] p-4 overflow-auto max-h-72 whitespace-pre-wrap break-words leading-relaxed">
+          <pre className="text-[11px] font-mono text-text-muted/80 bg-background p-4 overflow-auto max-h-72 whitespace-pre-wrap break-words leading-relaxed">
             {schema.code}
           </pre>
         </div>
@@ -1026,7 +1045,7 @@ function PromptInputResult({ data }: { data: Record<string, unknown> }) {
           <p className="text-sm font-semibold text-text">{topic}</p>
         </div>
       )}
-      <div className="bg-background border border-border rounded-lg p-4">
+      <div className="bg-card border border-border rounded-lg p-4">
         <div className="flex items-start justify-between gap-2 mb-1">
           <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Prompt</p>
           <CopyButton text={prompt} />
@@ -1071,7 +1090,7 @@ function GeoLlmAnalysisResult({ data, responsesKey }: { data: Record<string, unk
       {tab === 'summary' && (
         <div className="space-y-3">
           {summary && (
-            <div className="bg-background border border-border rounded-lg p-4">
+            <div className="bg-card border border-border rounded-lg p-4">
               <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-2">Analyse GEO</p>
               <p className="text-sm text-text leading-relaxed whitespace-pre-wrap">{summary}</p>
             </div>
@@ -1081,7 +1100,7 @@ function GeoLlmAnalysisResult({ data, responsesKey }: { data: Record<string, unk
               <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-2">Points communs</p>
               <div className="space-y-1">
                 {commonPoints.map((p, i) => (
-                  <div key={i} className="flex items-start gap-2 text-sm text-text-muted bg-background border border-border rounded-lg px-3 py-2">
+                  <div key={i} className="flex items-start gap-2 text-sm text-text-muted bg-card border border-border rounded-lg px-3 py-2">
                     <span className="text-accent font-bold shrink-0 text-xs">{i + 1}.</span>
                     <span>{p}</span>
                   </div>
@@ -1107,7 +1126,7 @@ function GeoLlmAnalysisResult({ data, responsesKey }: { data: Record<string, unk
           {questions.length === 0 ? (
             <p className="text-sm text-text-muted italic">Aucune question identifiée.</p>
           ) : questions.map((q, i) => (
-            <div key={i} className="flex items-start gap-2.5 bg-background border border-border rounded-lg px-3 py-2.5">
+            <div key={i} className="flex items-start gap-2.5 bg-card border border-border rounded-lg px-3 py-2.5">
               <span className="text-blue-400 font-bold shrink-0 text-xs mt-0.5">Q{i + 1}</span>
               <p className="text-sm text-text">{q}</p>
             </div>
@@ -1139,7 +1158,7 @@ function GeoLlmAnalysisResult({ data, responsesKey }: { data: Record<string, unk
                 let hostname: string | null = null;
                 try { if (src.url) { const u = new URL(src.url); favicon = `https://www.google.com/s2/favicons?sz=64&domain=${u.hostname}`; hostname = u.hostname; } } catch {}
                 return (
-                  <div key={i} className="flex items-center gap-2.5 bg-background border border-border rounded-lg px-3 py-2">
+                  <div key={i} className="flex items-center gap-2.5 bg-card border border-border rounded-lg px-3 py-2">
                     {favicon && <img src={favicon} alt="" className="w-4 h-4 rounded-full object-cover shrink-0" />}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
@@ -1183,15 +1202,259 @@ function GeoLlmAnalysisResult({ data, responsesKey }: { data: Record<string, unk
         <div className="space-y-3">
           {rawResponses.map((resp, i) => (
             <div key={i} className="border border-border rounded-lg overflow-hidden">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-[#1e1e1e]">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-background">
                 <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Réponse {i + 1}</p>
                 <CopyButton text={resp} />
               </div>
-              <pre className="text-[11px] font-mono text-text-muted/70 bg-[#1e1e1e] p-4 overflow-auto max-h-[300px] leading-relaxed whitespace-pre-wrap break-words">
+              <pre className="text-[11px] font-mono text-text-muted/70 bg-background p-4 overflow-auto max-h-[300px] leading-relaxed whitespace-pre-wrap break-words">
                 {resp}
               </pre>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Reddit Analyzer Result ───────────────────────────────────────────────────
+
+function RedditAnalyzerResult({ data }: { data: Record<string, unknown> }) {
+  const posts    = (data.redditPosts    as Record<string,unknown>[]) ?? [];
+  const patterns = (data.redditPatterns as Record<string,unknown>)   ?? null;
+  const strategy = (data.redditStrategy as Record<string,unknown>)   ?? null;
+
+  type TabId = 'posts' | 'patterns' | 'strategy';
+  const [tab, setTab] = useState<TabId>('posts');
+
+  const tabs: { id: TabId; label: string }[] = [
+    { id: 'posts',    label: `Posts (${posts.length})` },
+    ...(patterns ? [{ id: 'patterns' as TabId, label: 'Patterns' }] : []),
+    ...(strategy ? [{ id: 'strategy' as TabId, label: 'Stratégie' }] : []),
+  ];
+
+  if (!posts.length && !patterns && !strategy) {
+    return <p className="text-xs text-text-muted p-4">Aucun résultat Reddit disponible.</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Tabs */}
+      <div className="p-0.5 bg-background rounded-lg flex w-fit">
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={cn('px-4 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-all',
+              tab === t.id ? 'bg-surface text-text shadow-sm' : 'text-text-muted hover:text-text')}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Posts tab */}
+      {tab === 'posts' && (
+        <div className="space-y-3">
+          {posts.map((post, i) => {
+            const comments = (post.comments as {author:string;body:string;score:number}[]) ?? [];
+            return (
+              <div key={i} className="bg-card border border-border rounded-lg overflow-hidden">
+                <div className="px-4 py-3 border-b border-border flex items-start gap-3">
+                  <RedditIcon size={18} className="shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-text leading-snug">{post.title as string}</p>
+                    <div className="flex items-center gap-3 mt-1 flex-wrap">
+                      <span className="text-[10px] font-bold text-orange-400">{post.subredditPrefixed as string}</span>
+                      <span className="text-[10px] text-text-muted">▲ {post.score as number} pts</span>
+                      <span className="text-[10px] text-text-muted">{post.numComments as number} commentaires</span>
+                      {post.flair && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20">{post.flair as string}</span>}
+                    </div>
+                  </div>
+                  <a href={post.permalink as string} target="_blank" rel="noopener noreferrer"
+                    className="shrink-0 text-[10px] text-text-muted hover:text-accent transition-colors underline">
+                    Voir ↗
+                  </a>
+                </div>
+                {post.selftext && (
+                  <p className="px-4 py-2 text-xs text-text-muted/80 line-clamp-3 border-b border-border bg-background/30">
+                    {post.selftext as string}
+                  </p>
+                )}
+                {comments.length > 0 && (
+                  <div className="divide-y divide-border">
+                    {comments.slice(0, 5).map((c, j) => (
+                      <div key={j} className="px-4 py-2 flex gap-2">
+                        <span className="text-[10px] text-orange-400/70 font-mono shrink-0 w-10 text-right">▲{c.score}</span>
+                        <p className="text-xs text-text-muted/80 line-clamp-2">{c.body}</p>
+                      </div>
+                    ))}
+                    {comments.length > 5 && (
+                      <p className="px-4 py-2 text-[10px] text-text-muted/40 italic">+{comments.length - 5} commentaires supplémentaires</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Patterns tab */}
+      {tab === 'patterns' && patterns && (
+        <div className="space-y-4">
+          {/* Top subreddits */}
+          {(patterns.topSubreddits as {name:string;postCount:number;avgScore:number;why:string}[] ?? []).length > 0 && (
+            <div className="bg-card border border-border rounded-lg p-4">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-3">Subreddits les plus cités</p>
+              <div className="space-y-2">
+                {(patterns.topSubreddits as {name:string;postCount:number;avgScore:number;why:string}[]).map((s, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <span className="text-xs font-bold text-orange-400 w-28 shrink-0">{s.name}</span>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-[10px] text-text-muted">{s.postCount} post{s.postCount > 1 ? 's' : ''}</span>
+                        <span className="text-[10px] text-text-muted">· moy. {s.avgScore} pts</span>
+                      </div>
+                      <p className="text-xs text-text-muted/70 italic">{s.why}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Content types */}
+          {(patterns.contentTypes as {type:string;count:number;avgScore:number;characteristics:string[]}[] ?? []).length > 0 && (
+            <div className="bg-card border border-border rounded-lg p-4">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-3">Types de contenus valorisés</p>
+              <div className="space-y-3">
+                {(patterns.contentTypes as {type:string;count:number;avgScore:number;characteristics:string[]}[]).map((t, i) => (
+                  <div key={i}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-semibold text-text">{t.type}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/10 text-accent">{t.count}×</span>
+                      <span className="text-[10px] text-text-muted ml-auto">moy. {t.avgScore} pts</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {t.characteristics.map((c, j) => (
+                        <span key={j} className="text-[10px] px-1.5 py-0.5 rounded bg-background border border-border text-text-muted">{c}</span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* What AI values */}
+          {(patterns.whatAiValues as string[] ?? []).length > 0 && (
+            <div className="bg-card border border-border rounded-lg p-4">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-3">Pourquoi les IA citent ces contenus</p>
+              <ul className="space-y-1.5">
+                {(patterns.whatAiValues as string[]).map((v, i) => (
+                  <li key={i} className="flex gap-2 text-xs text-text-muted"><span className="text-accent shrink-0">→</span>{v}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {/* Gaps */}
+          {(patterns.gapsIdentified as string[] ?? []).length > 0 && (
+            <div className="bg-card border border-border rounded-lg p-4">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-3">Opportunités non couvertes</p>
+              <ul className="space-y-1.5">
+                {(patterns.gapsIdentified as string[]).map((g, i) => (
+                  <li key={i} className="flex gap-2 text-xs text-text-muted"><span className="text-amber-400 shrink-0">💡</span>{g}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Strategy tab */}
+      {tab === 'strategy' && strategy && (
+        <div className="space-y-4">
+          {/* Priority actions */}
+          {(strategy.priorityActions as string[] ?? []).length > 0 && (
+            <div className="bg-orange-500/5 border border-orange-500/20 rounded-lg p-4">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-orange-400 mb-3">Actions prioritaires cette semaine</p>
+              <ol className="space-y-1.5 list-decimal list-inside">
+                {(strategy.priorityActions as string[]).map((a, i) => (
+                  <li key={i} className="text-xs text-text">{a}</li>
+                ))}
+              </ol>
+            </div>
+          )}
+          {/* Post ideas */}
+          {(strategy.postIdeas as {title:string;subreddit:string;type:string;hook:string;outline:string[];geoValue:string;priority:string}[] ?? []).length > 0 && (
+            <div className="bg-card border border-border rounded-lg overflow-hidden">
+              <div className="px-4 py-2 border-b border-border">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Idées de posts à publier</p>
+              </div>
+              <div className="divide-y divide-border">
+                {(strategy.postIdeas as {title:string;subreddit:string;type:string;hook:string;outline:string[];geoValue:string;priority:string}[]).map((p, i) => (
+                  <div key={i} className="px-4 py-3">
+                    <div className="flex items-start gap-2 mb-2">
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-text">{p.title}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] font-bold text-orange-400">{p.subreddit}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-background border border-border text-text-muted">{p.type}</span>
+                          <span className={cn('text-[10px] px-1.5 py-0.5 rounded font-bold', p.priority === 'haute' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-background border border-border text-text-muted')}>{p.priority}</span>
+                        </div>
+                      </div>
+                      <CopyButton text={`${p.title}\n\n${p.hook}\n\n${p.outline.map((o,j) => `${j+1}. ${o}`).join('\n')}`} />
+                    </div>
+                    <p className="text-xs text-text-muted italic mb-2">{p.hook}</p>
+                    <ul className="space-y-0.5 mb-2">
+                      {p.outline.map((o, j) => <li key={j} className="text-xs text-text-muted/70 flex gap-1.5"><span className="shrink-0 text-accent">{j+1}.</span>{o}</li>)}
+                    </ul>
+                    <p className="text-[10px] text-accent/70 italic">GEO : {p.geoValue}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Comment templates */}
+          {(strategy.commentTemplates as {context:string;targetSubreddits:string[];template:string;tone:string}[] ?? []).length > 0 && (
+            <div className="bg-card border border-border rounded-lg overflow-hidden">
+              <div className="px-4 py-2 border-b border-border">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Templates de commentaires</p>
+              </div>
+              <div className="divide-y divide-border">
+                {(strategy.commentTemplates as {context:string;targetSubreddits:string[];template:string;tone:string}[]).map((c, i) => (
+                  <div key={i} className="px-4 py-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-background border border-border text-text-muted">{c.tone}</span>
+                        {c.targetSubreddits.slice(0,3).map((s,j) => <span key={j} className="text-[10px] font-bold text-orange-400">{s}</span>)}
+                      </div>
+                      <CopyButton text={c.template} />
+                    </div>
+                    <p className="text-[10px] text-text-muted/60 italic mb-2">{c.context}</p>
+                    <pre className="text-xs text-text-muted/80 bg-background rounded p-2 whitespace-pre-wrap break-words">{c.template}</pre>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* AMA */}
+          {strategy.amaStrategy && (strategy.amaStrategy as Record<string,unknown>).recommended && (
+            <div className="bg-card border border-border rounded-lg p-4">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-3">Opportunité AMA</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-orange-400">{(strategy.amaStrategy as Record<string,unknown>).subreddit as string}</span>
+                  <span className="text-xs text-text-muted">— {(strategy.amaStrategy as Record<string,unknown>).timing as string}</span>
+                </div>
+                <p className="text-sm text-text">{(strategy.amaStrategy as Record<string,unknown>).angle as string}</p>
+                <div>
+                  <p className="text-[10px] text-text-muted mb-1">Questions à anticiper :</p>
+                  <ul className="space-y-1">
+                    {((strategy.amaStrategy as Record<string,unknown>).sampleQuestions as string[] ?? []).map((q, i) => (
+                      <li key={i} className="text-xs text-text-muted flex gap-1.5"><span className="text-accent shrink-0">?</span>{q}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1235,6 +1498,7 @@ function StepResult({ step, steps, token, runId }: { step: RunStep; steps: RunSt
     case 'chatgpt-analysis':      content = <GeoLlmAnalysisResult data={data} responsesKey="chatgptResponses" />; break;
     case 'gemini-analysis':       content = <GeoLlmAnalysisResult data={data} responsesKey="geminiResponses" />; break;
     case 'perplexity-analysis':   content = <GeoLlmAnalysisResult data={data} responsesKey="perplexityResponses" />; break;
+    case 'reddit-analyzer':       content = <RedditAnalyzerResult data={data} />; break;
     case 'visual-schemas':        content = <VisualSchemasResult data={data} />; break;
     default:                      content = <JsonViewer data={data} />; break;
   }
@@ -1301,37 +1565,38 @@ function RunDetailContent() {
 
   const statusColor = run?.status === 'done' ? 'text-green-400' : run?.status === 'error' ? 'text-red-400' : 'text-accent';
 
-  return (
-    <AppLayout>
-      <div className="flex flex-col h-full">
-        {/* Header */}
-        <div className='flex items-center gap-2 p-2 border-b shrink-0'>
-          <Link href="/runs" className="inline-flex items-center gap-2 text-sm text-text-muted hover:text-text transition-colors">
-            <ChevronLeft size={14} />
-          </Link>
-          <span className='text-sm font-medium'>{run?.workflows?.name ?? 'Exécution'}</span>
-          <div className="flex items-center gap-3 text-sm text-text-muted">
-              {run?.sites?.name && <span>{run.sites.name}</span>}
-              <div className='flex items-center gap-1'>
-                <Clock size={11} />
-                <span  className='text-[11px]'>{run ? new Date(run.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
-              </div>
-              {run?.status && <span className={cn('font-semibold', statusColor)}>{run.status === 'done' ? 'Terminé' : run.status === 'error' ? 'Erreur' : 'En cours'}</span>}
-          </div>
+  const runHeader = (
+    <div className="flex items-center gap-2.5">
+      <Link href="/runs" className="inline-flex items-center text-text-muted hover:text-text transition-colors">
+        <ChevronLeft size={14} />
+      </Link>
+      <span className="font-semibold text-text">{run?.workflows?.name ?? 'Exécution'}</span>
+      <div className="flex items-center gap-3 text-xs text-text-muted">
+        {run?.sites?.name && <span>{run.sites.name}</span>}
+        <div className="flex items-center gap-1">
+          <Clock size={11} />
+          <span>{run ? new Date(run.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
         </div>
+        {run?.status && <span className={cn('font-semibold', statusColor)}>{run.status === 'done' ? 'Terminé' : run.status === 'error' ? 'Erreur' : 'En cours'}</span>}
+      </div>
+    </div>
+  );
 
+  return (
+    <AppLayout header={runHeader}>
+      <div className="flex flex-col h-full">
         {steps.length === 0 ? (
-          <div className="flex-1 bg-surface border border-dashed border-border rounded-xl p-16 text-center">
+          <div className="flex-1 bg-card border border-dashed border-border rounded-xl p-16 text-center">
             <p className="text-text-muted">Aucun module enregistré pour cette exécution.</p>
           </div>
         ) : (
           <div className="flex flex-1 overflow-hidden">
             {/* Module list */}
-            <div className="w-64 shrink-0 bg-surface shadow-xl rounded-none flex flex-col border-r">
-              <div className="px-4 py-3 border-b border-border bg-background/70 backdrop-blur shrink-0">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-accent">Modules exécutés</p>
+            <div className="w-64 shrink-0 rounded-none flex flex-col border-r">
+              <div className="px-4 py-3 border-b border-border  backdrop-blur shrink-0">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Modules exécutés</p>
               </div>
-              <div className="py-1 overflow-y-auto flex-1">
+              <div className="p-3 overflow-y-auto flex-1 gap-2 flex flex-col">
                 {steps.map((step) => {
                   const meta = getModuleMeta(step.module_type);
                   const Icon = meta.icon;
@@ -1342,19 +1607,18 @@ function RunDetailContent() {
                       key={step.id}
                       onClick={() => selectStep(step)}
                       className={cn(
-                        'w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors group',
-                        isSelected ? 'bg-accent/10' : 'hover:bg-background/60'
+                        'w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors group rounded-md',
+                        isSelected ? 'bg-accent-hover' : 'hover:bg-accent-hover'
                       )}
                     >
                       {BrandIcon ? (
-                        <BrandIcon size={17} className="shrink-0" />
-                      ) : (
-                        Icon && <Icon size={15} className={cn(meta.accent, 'shrink-0')} />
-                      )}
+                        <BrandIcon size={17} className={cn(isSelected ? 'text-text' : 'text-text-muted', 'shrink-0')} />
+                      ) : Icon ? (
+                        (() => { const I = Icon as React.ComponentType<{size?: number | string; className?: string; monochrome?: boolean}>; return <I size={15} className={cn(isSelected ? 'text-text' : 'text-text-muted', 'shrink-0')} monochrome />; })()
+                      ) : null}
                       <span className={cn('flex-1 text-xs font-medium truncate', isSelected ? 'text-text' : 'text-text-muted')}>
                         {meta.label}
                       </span>
-                      <StepStatusIcon status={step.status} />
                     </button>
                   );
                 })}

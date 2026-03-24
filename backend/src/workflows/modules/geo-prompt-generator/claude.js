@@ -52,6 +52,46 @@ function buildSiteContext(siteProfile, sitemapUrls = []) {
 }
 
 /**
+ * Generate 5 linguistic variants of a GEO prompt.
+ * @param {string} geoPrompt  — the original prompt
+ * @param {string} geoTopic   — the topic (used for context)
+ * @returns {Promise<string[]>} — array of 5 variant strings
+ */
+export async function generateGeoPromptVariants(geoPrompt, geoTopic) {
+  const client = getClient();
+
+  const message = await claudeCreate(client, {
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 512,
+    system: `Tu es un expert en rédaction de requêtes pour IA.
+Génère des reformulations d'une question GEO en gardant la même intention mais avec des formulations différentes.
+Réponds UNIQUEMENT en JSON valide, sans markdown.`,
+    messages: [{
+      role: 'user',
+      content: `Question originale : "${geoPrompt}"
+Sujet : "${geoTopic}"
+
+Génère 5 variantes de cette question avec des formulations différentes (mots différents, tournures différentes, mais même sens).
+Chaque variante doit sembler naturellement posée à une IA par un utilisateur différent.
+
+Retourne UNIQUEMENT ce JSON :
+{ "variants": ["variante 1", "variante 2", "variante 3", "variante 4", "variante 5"] }`,
+    }],
+  });
+
+  const raw = message.content[0].text.trim();
+  try {
+    const jsonStr = raw.startsWith('{') ? raw : raw.match(/\{[\s\S]*\}/)?.[0] || '{}';
+    const parsed = JSON.parse(jsonStr);
+    const variants = parsed.variants ?? [];
+    // Always include original as first variant
+    return [geoPrompt, ...variants.slice(0, 5)].slice(0, 6);
+  } catch {
+    return [geoPrompt];
+  }
+}
+
+/**
  * Ask Claude Haiku to propose a GEO prompt not yet covered by the site.
  *
  * @param {object}   siteProfile     - SiteProfile from website-scraper

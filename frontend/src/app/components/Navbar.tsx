@@ -44,7 +44,7 @@ export default function Navbar() {
                       "flex items-center gap-2.5 px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-widest transition-all duration-200",
                       active
                         ? "bg-accent/10 text-accent shadow-sm shadow-accent/5"
-                        : "text-text-muted hover:text-text hover:bg-surface"
+                        : "text-text-muted hover:text-text hover:bg-card"
                     )}
                   >
                     <Icon size={14} strokeWidth={2.5} />

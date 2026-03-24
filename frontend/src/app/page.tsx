@@ -79,7 +79,7 @@ export default function Home() {
       {/* Hero Section */}
       <main className="flex-1">
         <section className="px-6 pt-24 pb-16 md:pt-32 md:pb-24 max-w-6xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface border border-border text-xs font-medium text-text-muted mb-8">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-card border border-border text-xs font-medium text-text-muted mb-8">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
@@ -131,7 +131,7 @@ export default function Home() {
                 description: 'Synchronisation bidirectionnelle avec votre CMS pour une publication sans friction.'
               },
             ].map((feature, i) => (
-              <div key={i} className="p-8 rounded-2xl bg-surface border border-border hover:border-text/20 transition-colors group">
+              <div key={i} className="p-8 rounded-2xl bg-card border border-border hover:border-text/20 transition-colors group">
                 <div className="w-12 h-12 rounded-xl bg-background border border-border flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                   <feature.icon className="text-text" size={24} />
                 </div>
@@ -143,7 +143,7 @@ export default function Home() {
         </section>
 
         {/* Workflow Section */}
-        <section className="bg-surface border-y border-border py-24">
+        <section className="bg-card border-y border-border py-24">
           <div className="max-w-6xl mx-auto px-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
               <div>

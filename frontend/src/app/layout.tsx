@@ -3,6 +3,7 @@ import './globals.css';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProjectProvider } from './contexts/ProjectContext';
 import { TaskProvider } from './contexts/TaskContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
@@ -20,18 +21,35 @@ export const metadata: Metadata = {
   },
 };
 
+// Injected before React hydration to prevent theme flash
+const themeScript = `
+  (function(){
+    try {
+      var t = localStorage.getItem('theme');
+      if (t === 'light' || t === 'dark') { document.documentElement.setAttribute('data-theme', t); return; }
+      var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    } catch(e){}
+  })();
+`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr">
+    <html lang="fr" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="min-h-screen">
-        <AuthProvider>
-          <ProjectProvider>
-            <TaskProvider>
-              {children}
-              <Toaster position="bottom-right" />
-            </TaskProvider>
-          </ProjectProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <ProjectProvider>
+              <TaskProvider>
+                {children}
+                <Toaster position="bottom-right" />
+              </TaskProvider>
+            </ProjectProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

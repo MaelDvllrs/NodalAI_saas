@@ -397,7 +397,7 @@ function BuilderPageContent() {
                   <button
                     type="button"
                     onClick={() => editorActionsRef.current?.run?.()}
-                    className="btn-accent gap-2 text-xs"
+                    className="btn-primary gap-2 text-xs"
                   >
                     <Play size={13} />
                     Lancer
@@ -424,13 +424,13 @@ function BuilderPageContent() {
               <Skeleton className="flex-1 rounded-xl" />
             </div>
           ) : sites.length === 0 ? (
-            <div className="bg-surface border border-border rounded-lg p-10 text-center animate-slide-up">
+            <div className="bg-card border border-border rounded-lg p-10 text-center animate-slide-up">
               <div className="w-16 h-16 bg-accent/5 rounded-full flex items-center justify-center mx-auto mb-5">
                 <Globe className="text-accent" size={40} />
               </div>
               <h2 className="text-2xl font-bold mb-3">Aucun site configuré</h2>
               <p className="text-text-muted mb-6 max-w-sm mx-auto font-medium">Vous devez d'abord connecter un projet Webflow pour commencer à générer du contenu.</p>
-              <Link href="/dashboard" className="btn-accent uppercase tracking-widest">
+              <Link href="/dashboard" className="btn-primary uppercase tracking-widest">
                 Ajouter mon premier site
               </Link>
             </div>

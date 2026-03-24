@@ -2,19 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+
 :root {
-  --bg: #f0f0f2;
-  --surface: #fafafa;
-  --bg-card: #ffffff;
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --bg-card: #fcfcfc;
   --border: #eaeaea;
-  --text: #000000;
-  --text-muted: #666666;
-  --primary: #000000;
+  --text: #47525b;
+  --text-muted: #7e7f82;
+  --primary: #f9f9f9;
   --primary-foreground: #ffffff;
-  --accent: #0070f3;
-  --accent-hover: #0060df;
+  --accent: #0d0d0d;
+  --accent-hover: #f9fbfc;
   --accent-foreground: #ffffff;
-  --accent-soft: rgba(0, 112, 243, 0.1);
+  --accent-soft: #e4eaf1;
   --success: #0070f3;
   --error: #ee0000;
   --font-sans: 'Inter';
@@ -25,21 +26,19 @@
   --radius-xl: 1rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #000000;
-    --surface: #222222;
-    --bg-card: hsl(0, 0%, 4%);
-    --border: #333333;
-    --text: #ffffff;
-    --text-muted: #888888;
-    --primary: #ffffff;
-    --primary-foreground: #000000;
-    --accent: #ffffff;
-    --accent-hover: #eaeaea;
-    --accent-foreground: #000000;
-    --accent-soft: rgba(255, 255, 255, 0.1);
-  }
+[data-theme="dark"] {
+  --bg: #000000;
+  --surface: #121314;
+  --bg-card: rgba(255,255,255,.01);
+  --border: #252525;
+  --text: #d0d6e0;
+  --text-muted: #8a8f98;
+  --primary: #262626;
+  --primary-foreground: #000000;
+  --accent: #ffffff;
+  --accent-hover: rgba(255, 255, 255, 0.1);
+  --accent-foreground: #000000;
+  --accent-soft: rgba(255, 255, 255, 0.15);
 }
 
 body {
@@ -71,10 +70,10 @@ body {
   }
 
   .btn-primary {
-    @apply btn-base px-3 py-1.5;
-    background-color: var(--primary);
-    color: var(--primary-foreground);
-    box-shadow: inset 0 1px 2px rgba(255,255,255,0.04), inset 0 -1px 2px rgba(0,0,0,0.06);
+    @apply btn-base px-2.5 py-1.5;
+    background-color: var(--accent);
+    color: var(--accent-foreground);
+    box-shadow: inset 0 1px 2px rgba(255,255,255,0.06), inset 0 -1px 2px rgba(0,0,0,0.06);
   }
 
   .btn-secondary {
@@ -86,13 +85,6 @@ body {
     border-color: var(--text-muted);
   }
 
-  .btn-accent {
-    @apply btn-base px-2.5 py-1.5;
-    background-color: var(--accent);
-    color: var(--accent-foreground);
-    box-shadow: inset 0 1px 2px rgba(255,255,255,0.06), inset 0 -1px 2px rgba(0,0,0,0.06);
-  }
-
   .input-base {
     @apply w-full rounded-md px-3 py-2 text-sm transition-all duration-150 border border-border bg-surface text-text placeholder:text-text-muted focus:outline-none focus:ring-1 focus:border-accent;
   }
@@ -101,6 +93,25 @@ body {
   }
   .input-base:hover {
     border-color: var(--text-muted);
+  }
+
+  /* React Flow Controls override */
+  .react-flow__controls {
+    background: var(--accent-hover) !important;
+    box-shadow: none !important;
+    border: 1px solid var(--border) !important;
+  }
+  .react-flow__controls-button {
+    background: transparent !important;
+    border-bottom-color: var(--border) !important;
+    color: var(--text-muted) !important;
+    fill: var(--text-muted) !important;
+  }
+  .react-flow__controls-button:hover {
+    background: var(--accent-soft) !important;
+  }
+  .react-flow__controls-button:last-child {
+    border-bottom: none !important;
   }
 
   .animate-fade-in {
@@ -151,6 +162,6 @@ body {
 }
 
 /* Card gradient: bottom = --bg, top = --bg-card */
-.bg-surface {
-  background: linear-gradient(to top, var(--bg), var(--bg-card));
+.bg-card {
+  background-color: var(--bg-card);
 }

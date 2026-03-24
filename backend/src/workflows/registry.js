@@ -34,6 +34,7 @@ import { BlogGenerationGeoModule }   from './modules/blog-generation-geo/index.j
 import { ChatGptAnalysisModule }      from './modules/chatgpt-analysis/index.js';
 import { GeminiAnalysisModule }      from './modules/gemini-analysis/index.js';
 import { PerplexityAnalysisModule }  from './modules/perplexity-analysis/index.js';
+import { RedditAnalyzerModule }      from './modules/reddit-analyzer/index.js';
 
 const MODULES = [
   // ── Prompt Input ───────────────────────────────────────────────────────────
@@ -315,6 +316,28 @@ const MODULES = [
     module:      PerplexityAnalysisModule,
   },
 
+  // ── Reddit Analyzer ────────────────────────────────────────────────────────
+  {
+    id:          'reddit-analyzer',
+    label:       'Analyseur Reddit',
+    description: 'Scrape les posts Reddit cités par les IA, analyse les patterns de contenu et génère un plan d\'action pour gagner en autorité GEO.',
+    ports: {
+      in: [
+        { key: 'geoSources',   label: 'Sources LLM (ChatGPT / Gemini / Perplexity)', required: true },
+        { key: 'geoPrompt',    label: 'Prompt GEO testé',                             required: false },
+        { key: 'siteProfile',  label: 'Profil du site',                               required: false },
+        { key: 'siteUrl',      label: 'URL du site',                                  required: false },
+      ],
+      out: [
+        { key: 'redditPosts',    label: 'Posts Reddit scrapés' },
+        { key: 'redditPatterns', label: 'Patterns de contenu' },
+        { key: 'redditStrategy', label: 'Plan d\'action Reddit' },
+      ],
+    },
+    defaultConfig: {},
+    module:      RedditAnalyzerModule,
+  },
+
   // ── Blog Generation GEO ───────────────────────────────────────────────────
   {
     id:          'blog-generation-geo',
@@ -356,9 +379,10 @@ const MODULES = [
         { key: 'sitemapUrls',  label: 'URLs sitemap',     required: false },
       ],
       out: [
-        { key: 'geoPrompt',    label: 'Prompt GEO' },
-        { key: 'geoTopic',     label: 'Sujet GEO' },
-        { key: 'geoRationale', label: 'Justification' },
+        { key: 'geoPrompt',         label: 'Prompt GEO' },
+        { key: 'geoTopic',          label: 'Sujet GEO' },
+        { key: 'geoRationale',      label: 'Justification' },
+        { key: 'geoPromptVariants', label: '5 variantes du prompt' },
       ],
     },
     defaultConfig: {},

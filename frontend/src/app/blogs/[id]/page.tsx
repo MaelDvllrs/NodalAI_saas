@@ -345,7 +345,7 @@ export default function BlogDetailPage() {
             <div className="space-y-4">
 
               {/* SEO */}
-              <div className="bg-surface border border-border rounded-lg p-4 space-y-4">
+              <div className="bg-card border border-border rounded-lg p-4 space-y-4">
                 <h2 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
                   <BarChart2 size={14} /> SEO
                 </h2>
@@ -372,7 +372,7 @@ export default function BlogDetailPage() {
               </div>
 
               {/* Keyword */}
-              <div className="bg-surface border border-border rounded-lg p-4 space-y-3">
+              <div className="bg-card border border-border rounded-lg p-4 space-y-3">
                 <h2 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
                   <Hash size={14} /> Mots-clés
                 </h2>
@@ -401,7 +401,7 @@ export default function BlogDetailPage() {
               </div>
 
               {/* Infos */}
-              <div className="bg-surface border border-border rounded-lg p-4 space-y-3">
+              <div className="bg-card border border-border rounded-lg p-4 space-y-3">
                 <h2 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
                   <Tag size={14} /> Infos
                 </h2>
@@ -446,7 +446,7 @@ export default function BlogDetailPage() {
                 )}
               </div>
               {/* Notation */}
-              <div className="bg-surface border border-border rounded-lg p-4 space-y-3">
+              <div className="bg-card border border-border rounded-lg p-4 space-y-3">
                 <h2 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
                   <Star size={14} /> Notation
                 </h2>
@@ -462,7 +462,7 @@ export default function BlogDetailPage() {
             <div className="lg:col-span-2 space-y-4">
 
               {/* Tabs */}
-              <div className="flex gap-0.5 bg-surface border border-border rounded-md p-0.5 w-fit">
+              <div className="flex gap-0.5 bg-card border border-border rounded-md p-0.5 w-fit">
                 {([
                   { key: 'seo', label: 'Aperçu SEO', icon: Eye },
                   { key: 'content', label: 'Article HTML', icon: FileText },
@@ -489,7 +489,7 @@ export default function BlogDetailPage() {
               {/* Tab: Aperçu SEO (Google preview + introduction) */}
               {tab === 'seo' && (
                 <div className="space-y-4">
-                  <div className="bg-surface border border-border rounded-lg p-4 space-y-3">
+                  <div className="bg-card border border-border rounded-lg p-4 space-y-3">
                     <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
                       <Eye size={14} /> Aperçu Google
                     </h3>
@@ -504,7 +504,7 @@ export default function BlogDetailPage() {
                     </div>
                   </div>
 
-                  <div className="bg-surface border border-border rounded-lg p-4">
+                  <div className="bg-card border border-border rounded-lg p-4">
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
                         <FileText size={14} /> Introduction
@@ -518,7 +518,7 @@ export default function BlogDetailPage() {
 
               {/* Tab: Article HTML */}
               {tab === 'content' && (
-                <div className="bg-surface border border-border rounded-lg overflow-hidden">
+                <div className="bg-card border border-border rounded-lg overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                     <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
                       <FileText size={14} /> Corps de l&apos;article
@@ -552,7 +552,7 @@ export default function BlogDetailPage() {
 
               {/* Tab: Raw Claude output */}
               {tab === 'raw' && (
-                <div className="bg-surface border border-border rounded-lg overflow-hidden">
+                <div className="bg-card border border-border rounded-lg overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-zinc-900/50">
                     <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-2">
                       <Code2 size={14} /> Sortie brute Claude
@@ -645,7 +645,7 @@ function EmbedsDetailPanel({ faqEmbed, schemas = [] }: { faqEmbed: string | null
 
   if (blocks.length === 0) {
     return (
-      <div className="bg-surface border border-border rounded-2xl p-12 flex flex-col items-center justify-center text-center gap-3">
+      <div className="bg-card border border-border rounded-2xl p-12 flex flex-col items-center justify-center text-center gap-3">
         <Code2 size={36} className="text-text-muted opacity-20" />
         <p className="text-sm font-bold text-text-muted">Aucun embed disponible</p>
         <p className="text-xs text-text-muted">Les schémas et la FAQ ne sont pas présents dans cet article.</p>
@@ -662,7 +662,7 @@ function EmbedsDetailPanel({ faqEmbed, schemas = [] }: { faqEmbed: string | null
           Copiez chaque bloc et collez-le manuellement dans Webflow via <em>Add block → Embed</em>.
         </p>
       </div>
-      <div className="bg-surface border border-border rounded-2xl overflow-hidden">
+      <div className="bg-card border border-border rounded-2xl overflow-hidden">
         {blocks.map((block, i) => (
           <EmbedBlock key={i} {...block} />
         ))}
@@ -728,7 +728,7 @@ function SeoAnalysisPanel({ seoAnalysis, articleText = '' }: { seoAnalysis?: Seo
 
   if (!seoAnalysis) {
     return (
-      <div className="bg-surface border border-border rounded-2xl p-12 flex flex-col items-center justify-center text-center gap-3">
+      <div className="bg-card border border-border rounded-2xl p-12 flex flex-col items-center justify-center text-center gap-3">
         <Search size={36} className="text-text-muted opacity-20" />
         <p className="text-sm font-bold text-text-muted">Aucune analyse SEO disponible</p>
         <p className="text-xs text-text-muted">
@@ -800,7 +800,7 @@ function SeoAnalysisPanel({ seoAnalysis, articleText = '' }: { seoAnalysis?: Seo
 
       {/* ── 1. Coverage Score ─────────────────────────────────────── */}
       {coverage && (
-        <div className="bg-surface border border-border rounded-lg p-4 space-y-4">
+        <div className="bg-card border border-border rounded-lg p-4 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
               <BarChart2 size={14} /> Score Couverture SEO
@@ -888,7 +888,7 @@ function SeoAnalysisPanel({ seoAnalysis, articleText = '' }: { seoAnalysis?: Seo
 
       {/* ── 2. Semantic Terms ─────────────────────────────────────── */}
       {semantic && (
-        <div className="bg-surface border border-border rounded-lg p-4 space-y-4">
+        <div className="bg-card border border-border rounded-lg p-4 space-y-4">
           <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
             <Search size={14} /> Termes Sémantiques
             <span className="font-normal text-text-muted/50">({semantic.pagesAnalyzed} pages analysées)</span>
@@ -970,7 +970,7 @@ function SeoAnalysisPanel({ seoAnalysis, articleText = '' }: { seoAnalysis?: Seo
 
       {/* ── 2b. Clusters sémantiques ──────────────────────────────── */}
       {semantic?.clusters && semantic.clusters.length > 0 && (
-        <div className="bg-surface border border-border rounded-lg p-4 space-y-3">
+        <div className="bg-card border border-border rounded-lg p-4 space-y-3">
           <h3 className="text-[10px] font-bold uppercase tracking-widest text-text-muted flex items-center gap-2">
             <Layers size={14} /> Expressions Clés des SERP
             <span className="font-normal text-text-muted/50">({semantic.clusters.length} expressions)</span>
@@ -1026,7 +1026,7 @@ function SeoAnalysisPanel({ seoAnalysis, articleText = '' }: { seoAnalysis?: Seo
         const editorial = serpResults.filter((r) => !r.pageType || !EXCL.has(r.pageType));
         const excluded  = serpResults.filter((r) => r.pageType && EXCL.has(r.pageType));
         return (
-          <div className="bg-surface border border-border rounded-lg overflow-hidden">
+          <div className="bg-card border border-border rounded-lg overflow-hidden">
             <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2">
                 <Target size={14} className="text-text-muted" />
@@ -1057,7 +1057,7 @@ function SeoAnalysisPanel({ seoAnalysis, articleText = '' }: { seoAnalysis?: Seo
                     return (
                       <tr key={i} className={cn(
                         'border-b border-border/50 transition-colors',
-                        isExcluded ? 'opacity-40' : 'hover:bg-background/50',
+                        isExcluded ? 'opacity-40' : 'hover:bg-accent-hover',
                       )}>
                         <td className="px-4 py-3 text-text-muted font-mono text-[10px]">{r.rank}</td>
                         <td className="px-4 py-3">
@@ -1096,7 +1096,7 @@ function SeoAnalysisPanel({ seoAnalysis, articleText = '' }: { seoAnalysis?: Seo
 
       {/* ── 4. 300 Key Terms Table ─────────────────────────────────── */}
       {allTerms.length > 0 && (
-        <div className="bg-surface border border-border rounded-lg overflow-hidden">
+        <div className="bg-card border border-border rounded-lg overflow-hidden">
           {/* Header */}
           <div className="px-4 py-3 border-b border-border space-y-3">
             <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -1175,11 +1175,11 @@ function SeoAnalysisPanel({ seoAnalysis, articleText = '' }: { seoAnalysis?: Seo
                         t.status === 'in'     ? 'hover:bg-green-500/5' :
                         t.status === 'out'    ? 'hover:bg-amber-500/5' :
                         t.status === 'absent' ? 'hover:bg-red-500/5' :
-                        'hover:bg-background/50'
+                        'hover:bg-accent-hover'
                       )}
                     >
                       {/* Term */}
-                      <td className="px-4 py-2 sticky left-0 bg-surface backdrop-blur">
+                      <td className="px-4 py-2 sticky left-0 bg-card backdrop-blur">
                         <div className="flex items-center gap-2">
                           <span className="text-[9px] text-text-muted/40 font-mono w-6 shrink-0">{i + 1}</span>
                           <span className="font-mono text-[11px] text-text font-medium">{t.display || t.term}</span>
@@ -1261,7 +1261,7 @@ function SeoAnalysisPanel({ seoAnalysis, articleText = '' }: { seoAnalysis?: Seo
 
       {/* empty state — neither coverage nor semantic */}
       {!coverage && !semantic && serpResults.length === 0 && (
-        <div className="bg-surface border border-border rounded-2xl p-12 flex flex-col items-center justify-center text-center gap-3">
+        <div className="bg-card border border-border rounded-2xl p-12 flex flex-col items-center justify-center text-center gap-3">
           <Search size={36} className="text-text-muted opacity-20" />
           <p className="text-sm font-bold text-text-muted">Données d&apos;analyse absentes</p>
           <p className="text-xs text-text-muted">Les données SEO seront disponibles pour les prochains articles générés.</p>

@@ -3,6 +3,7 @@
  */
 
 import OpenAI from 'openai';
+import { buildGeoMessage } from '../_shared/geoAnalysisPrompt.js';
 
 function getClient() {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -23,7 +24,7 @@ export async function askChatGpt(prompt) {
     messages: [
       {
         role: 'system',
-        content: 'Tu es un assistant expert. Réponds de façon précise, structurée et détaillée à la question posée. Cite tes sources quand tu les connais.',
+        content: 'Tu es un assistant expert. Réponds de façon précise, structurée et détaillée à la question posée. Cite les URL de tes sources quand tu les connais.',
       },
       { role: 'user', content: prompt },
     ],
@@ -40,6 +41,23 @@ export async function askChatGpt(prompt) {
  * @param {number} runs - number of times to send (default: 3)
  * @returns {Promise<string[]>}
  */
+/**
+ * Send a GEO prompt using the structured analysis system prompt.
+ * Returns raw text (JSON expected).
+ * @param {string} question
+ * @returns {Promise<string>}
+ */
+export async function askChatGptStructured(question) {
+  const client = getClient();
+  const completion = await client.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: buildGeoMessage(question) }],
+    max_tokens: 4000,
+    temperature: 0.7,
+  });
+  return completion.choices[0]?.message?.content?.trim() ?? '';
+}
+
 export async function askChatGptMultiple(prompt, runs = 3) {
   const results = [];
   for (let i = 0; i < runs; i++) {

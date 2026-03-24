@@ -21,7 +21,7 @@ function TaskCard({ task, onClear }: { task: Task; onClear: () => void }) {
   const isLinked = task.status === 'done' && !!task.blogId;
   const Wrapper = isLinked
     ? ({ children }: { children: React.ReactNode }) => (
-        <Link href={`/blogs/${task.blogId}`} className="block px-3 py-2.5 hover:bg-background transition-colors group/card">
+        <Link href={`/blogs/${task.blogId}`} className="block px-3 py-2.5 hover:bg-accent-hover transition-colors group/card">
           {children}
         </Link>
       )
@@ -167,12 +167,12 @@ export default function TaskPanel() {
         ref={btnRef}
         onClick={handleToggle}
         className={cn(
-          'relative flex items-center justify-center w-9 h-9 rounded-md transition-all duration-150',
-          open ? 'bg-accent/10 text-accent' : 'hover:bg-background text-text-muted hover:text-text',
+          'relative flex items-center justify-center p-1.5  rounded-md transition-all duration-150',
+          open ? 'bg-accent/10 text-accent' : 'hover:bg-accent-hover text-text-muted hover:text-text',
         )}
         title="Tâches"
       >
-        <ListTodo size={18} />
+        <ListTodo size={14} />
         {runningCount > 0 && (
           <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-accent text-primary-foreground text-[9px] font-bold flex items-center justify-center animate-pulse">
             {runningCount}

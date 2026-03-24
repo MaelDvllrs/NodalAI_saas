@@ -158,7 +158,7 @@ function ProjectsPage() {
             </div>
             <button
               onClick={() => setShowAddModal(true)}
-            className="btn-accent gap-2"
+            className="btn-primary gap-2"
             >
               <Plus size={20} />
               Nouveau Site
@@ -176,7 +176,7 @@ function ProjectsPage() {
 
           {/* Empty State */}
           {!loading && sites.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 bg-surface/50 border-2 border-dashed border-border rounded-lg animate-slide-up">
+            <div className="flex flex-col items-center justify-center py-20 bg-card/50 border-2 border-dashed border-border rounded-lg animate-slide-up">
               <div className="w-16 h-16 bg-bg border border-border rounded-lg flex items-center justify-center mb-6 shadow-sm">
                 <Globe className="text-text-muted/50" size={32} />
               </div>
@@ -186,7 +186,7 @@ function ProjectsPage() {
               </p>
               <button
                 onClick={() => setShowAddModal(true)}
-                className="btn-accent gap-2"
+                className="btn-primary gap-2"
               >
                 <Plus size={20} />
                 Ajouter mon premier site
@@ -202,7 +202,7 @@ function ProjectsPage() {
                   key={site.id}
                   style={{ animationDelay: `${index * 50}ms` }}
                   onClick={() => { setSelectedSiteId(site.id); router.push('/dashboard'); }}
-                  className="group cursor-pointer bg-surface/50 border border-border rounded-lg p-4 hover:border-accent/40 hover:shadow-lg hover:shadow-accent/5 transition-all duration-200 flex flex-col animate-slide-up backdrop-blur-sm"
+                  className="group cursor-pointer bg-card/50 border border-border rounded-lg p-4 hover:border-accent/40 hover:shadow-lg hover:shadow-accent/5 transition-all duration-200 flex flex-col animate-slide-up backdrop-blur-sm"
                 >
                   <div className="flex items-start justify-between mb-5">
                     <div className="w-10 h-10 bg-bg border border-border rounded-md flex items-center justify-center shadow-sm">
@@ -378,7 +378,7 @@ function AddSiteModal({ onClose, onSuccess, token }: { onClose: () => void; onSu
           <h3 className="text-xl font-bold tracking-tight">Nouveau Projet</h3>
           <p className="text-sm font-medium text-text-muted mt-1 uppercase tracking-wide">Configurez votre nouveau projet.</p>
         </div>
-        <button onClick={onClose} className="p-1.5 hover:bg-surface border border-transparent hover:border-border rounded-md transition-all text-text-muted">
+        <button onClick={onClose} className="p-1.5 hover:bg-card border border-transparent hover:border-border rounded-md transition-all text-text-muted">
           <X size={24} />
         </button>
       </div>
@@ -527,12 +527,12 @@ function MembersModal({ site, onClose, token }: { site: Site; onClose: () => voi
           <h3 className="text-xl font-bold tracking-tight">Membres</h3>
           <p className="text-sm font-medium text-text-muted mt-1 uppercase tracking-wide">{site.name}</p>
         </div>
-        <button onClick={onClose} className="p-1.5 hover:bg-surface border border-transparent hover:border-border rounded-md transition-all text-text-muted">
+        <button onClick={onClose} className="p-1.5 hover:bg-card border border-transparent hover:border-border rounded-md transition-all text-text-muted">
           <X size={24} />
         </button>
       </div>
 
-      <form onSubmit={handleInvite} className="mb-6 bg-surface border border-border rounded-lg p-4 space-y-4">
+      <form onSubmit={handleInvite} className="mb-6 bg-card border border-border rounded-lg p-4 space-y-4">
         <h4 className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted flex items-center gap-2 px-1">
           <UserPlus size={14} className="text-accent" />
           Inviter un collaborateur
@@ -586,7 +586,7 @@ function MembersModal({ site, onClose, token }: { site: Site; onClose: () => voi
         )}
 
         {!loading && members.length === 0 && (
-          <div className="text-center py-8 bg-surface/30 border border-dashed border-border rounded-md">
+          <div className="text-center py-8 bg-card/30 border border-dashed border-border rounded-md">
             <p className="text-xs font-semibold text-text-muted uppercase tracking-widest">Seul pour l'instant</p>
           </div>
         )}
@@ -594,7 +594,7 @@ function MembersModal({ site, onClose, token }: { site: Site; onClose: () => voi
         {!loading && members.map(member => (
           <div
             key={member.id}
-            className="group flex items-center justify-between p-4 bg-surface border border-border rounded-lg hover:border-accent/20 transition-all duration-200"
+            className="group flex items-center justify-between p-4 bg-card border border-border rounded-lg hover:border-accent/20 transition-all duration-200"
           >
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-8 h-8 rounded-md bg-bg border border-border flex items-center justify-center text-sm font-semibold shrink-0 shadow-sm group-hover:bg-accent group-hover:text-white transition-all duration-200">

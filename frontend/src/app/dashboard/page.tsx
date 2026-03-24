@@ -68,7 +68,7 @@ function DashboardPage() {
             {selectedSite && (
               <Link
                 href="/generate"
-                className="btn-accent gap-2"
+                className="btn-primary gap-2"
               >
                 <GitBranch size={18} />
                 Lancer un workflow
@@ -78,7 +78,7 @@ function DashboardPage() {
 
           {/* No project selected */}
           {!projectLoading && !selectedSite && (
-            <div className="flex flex-col items-center justify-center py-20 bg-surface/50 border-2 border-dashed border-border rounded-lg animate-slide-up">
+            <div className="flex flex-col items-center justify-center py-20 bg-card/50 border-2 border-dashed border-border rounded-lg animate-slide-up">
               <div className="w-16 h-16 bg-bg border border-border rounded-lg flex items-center justify-center mb-6 shadow-sm">
                 <Globe className="text-text-muted/50" size={40} />
               </div>
@@ -86,7 +86,7 @@ function DashboardPage() {
               <p className="text-text-muted mb-6 max-w-sm text-center font-medium">
                 Sélectionnez un projet dans le menu de gauche ou créez-en un nouveau.
               </p>
-              <Link href="/projects" className="btn-accent gap-2">
+              <Link href="/projects" className="btn-primary gap-2">
                 Voir mes projets
               </Link>
             </div>
@@ -97,7 +97,7 @@ function DashboardPage() {
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 animate-slide-up">
                 {/* Total blogs */}
-                <div className="bg-surface/50 border border-border rounded-lg p-4 hover:border-accent/30 transition-all duration-200 backdrop-blur-sm">
+                <div className="bg-card/50 border border-border rounded-lg p-4 hover:border-accent/30 transition-all duration-200 backdrop-blur-sm">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted">Articles générés</p>
                     <div className="w-8 h-8 bg-accent/10 rounded-md flex items-center justify-center">
@@ -113,7 +113,7 @@ function DashboardPage() {
                 </div>
 
                 {/* Published blogs */}
-                <div className="bg-surface/50 border border-border rounded-lg p-4 hover:border-accent/30 transition-all duration-200 backdrop-blur-sm">
+                <div className="bg-card/50 border border-border rounded-lg p-4 hover:border-accent/30 transition-all duration-200 backdrop-blur-sm">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted">Publiés</p>
                     <div className="w-8 h-8 bg-green-500/10 rounded-md flex items-center justify-center">
@@ -129,7 +129,7 @@ function DashboardPage() {
                 </div>
 
                 {/* Draft blogs */}
-                <div className="bg-surface/50 border border-border rounded-lg p-4 hover:border-accent/30 transition-all duration-200 backdrop-blur-sm">
+                <div className="bg-card/50 border border-border rounded-lg p-4 hover:border-accent/30 transition-all duration-200 backdrop-blur-sm">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted">Brouillons</p>
                     <div className="w-8 h-8 bg-amber-500/10 rounded-md flex items-center justify-center">
@@ -161,7 +161,7 @@ function DashboardPage() {
                   ].map(({ label, icon: Icon, color, bg }) => (
                     <div
                       key={label}
-                      className="relative bg-surface/30 border border-dashed border-border rounded-lg p-4 overflow-hidden"
+                      className="relative bg-card/30 border border-dashed border-border rounded-lg p-4 overflow-hidden"
                     >
                       <div className="flex items-center justify-between mb-3">
                         <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-text-muted/60">{label}</p>

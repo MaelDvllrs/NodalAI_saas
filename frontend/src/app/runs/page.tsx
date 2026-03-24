@@ -55,11 +55,24 @@ function StatusBadge({ status }: { status: WorkflowRun['status'] }) {
   );
 }
 
+const AVATAR_COLORS = [
+  ['#7c3aed', '#ffffff'],
+  ['#2563eb', '#ffffff'],
+  ['#059669', '#ffffff'],
+  ['#d97706', '#ffffff'],
+  ['#dc2626', '#ffffff'],
+  ['#0891b2', '#ffffff'],
+  ['#db2777', '#ffffff'],
+];
+
 function UserAvatar({ name, email }: { name?: string; email: string }) {
-  const initials = (name?.trim() || email).slice(0, 2).toUpperCase();
+  const label = name?.trim() || email;
+  const initials = label.slice(0, 2).toUpperCase();
+  const seed = label.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  const [bg, fg] = AVATAR_COLORS[seed % AVATAR_COLORS.length];
   return (
-    <div className="w-7 h-7 rounded-full bg-accent/15 flex items-center justify-center shrink-0" title={name || email}>
-      <span className="text-[10px] font-bold text-accent leading-none">{initials}</span>
+    <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold" style={{ backgroundColor: bg, color: fg }} title={label}>
+      {initials}
     </div>
   );
 }
@@ -156,36 +169,16 @@ function RunsListContent() {
 
   return (
     <AppLayout>
-      <div className="max-w-7xl mx-auto py-4 px-4">
-
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 animate-slide-up">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-text-muted mb-1">Exécutions</p>
-          </div>
-        </div>
+      <div className="h-full flex flex-col">
 
         {/* Filter bar */}
         {!loading && runs.length > 0 && (
-          <div className="flex items-center gap-3 mb-4 animate-slide-up">
+          <div className="shrink-0 flex items-center gap-3 animate-slide-up p-4">
 
             {/* Left: count */}
-            <span className="text-xs text-text-muted shrink-0">{filtered.length} résultat{filtered.length !== 1 ? 's' : ''}</span>
+            <div className="flex items-center gap-2">
 
-            {/* Right: reset + sort + filters */}
-            <div className="ml-auto flex items-center gap-2">
-
-              {/* Reset */}
-              <button
-                onClick={() => { setFilters(DEFAULT_FILTERS); saveFilters(DEFAULT_FILTERS); }}
-                disabled={!hasFilters}
-                className={cn(
-                  'text-xs underline underline-offset-2 shrink-0 transition-colors px-1',
-                  hasFilters ? 'text-text hover:text-text/70' : 'text-text-muted/30 cursor-default no-underline',
-                )}
-              >
-                Réinitialiser
-              </button>
+              
 
               {/* Search */}
               <div className="relative">
@@ -212,7 +205,7 @@ function RunsListContent() {
                   'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors shrink-0',
                   sortDir !== 'desc'
                     ? 'border-accent/50 text-accent bg-accent/5'
-                    : 'border-border text-text-muted hover:border-border hover:text-text bg-surface',
+                    : 'border-border text-text-muted hover:border-border hover:text-text bg-card',
                 )}
               >
                 {sortDir === 'desc' ? <ArrowDown size={12} /> : <ArrowUp size={12} />}
@@ -256,13 +249,31 @@ function RunsListContent() {
                   { value: 'running', label: 'En cours' },
                 ]}
               />
+
+              {/* Reset */}
+              <button
+                onClick={() => { setFilters(DEFAULT_FILTERS); saveFilters(DEFAULT_FILTERS); }}
+                disabled={!hasFilters}
+                className={cn(
+                  'text-xs  underline-offset-2 shrink-0 transition-colors px-1',
+                  hasFilters ? 'text-text hover:text-text/70' : 'text-text-muted cursor-default no-underline',
+                )}
+              >
+                Réinitialiser
+              </button>
             </div>
+            
+
+            {/* Right: reset + sort + filters */}
+            <span className="ml-auto text-xs text-text-muted shrink-0">{filtered.length} résultat{filtered.length !== 1 ? 's' : ''}</span>
+            
           </div>
         )}
 
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
         {loading ? (
-          <div className="bg-surface border border-border rounded-lg overflow-hidden">
-            <div className="p-4 space-y-3">
+          <div>
+            <div className="px-4 space-y-3">
               {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="flex items-center justify-between py-2">
                   <div className="flex items-center gap-4">
@@ -280,29 +291,27 @@ function RunsListContent() {
             </div>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 bg-surface border border-dashed border-border rounded-lg">
+          <div className="flex flex-col items-center justify-center py-20">
             <History className="text-text-muted mb-4 opacity-20" size={48} />
             <h3 className="text-lg font-bold mb-1">{runs.length === 0 ? 'Aucune exécution' : 'Aucun résultat'}</h3>
             <p className="text-text-muted text-sm mb-6">
               {runs.length === 0 ? "Lancez un workflow pour voir l'historique ici." : 'Essayez de modifier les filtres.'}
             </p>
             {runs.length === 0 && (
-              <Link href="/generate" className="btn-accent uppercase tracking-widest text-sm">Lancer un workflow</Link>
+              <Link href="/generate" className="btn-primary uppercase tracking-widest text-sm">Lancer un workflow</Link>
             )}
           </div>
         ) : (
-          <div className="bg-surface border border-border rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-background/50 border-b border-border">
+          <table className="w-full text-left border-separate border-spacing-0 ">
+                <thead className="sticky bg-surface top-0 z-10 [box-shadow:0_1px_0_var(--border),inset_1px_1px_0_var(--border)]">
+                  <tr className="">
                     <th className="px-4 py-3 text-[10px] font-bold text-text-muted uppercase tracking-widest">Workflow</th>
                     <th className="px-4 py-3 text-[10px] font-bold text-text-muted uppercase tracking-widest">Exécuté par</th>
                     <th className="px-4 py-3 text-[10px] font-bold text-text-muted uppercase tracking-widest">Statut</th>
                     <th className="px-4 py-3 text-[10px] font-bold text-text-muted uppercase tracking-widest">
                       <button
                         onClick={() => setFilter('sort', sortDir === 'desc' ? 'asc' : 'desc')}
-                        className="inline-flex items-center gap-1 hover:text-text transition-colors"
+                        className="inline-flex items-center gap-1 hover:text-text transition-colors uppercase"
                       >
                         Date
                         {sortDir === 'desc' ? <ArrowDown size={10} /> : <ArrowUp size={10} />}
@@ -311,9 +320,9 @@ function RunsListContent() {
                     <th className="px-4 py-3 text-[10px] font-bold text-text-muted uppercase tracking-widest text-right">Détail</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody className="divide-y divide-border overflow-auto flex-1">
                   {filtered.map((run) => (
-                    <tr key={run.id} className="group hover:bg-background/50 transition-colors">
+                    <tr key={run.id} className="group hover:bg-accent-hover transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="p-2 bg-accent/10 rounded-lg shrink-0">
@@ -328,10 +337,7 @@ function RunsListContent() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <UserAvatar name={user?.name} email={user?.email ?? ''} />
-                          <span className="text-xs text-text-muted truncate max-w-[140px]">{user?.name || user?.email}</span>
-                        </div>
+                        <UserAvatar name={user?.name} email={user?.email ?? ''} />
                       </td>
                       <td className="px-4 py-3">
                         <StatusBadge status={run.status} />
@@ -356,10 +362,9 @@ function RunsListContent() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
-          </div>
+          </table>
         )}
+        </div>
       </div>
     </AppLayout>
   );

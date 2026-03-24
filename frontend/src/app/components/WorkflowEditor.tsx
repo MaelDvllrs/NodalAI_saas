@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 import type { LogEvent } from './ProgressLog';
-import { WebflowIcon, GoogleIcon, ChatGptIcon, GeminiIcon, PerplexityIcon } from './WorkflowBlocks';
+import { WebflowIcon, GoogleIcon, ChatGptIcon, GeminiIcon, PerplexityIcon, RedditIcon } from './WorkflowBlocks';
 
 // Dot background that pans with the canvas but keeps dot size fixed on zoom
 function FixedDotBackground({ gap = 100, dotSize = 0.5, color = 'var(--border)' }: { gap?: number; dotSize?: number; color?: string }) {
@@ -236,12 +236,12 @@ export const MODULE_CATALOG: ModuleDef[] = [
   {
     type: 'gemini-analysis',
     label: 'Analyse Gemini',
-    description: 'Prompt × 3 · Questions · Sources · Résumé GEO',
+    description: '6 variantes · Sources citées · Résumé GEO',
     details: 'Envoie le prompt GEO 3 fois à Google Gemini (gemini-1.5-flash), collecte les réponses, puis utilise Claude Haiku pour en extraire les questions pertinentes, les sources citées, les points communs et les opportunités de contenu GEO.',
     icon: GeminiIcon,
     category: 'analysis',
     accent: { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20' },
-    defaultConfig: { runs: 3 },
+    defaultConfig: {},
     ports: {
       in:  [{ key: 'geoPrompt', label: 'Prompt GEO', required: true }],
       out: [
@@ -258,12 +258,12 @@ export const MODULE_CATALOG: ModuleDef[] = [
   {
     type: 'perplexity-analysis',
     label: 'Analyse Perplexity',
-    description: 'Prompt × 3 · Questions · Sources · Résumé GEO',
+    description: '6 variantes · Sources citées · Résumé GEO',
     details: 'Envoie le prompt GEO 3 fois à Perplexity (sonar), collecte les réponses avec leurs sources web, puis utilise Claude Haiku pour en extraire les questions pertinentes, les sources citées, les points communs et les opportunités de contenu GEO.',
     icon: PerplexityIcon,
     category: 'analysis',
     accent: { bg: 'bg-teal-500/10', text: 'text-teal-400', border: 'border-teal-500/20' },
-    defaultConfig: { runs: 3 },
+    defaultConfig: {},
     ports: {
       in:  [{ key: 'geoPrompt', label: 'Prompt GEO', required: true }],
       out: [
@@ -278,14 +278,36 @@ export const MODULE_CATALOG: ModuleDef[] = [
     },
   },
   {
+    type: 'reddit-analyzer',
+    label: 'Analyseur Reddit',
+    description: 'Scrape les posts Reddit cités · Patterns · Plan d\'action GEO',
+    details: 'Récupère les posts Reddit cités par les IA lors des analyses LLM, scrape leur contenu et top 20 commentaires, puis utilise Claude pour identifier les patterns de contenu valorisés et générer un plan d\'action (posts, commentaires, AMA) pour gagner en autorité GEO.',
+    icon: RedditIcon,
+    category: 'analysis',
+    accent: { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20' },
+    defaultConfig: {},
+    ports: {
+      in: [
+        { key: 'geoSources',  label: 'Sources LLM', required: true },
+        { key: 'geoPrompt',   label: 'Prompt GEO',  required: false },
+        { key: 'siteProfile', label: 'Profil site',  required: false },
+      ],
+      out: [
+        { key: 'redditPosts',    label: 'Posts Reddit scrapés' },
+        { key: 'redditPatterns', label: 'Patterns de contenu' },
+        { key: 'redditStrategy', label: 'Plan d\'action Reddit' },
+      ],
+    },
+  },
+  {
     type: 'chatgpt-analysis',
     label: 'Analyse ChatGPT',
-    description: 'Prompt × 3 · Questions · Sources · Résumé GEO',
+    description: '6 variantes · Sources citées · Résumé GEO',
     details: 'Envoie le prompt GEO 3 fois à ChatGPT (gpt-4o-mini), collecte les réponses, puis utilise Claude Haiku pour en extraire les questions pertinentes, les sources citées, les points communs et les opportunités de contenu GEO.',
     icon: ChatGptIcon,
     category: 'analysis',
     accent: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' },
-    defaultConfig: { runs: 3 },
+    defaultConfig: {},
     ports: {
       in:  [{ key: 'geoPrompt', label: 'Prompt GEO', required: true }],
       out: [
@@ -314,9 +336,10 @@ export const MODULE_CATALOG: ModuleDef[] = [
         { key: 'sitemapUrls',  label: 'URLs sitemap',     required: false },
       ],
       out: [
-        { key: 'geoPrompt',    label: 'Prompt GEO' },
-        { key: 'geoTopic',     label: 'Sujet GEO' },
-        { key: 'geoRationale', label: 'Justification' },
+        { key: 'geoPrompt',         label: 'Prompt GEO' },
+        { key: 'geoTopic',          label: 'Sujet GEO' },
+        { key: 'geoRationale',      label: 'Justification' },
+        { key: 'geoPromptVariants', label: '5 variantes du prompt' },
       ],
     },
   },
@@ -547,42 +570,10 @@ function PromptInputConfig({ config, onChange, readOnly }: { config: BlockConfig
   );
 }
 
-function LlmAnalysisConfig({ config, onChange, readOnly, accentClass }: { config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean; accentClass: string }) {
-  const runs = (config.runs as number) ?? 3;
-  return (
-    <div className="flex items-center gap-2">
-      <label className="text-[10px] text-text-muted/60 shrink-0">Passages</label>
-      <div className="flex gap-1">
-        {[1, 2, 3, 5].map(n => (
-          <button key={n} type="button" disabled={readOnly}
-            onClick={() => onChange({ ...config, runs: n })}
-            className={cn(
-              'w-7 h-7 rounded-md text-[11px] font-semibold border transition-all nodrag',
-              runs === n ? accentClass : 'bg-background border-border text-text-muted hover:border-text/20',
-              readOnly && 'cursor-default',
-            )}>
-            {n}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-const ChatGptAnalysisConfig    = (p: { config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean }) =>
-  <LlmAnalysisConfig {...p} accentClass="bg-emerald-500/15 text-emerald-400 border-emerald-500/30" />;
-const GeminiAnalysisConfig     = (p: { config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean }) =>
-  <LlmAnalysisConfig {...p} accentClass="bg-blue-500/15 text-blue-400 border-blue-500/30" />;
-const PerplexityAnalysisConfig = (p: { config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean }) =>
-  <LlmAnalysisConfig {...p} accentClass="bg-teal-500/15 text-teal-400 border-teal-500/30" />;
-
 type ConfigComponent = React.ComponentType<{ config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean }>;
 const CONFIG_RENDERERS: Record<string, ConfigComponent> = {
   'text-input':          TextInputConfig,
   'prompt-input':        PromptInputConfig,
-  'chatgpt-analysis':    ChatGptAnalysisConfig,
-  'gemini-analysis':     GeminiAnalysisConfig,
-  'perplexity-analysis': PerplexityAnalysisConfig,
   'website-scraper':     ScraperConfig,
   'webflow-structure':   WebflowStructureConfig,
   'webflow-publish':     PublishConfig,
@@ -614,7 +605,7 @@ function WorkflowNode({ data }: NodeProps) {
 
       {/* ── External status indicator — top-right, outside the card ── */}
       {status === 'active' && (
-        <div className="absolute -top-8 right-0 z-10 pointer-events-none flex items-center gap-1.5 bg-surface border border-accent/40 rounded-full px-2.5 py-1 shadow-lg shadow-accent/10">
+        <div className="absolute -top-8 right-0 z-10 pointer-events-none flex items-center gap-1.5 bg-card border border-accent/40 rounded-full px-2.5 py-1 shadow-lg shadow-accent/10">
           <svg className="w-3 h-3 animate-spin shrink-0" viewBox="0 0 12 12" style={{ animationDuration: '0.8s' }}>
             <circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent/20" />
             <circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" strokeWidth="2"
@@ -639,10 +630,10 @@ function WorkflowNode({ data }: NodeProps) {
       {/* ── Card ── */}
       <div className={cn(
         'w-64 rounded-xl border shadow-md transition-all duration-300 group',
-        status === 'idle'   && 'border-border bg-surface',
-        status === 'active' && cn(def.accent.border, 'bg-surface'),
-        status === 'done'   && 'border-green-500 bg-surface',
-        status === 'error'  && 'border-red-500 bg-surface',
+        status === 'idle'   && 'border-border bg-card',
+        status === 'active' && cn(def.accent.border, 'bg-card'),
+        status === 'done'   && 'border-green-500 bg-card',
+        status === 'error'  && 'border-red-500 bg-card',
       )}>
         {/* Target handle — only when the module accepts inputs */}
         {def.ports.in.length > 0 && (
@@ -734,7 +725,7 @@ function WorkflowNode({ data }: NodeProps) {
       {/* ── IO Details Popup ── */}
       {ioOpen && (
         <div
-          className="absolute left-[calc(100%+12px)] top-0 z-[200] w-56 bg-background border border-border rounded-xl shadow-2xl p-3.5 nodrag nopan"
+          className="absolute left-[calc(100%+12px)] top-0 z-[200] w-56 bg-surface border border-border rounded-xl shadow-2xl p-3.5 nodrag nopan"
           onClick={e => e.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-2.5">
@@ -912,8 +903,8 @@ function PaletteCard({ def, disabled, onAdd }: { def: ModuleDef; disabled: boole
   return (
     <div className={cn('relative flex items-center gap-2.5 px-2  rounded-lg  transition-all duration-150 group/card',
       disabled
-        ? ' bg-neutral-800/60 opacity-40 cursor-not-allowed shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
-        : ' bg-neutral-800 hover:border-border hover:bg-neutral-700 cursor-grab active:cursor-grabbing shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]')}
+        ? ' bg-accent-hover/60 opacity-40 cursor-not-allowed shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+        : ' bg-primary hover:border-border hover:bg-accent-hover cursor-grab active:cursor-grabbing shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]')}
       draggable={!disabled}
       onDragStart={!disabled ? e => {
         e.dataTransfer.setData('module-type', def.type);
@@ -1111,9 +1102,9 @@ function DroppableCanvas({
       >
         <FixedDotBackground gap={20} dotSize={0.7} color="var(--border)" />
         <Controls showInteractive={false}
-          className="!border-border !bg-surface !shadow-none [&>button]:!bg-surface [&>button]:!border-border [&>button]:!text-text-muted rounded-md overflow-hidden" />
-        <MiniMap nodeStrokeWidth={0} nodeColor={() => 'var(--surface)'}
-          maskColor="var(--surface)" className="!bg-background !border-border rounded-md overflow-hidden" />
+          className="border-border !shadow-none [&>button]:border-border [&>button]:!text-text-muted rounded-md overflow-hidden !bg-[var(--primary)] [&>button]:!bg-[var(--primary)]" />
+        <MiniMap nodeStrokeWidth={0} nodeColor={() => 'var(--primary)'}
+          maskColor="var(--primary)" className="!bg-surface !border-border rounded-md overflow-hidden" />
       </ReactFlow>
       {visibleCount === 0 && (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
@@ -1309,7 +1300,7 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
     },
     {
       id: 'geo', label: 'GEO', color: '#a78bfa99',
-      types: ['geo-prompt-generator', 'chatgpt-analysis', 'gemini-analysis', 'perplexity-analysis', 'blog-generation-geo'],
+      types: ['geo-prompt-generator', 'chatgpt-analysis', 'gemini-analysis', 'perplexity-analysis', 'reddit-analyzer', 'blog-generation-geo'],
     },
     {
       id: 'webflow', label: 'Webflow', color: '#146EF599',
@@ -1351,14 +1342,16 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
               <Type size={9} />
               <p className="text-[9px] font-bold uppercase tracking-[0.18em]">Entrées</p>
             </div>
-            {paletteInputs.map(def => (
-              <PaletteCard
-                key={def.type}
-                def={def}
-                disabled={isRunning || (!!def.unique && usedTypes.has(def.type))}
-                onAdd={() => addBlock(def.type)}
-              />
-            ))}
+            <div className="space-y-1">
+              {paletteInputs.map(def => (
+                <PaletteCard
+                  key={def.type}
+                  def={def}
+                  disabled={isRunning || (!!def.unique && usedTypes.has(def.type))}
+                  onAdd={() => addBlock(def.type)}
+                />
+              ))}
+            </div>
           </div>
         )}
 
@@ -1409,7 +1402,7 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
             {!isRunning ? (
               <button type="button" disabled={visibleCount === 0}
                 onClick={() => onRun(blocks, rfEdges.map(e => ({ source: e.source, target: e.target })))}
-                className="btn-accent gap-2 disabled:opacity-40">
+                className="btn-primary gap-2 disabled:opacity-40">
                 <Play size={14} />
                 Lancer
               </button>
@@ -1446,7 +1439,7 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
             <div className="absolute bottom-4 left-4 z-10">
               <label className={cn(
                 "flex items-center gap-2.5 px-4 py-2.5 rounded-lg cursor-pointer select-none transition-all duration-200",
-                "bg-surface/95 backdrop-blur-sm border shadow-lg",
+                "bg-card/95 backdrop-blur-sm border shadow-lg",
                 showLogs
                   ? "border-accent/30 shadow-accent/10 hover:border-accent/40"
                   : "border-border/50 hover:border-border"

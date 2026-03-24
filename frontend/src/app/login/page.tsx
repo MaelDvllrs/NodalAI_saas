@@ -45,7 +45,7 @@ function LoginPageContent() {
           </p>
         </div>
         
-        <div className="bg-surface border border-border p-8 rounded-2xl shadow-sm">
+        <div className="bg-card border border-border p-8 rounded-2xl shadow-sm">
           <form className="space-y-6" onSubmit={handleSubmit}>
             {error && (
               <div className="bg-error/10 border border-error/20 text-error px-4 py-3 rounded-xl text-sm font-medium animate-in fade-in zoom-in-95">

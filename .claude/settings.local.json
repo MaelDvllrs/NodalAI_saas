@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(xargs grep:*)",
+      "Bash(while read:*)",
+      "Bash(do sed:*)",
+      "Bash(done)",
+      "Bash(grep -n \"hover:bg-background\\\\|hover:bg-white/5\\\\|hover:bg-white/10\" runs/[id]/page.tsx)"
     ]
   }
 }

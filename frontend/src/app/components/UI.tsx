@@ -87,7 +87,7 @@ export function SelectMenu<T extends string = string>({
           'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors whitespace-nowrap',
           active || value
             ? 'border-accent/50 text-accent bg-accent/5'
-            : 'border-border text-text-muted hover:border-border hover:text-text bg-surface',
+            : 'border-border text-text-muted hover:border-border hover:text-text bg-card',
         )}
       >
         <span>{selected?.label ?? placeholder}</span>
