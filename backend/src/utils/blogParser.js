@@ -54,6 +54,14 @@ export function parseBlogContent(raw) {
   if (!result.h1 && result.titleTag) result.h1 = result.titleTag;
   if (!result.titleTag && result.h1) result.titleTag = result.h1;
 
+  // ── 4. No-section fallback ──────────────────────────────────────────────────
+  // If section 5 was not detected (e.g. content returned by trimContentToWordCount
+  // without numbered section markers) but the text has H2 headings, treat the
+  // entire text as planMece so the HTML body is never empty.
+  if (!result.planMece && /^## /m.test(text)) {
+    result.planMece = text.trim();
+  }
+
   return result;
 }
 

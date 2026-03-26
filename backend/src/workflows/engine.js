@@ -270,6 +270,9 @@ export class WorkflowEngine {
       faqQuestions:      [],
       internalLinks:     [],
 
+      // Accumulated translations (one entry per blog-translation step)
+      translations: [],
+
       // Internal audit trail
       _steps: [],
     };

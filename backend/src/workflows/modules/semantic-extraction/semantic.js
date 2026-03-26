@@ -1477,14 +1477,19 @@ function computeBm25Score(articleTokens, pageTokensArray) {
 const EMBED_MODEL    = 'Xenova/multilingual-e5-small';
 const EMBED_TRUNCATE = 2000; // chars max par texte
 
-// Singleton : le pipeline est initialisé une seule fois au premier appel
+// Singleton : le pipeline est initialisé une seule fois au premier appel.
+// _pipelinePromise est assigné AVANT le premier await pour éviter la race condition
+// entre deux jobs concurrents (sinon le modèle serait chargé 2× → OOM + crash).
 let _pipelinePromise = null;
 async function getEmbeddingPipeline() {
   if (!_pipelinePromise) {
-    // Import dynamique pour ne pas bloquer le démarrage du serveur
-    const { pipeline } = await import('@huggingface/transformers');
-    _pipelinePromise = pipeline('feature-extraction', EMBED_MODEL, { progress_callback: null });
-    console.log(`[Semantic] Pipeline Transformers.js «${EMBED_MODEL}» initialisé`);
+    _pipelinePromise = (async () => {
+      // Import dynamique pour ne pas bloquer le démarrage du serveur
+      const { pipeline } = await import('@huggingface/transformers');
+      const pipe = await pipeline('feature-extraction', EMBED_MODEL, { progress_callback: null });
+      console.log(`[Semantic] Pipeline Transformers.js «${EMBED_MODEL}» initialisé`);
+      return pipe;
+    })();
   }
   return _pipelinePromise;
 }

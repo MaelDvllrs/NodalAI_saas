@@ -35,6 +35,7 @@ import { ChatGptAnalysisModule }      from './modules/chatgpt-analysis/index.js'
 import { GeminiAnalysisModule }      from './modules/gemini-analysis/index.js';
 import { PerplexityAnalysisModule }  from './modules/perplexity-analysis/index.js';
 import { RedditAnalyzerModule }      from './modules/reddit-analyzer/index.js';
+import { BlogTranslationModule }     from './modules/blog-translation/index.js';
 
 const MODULES = [
   // ── Prompt Input ───────────────────────────────────────────────────────────
@@ -389,6 +390,33 @@ const MODULES = [
     module:      GeoPromptGeneratorModule,
   },
 
+  // ── Blog Translation ───────────────────────────────────────────────────────
+  {
+    id:          'blog-translation',
+    label:       'Traduction article',
+    description: 'Traduit le contenu HTML, adapte les liens internes et externes dans la langue cible.',
+    ports: {
+      in: [
+        { key: 'htmlBody',     label: 'HTML article',       required: false },
+        { key: 'htmlBodyFull', label: 'HTML complet',        required: false },
+        { key: 'fieldData',    label: 'Champs Webflow',      required: false },
+      ],
+      out: [
+        { key: 'htmlBody',      label: 'HTML traduit' },
+        { key: 'htmlBodyFull',  label: 'HTML complet traduit' },
+        { key: 'fieldData',     label: 'Champs Webflow traduits' },
+        { key: 'translations',  label: 'Traductions accumulées' },
+      ],
+    },
+    defaultConfig: {
+      targetLanguage:         'Anglais',
+      targetCountry:          'US',
+      targetSiteUrl:          '',
+      translateExternalLinks: true,
+    },
+    module: BlogTranslationModule,
+  },
+
   // ── Webflow Publish ────────────────────────────────────────────────────────
   {
     id:          'webflow-publish',
@@ -402,10 +430,12 @@ const MODULES = [
         { key: 'webflowFields',  label: 'Champs bruts',       required: false },
         { key: 'detectedFields', label: 'Champs détectés',    required: false },
         { key: 'publishStatus',  label: 'Statut publication', required: false },
+        { key: 'translations',   label: 'Traductions multi-locales', required: false },
       ],
       out: [
-        { key: 'webflowItemId',  label: 'ID article Webflow' },
-        { key: 'webflowItemUrl', label: 'URL article' },
+        { key: 'webflowItemId',          label: 'ID article Webflow' },
+        { key: 'webflowItemUrl',         label: 'URL article' },
+        { key: 'webflowLocalizedItems',  label: 'Locales publiées' },
       ],
     },
     defaultConfig: { apiKey: '', siteId: '', collectionName: '', status: 'draft' },

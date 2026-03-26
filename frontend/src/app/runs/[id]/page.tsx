@@ -10,7 +10,7 @@ import {
   Search, TrendingUp, Layers, Sparkles, Rocket, Globe,
   MousePointerClick, Zap, ExternalLink, BarChart2, Link as LinkIcon, Type,
   Copy, Check, ChevronDown, ThumbsUp, ThumbsDown,
-  Lightbulb, MessageSquare, Database,
+  Lightbulb, MessageSquare, Database, Languages,
   ChevronLeft,
 } from 'lucide-react';
 import { WebflowIcon, GoogleIcon, CountryFlag, ChatGptIcon, GeminiIcon, PerplexityIcon, RedditIcon } from '../../components/WorkflowBlocks';
@@ -58,6 +58,7 @@ const MODULE_META: Record<string, { label: string; icon?: React.ElementType; acc
   'webflow-structure':     { label: 'Structure Webflow',         brandIcon: WebflowIcon },
   'geo-prompt-generator':   { label: 'Générateur de prompt GEO',  icon: Lightbulb,  accent: 'text-yellow-400' },
   'blog-generation-geo':   { label: 'Blog GEO',                  icon: Sparkles,   accent: 'text-violet-400' },
+  'blog-translation':      { label: 'Traduction article',         icon: Languages,  accent: 'text-rose-400' },
   'chatgpt-analysis':      { label: 'Analyse ChatGPT',            brandIcon: ChatGptIcon },
   'gemini-analysis':       { label: 'Analyse Gemini',            brandIcon: GeminiIcon },
   'perplexity-analysis':   { label: 'Analyse Perplexity',        brandIcon: PerplexityIcon },
@@ -418,6 +419,257 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+
+// ── Pattern-based fieldData key finder (mirrors detectFields slug patterns) ────
+const META_TITLE_PATTERNS = ['meta-title', 'seo-title', 'title-tag', 'titre-seo', 'meta-titre', 'og-title', 'seo-tag'];
+const META_DESC_PATTERNS  = ['meta-desc', 'seo-desc', 'meta-description', 'description-seo', 'og-desc', 'description-meta'];
+
+function findField(fd: Record<string, unknown>, patterns: string[]): string {
+  const key = Object.keys(fd).find(k => patterns.some(p => k.toLowerCase().includes(p)));
+  return (key ? fd[key] as string : null) ?? '—';
+}
+
+// ── Parse htmlBodyFull into named sections using buildFullHtml comment markers ─
+// Markers written by buildFullHtml: <!-- === FAQ === --> and <!-- === SCHÉMA N === -->
+interface TranslatedSection {
+  label: string;
+  tag?: string;   // e.g. "FAQ", "SCHÉMA 1"
+  code: string;
+  isJsonLd?: boolean;
+  isHtml?: boolean;
+}
+
+function parseTranslatedSections(htmlBodyFull: string): TranslatedSection[] {
+  const sections: TranslatedSection[] = [];
+  if (!htmlBodyFull) return sections;
+
+  // Split on buildFullHtml comment markers: <!-- === LABEL === -->
+  const rawParts = htmlBodyFull.split(/<!-- === .+? === -->/);
+  const markerLabels: string[] = [];
+  let mLabel: RegExpExecArray | null;
+  const labelRe = /<!-- === (.+?) === -->/g;
+  while ((mLabel = labelRe.exec(htmlBodyFull)) !== null) markerLabels.push(mLabel[1].trim());
+
+  // rawParts[0] = body (before first marker), rawParts[1..] = section contents
+  markerLabels.forEach((label, i) => {
+    const raw = (rawParts[i + 1] ?? '').trim();
+    if (!raw) return;
+
+    if (label.toUpperCase().startsWith('FAQ')) {
+      // FAQ: may contain HTML + a <script type="application/ld+json">
+      const scriptIdx = raw.indexOf('<script');
+      const faqHtml   = scriptIdx !== -1 ? raw.slice(0, scriptIdx).trim() : raw;
+      const faqScript = scriptIdx !== -1 ? raw.slice(scriptIdx).trim()    : '';
+
+      if (faqHtml) sections.push({ label: 'FAQ', tag: 'FAQ', code: faqHtml, isHtml: true });
+      if (faqScript) {
+        const jsonMatch = faqScript.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+        const jsonCode = jsonMatch ? jsonMatch[1].trim() : faqScript;
+        let type = 'FAQPage';
+        try { type = (JSON.parse(jsonCode)['@type'] as string) ?? 'FAQPage'; } catch { /* ignore */ }
+        sections.push({ label: 'FAQ JSON-LD', tag: type, code: jsonCode, isJsonLd: true });
+      }
+    } else {
+      // Visual schema (table / comparison HTML) or JSON-LD schema
+      const scriptRe = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+      let remaining = raw;
+      let sm: RegExpExecArray | null;
+      const jsonBlocks: string[] = [];
+
+      while ((sm = scriptRe.exec(raw)) !== null) {
+        jsonBlocks.push(sm[1].trim());
+        remaining = remaining.replace(sm[0], '').trim();
+      }
+
+      // Remaining after removing JSON-LD scripts = visual HTML (table/comparison)
+      if (remaining) {
+        const schemaNum = label.match(/\d+/)?.[0] ?? String(i + 1);
+        sections.push({ label: `Schéma ${schemaNum}`, tag: 'HTML', code: remaining, isHtml: true });
+      }
+
+      jsonBlocks.forEach(jCode => {
+        let type: string | null = null;
+        try { type = (JSON.parse(jCode)['@type'] as string) ?? null; } catch { /* ignore */ }
+        sections.push({ label: `Schéma ${label.match(/\d+/)?.[0] ?? ''} JSON-LD`, tag: type ?? 'JSON-LD', code: jCode, isJsonLd: true });
+      });
+    }
+  });
+
+  return sections;
+}
+
+function TranslationResult({ data }: { data: Record<string, unknown> }) {
+  const [tab, setTab] = useState<'meta' | 'rendu' | 'html' | 'schema'>('meta');
+
+  const fieldData    = (data.fieldData as Record<string, unknown>) ?? {};
+  const htmlBody     = (data.htmlBody as string) ?? '';
+  const htmlBodyFull = (data.htmlBodyFull as string) ?? htmlBody;
+
+  // Metadata — use Webflow `name` for H1, pattern-scan other keys
+  const h1        = (fieldData['name'] as string) ?? '—';
+  const metaTitle = findField(fieldData, META_TITLE_PATTERNS);
+  const metaDesc  = findField(fieldData, META_DESC_PATTERNS);
+
+  // Section-aware schema parsing
+  const sections  = parseTranslatedSections(htmlBodyFull);
+  const hasSchema = sections.length > 0;
+
+  // Extra fieldData rows (skip structural/HTML fields)
+  const SKIP_DISPLAY_KEYS = new Set(['name', 'slug', '_archived', '_draft']);
+  const extraFields = Object.entries(fieldData).filter(([k, v]) =>
+    !SKIP_DISPLAY_KEYS.has(k) &&
+    !META_TITLE_PATTERNS.some(p => k.toLowerCase().includes(p)) &&
+    !META_DESC_PATTERNS.some(p => k.toLowerCase().includes(p)) &&
+    typeof v === 'string' && v.length > 0 && !(v as string).includes('<')
+  );
+
+  const tabs = [
+    { id: 'meta'   as const, label: 'Métadonnées' },
+    { id: 'rendu'  as const, label: 'Rendu' },
+    { id: 'html'   as const, label: 'HTML' },
+    ...(hasSchema ? [{ id: 'schema' as const, label: 'Schéma' }] : []),
+  ];
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0 gap-4">
+      <div className="flex items-center gap-2 text-xs text-text-muted bg-card border border-border rounded-lg px-3 py-2 w-fit shrink-0">
+        <Languages size={12} className="text-rose-400" />
+        <span>Article traduit</span>
+      </div>
+      <div className="p-0.5 bg-background rounded-lg flex w-fit shrink-0">
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={cn('px-4 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-all',
+              tab === t.id ? 'bg-surface text-text shadow-sm' : 'text-text-muted hover:text-text')}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'meta' && (
+        <div className="space-y-3 overflow-auto flex-1">
+          <div className="bg-card border border-border rounded-lg p-3">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">H1</p>
+              <CopyButton text={h1} />
+            </div>
+            <p className="text-sm font-semibold text-text">{h1}</p>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-3">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Title Tag</p>
+              <CopyButton text={metaTitle} />
+            </div>
+            <p className="text-sm text-text">{metaTitle}</p>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-3">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Meta Description</p>
+              <CopyButton text={metaDesc} />
+            </div>
+            <p className="text-sm text-text">{metaDesc}</p>
+          </div>
+          {extraFields.map(([key, value]) => (
+            <div key={key} className="bg-card border border-border rounded-lg p-3">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">{key}</p>
+                <CopyButton text={value as string} />
+              </div>
+              <p className="text-sm text-text">{value as string}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === 'rendu' && (
+        <div className="flex flex-col flex-1 min-h-0 gap-3">
+          <div className="flex items-center justify-between shrink-0">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">
+              Aperçu rendu <span className="normal-case font-normal tracking-normal text-text-muted/60">(copiez le HTML ci-dessous)</span>
+            </p>
+            <CopyButton text={htmlBody} />
+          </div>
+          <style>{`
+            .blog-render h2 { font-size: 1.3rem; font-weight: 700; margin: 1.5em 0 0.5em; }
+            .blog-render h3 { font-size: 1.1rem; font-weight: 600; margin: 1.2em 0 0.4em; }
+            .blog-render p  { margin: 0.6em 0; }
+            .blog-render a  { color: #2563eb; text-decoration: underline; }
+            .blog-render ul, .blog-render ol { padding-left: 1.5em; margin: 0.6em 0; }
+            .blog-render li { margin: 0.3em 0; }
+            .blog-render strong { font-weight: 700; }
+          `}</style>
+          <div
+            className="blog-render bg-white rounded-lg p-6 overflow-auto flex-1 min-h-0 text-sm leading-relaxed"
+            style={{ fontFamily: 'Georgia, serif', color: '#1a1a1a' }}
+            dangerouslySetInnerHTML={{ __html: htmlBody }}
+          />
+        </div>
+      )}
+
+      {tab === 'html' && (
+        <div className="space-y-4 overflow-auto flex-1">
+          <div className="border border-border rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-background">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Corps traduit <span className="text-accent/60 normal-case font-normal tracking-normal">(sans FAQ ni schémas — compatible API Webflow)</span></p>
+              <CopyButton text={htmlBody} />
+            </div>
+            <pre className="text-[11px] font-mono text-text-muted/70 bg-background p-4 overflow-auto max-h-[400px] leading-relaxed whitespace-pre-wrap break-words">
+              {htmlBody || '(aucun contenu HTML)'}
+            </pre>
+          </div>
+          {htmlBodyFull && htmlBodyFull !== htmlBody && (
+            <div className="border border-border rounded-lg overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-background">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Version complète <span className="text-amber-400/70 normal-case font-normal tracking-normal">(corps + FAQ + schémas)</span></p>
+                <CopyButton text={htmlBodyFull} />
+              </div>
+              <pre className="text-[11px] font-mono text-text-muted/70 bg-background p-4 overflow-auto max-h-[400px] leading-relaxed whitespace-pre-wrap break-words">
+                {htmlBodyFull}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'schema' && (
+        <div className="space-y-4 overflow-auto flex-1">
+          {sections.map((section, i) => (
+            <div key={i} className="border border-border rounded-lg overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-background">
+                <div className="flex items-center gap-2">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">{section.label}</p>
+                  {section.tag && (
+                    <span className={cn(
+                      'text-[9px] px-1.5 py-0.5 rounded border uppercase tracking-widest font-bold',
+                      section.isJsonLd
+                        ? 'bg-sky-500/10 text-sky-400 border-sky-500/20'
+                        : 'bg-violet-500/10 text-violet-400 border-violet-500/20'
+                    )}>
+                      {section.tag}
+                    </span>
+                  )}
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20 uppercase tracking-widest font-bold">traduit</span>
+                </div>
+                <CopyButton text={section.code} />
+              </div>
+              {section.isHtml ? (
+                <div
+                  className="blog-render bg-white p-4 overflow-auto max-h-72 text-xs leading-relaxed"
+                  style={{ color: '#1a1a1a' }}
+                  dangerouslySetInnerHTML={{ __html: section.code }}
+                />
+              ) : (
+                <pre className="text-[11px] font-mono text-text-muted/80 bg-background p-4 overflow-auto max-h-72 whitespace-pre-wrap break-words leading-relaxed">
+                  {section.code}
+                </pre>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function BlogGenerationResult({ data, semanticData }: { data: Record<string, unknown>; semanticData?: Record<string, unknown> }) {
   const [tab, setTab] = useState<'meta' | 'rendu' | 'html' | 'outline' | 'schema' | 'tfidf'>('meta');
@@ -1013,19 +1265,19 @@ function VisualSchemasResult({ data }: { data: Record<string, unknown> }) {
               <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">
                 Schéma {i + 1}
               </p>
-              {schema.type && (
+              {!!(schema.type) && (
                 <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase tracking-widest font-bold">
-                  {schema.type}
+                  {schema.type as string}
                 </span>
               )}
-              {schema.position && (
-                <span className="text-[10px] text-text-muted/60 italic">après : {schema.position}</span>
+              {!!(schema.position) && (
+                <span className="text-[10px] text-text-muted/60 italic">après : {schema.position as string}</span>
               )}
             </div>
-            <CopyButton text={schema.code} />
+            <CopyButton text={schema.code as string} />
           </div>
           <pre className="text-[11px] font-mono text-text-muted/80 bg-background p-4 overflow-auto max-h-72 whitespace-pre-wrap break-words leading-relaxed">
-            {schema.code}
+            {schema.code as string}
           </pre>
         </div>
       ))}
@@ -1163,16 +1415,16 @@ function GeoLlmAnalysisResult({ data, responsesKey }: { data: Record<string, unk
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p className="text-sm text-text font-medium truncate">{src.name ?? '—'}</p>
-                        {src.type && <span className="text-[9px] uppercase tracking-wider text-text-muted/60 border border-border rounded px-1.5 py-0.5 shrink-0">{src.type}</span>}
+                        {!!(src.type) && <span className="text-[9px] uppercase tracking-wider text-text-muted/60 border border-border rounded px-1.5 py-0.5 shrink-0">{src.type as string}</span>}
                       </div>
                       {hostname && <p className="text-[10px] text-text-muted font-mono truncate">{hostname}</p>}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {(src.frequency ?? 0) > 1 && (
-                        <span className="text-[10px] font-bold text-accent/70">×{src.frequency}</span>
+                      {((src.frequency as number) ?? 0) > 1 && (
+                        <span className="text-[10px] font-bold text-accent/70">×{src.frequency as number}</span>
                       )}
-                      {src.url && (
-                        <a href={src.url} target="_blank" rel="noopener noreferrer" className="text-text-muted/40 hover:text-accent">
+                      {!!(src.url) && (
+                        <a href={src.url as string} target="_blank" rel="noopener noreferrer" className="text-text-muted/40 hover:text-accent">
                           <ExternalLink size={12} />
                         </a>
                       )}
@@ -1265,7 +1517,7 @@ function RedditAnalyzerResult({ data }: { data: Record<string, unknown> }) {
                       <span className="text-[10px] font-bold text-orange-400">{post.subredditPrefixed as string}</span>
                       <span className="text-[10px] text-text-muted">▲ {post.score as number} pts</span>
                       <span className="text-[10px] text-text-muted">{post.numComments as number} commentaires</span>
-                      {post.flair && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20">{post.flair as string}</span>}
+                      {!!post.flair && <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20">{String(post.flair)}</span>}
                     </div>
                   </div>
                   <a href={post.permalink as string} target="_blank" rel="noopener noreferrer"
@@ -1273,7 +1525,7 @@ function RedditAnalyzerResult({ data }: { data: Record<string, unknown> }) {
                     Voir ↗
                   </a>
                 </div>
-                {post.selftext && (
+                {!!post.selftext && (
                   <p className="px-4 py-2 text-xs text-text-muted/80 line-clamp-3 border-b border-border bg-background/30">
                     {post.selftext as string}
                   </p>
@@ -1382,7 +1634,7 @@ function RedditAnalyzerResult({ data }: { data: Record<string, unknown> }) {
             </div>
           )}
           {/* Post ideas */}
-          {(strategy.postIdeas as {title:string;subreddit:string;type:string;hook:string;outline:string[];geoValue:string;priority:string}[] ?? []).length > 0 && (
+          {Array.isArray(strategy.postIdeas) && strategy.postIdeas.length > 0 && (
             <div className="bg-card border border-border rounded-lg overflow-hidden">
               <div className="px-4 py-2 border-b border-border">
                 <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Idées de posts à publier</p>
@@ -1435,7 +1687,7 @@ function RedditAnalyzerResult({ data }: { data: Record<string, unknown> }) {
             </div>
           )}
           {/* AMA */}
-          {strategy.amaStrategy && (strategy.amaStrategy as Record<string,unknown>).recommended && (
+          {!!(strategy.amaStrategy) && !!((strategy.amaStrategy as Record<string,unknown>).recommended) && (
             <div className="bg-card border border-border rounded-lg p-4">
               <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-3">Opportunité AMA</p>
               <div className="space-y-2">
@@ -1447,7 +1699,7 @@ function RedditAnalyzerResult({ data }: { data: Record<string, unknown> }) {
                 <div>
                   <p className="text-[10px] text-text-muted mb-1">Questions à anticiper :</p>
                   <ul className="space-y-1">
-                    {((strategy.amaStrategy as Record<string,unknown>).sampleQuestions as string[] ?? []).map((q, i) => (
+                    {(((strategy.amaStrategy as Record<string,unknown>).sampleQuestions as string[]) ?? []).map((q, i) => (
                       <li key={i} className="text-xs text-text-muted flex gap-1.5"><span className="text-accent shrink-0">?</span>{q}</li>
                     ))}
                   </ul>
@@ -1493,6 +1745,7 @@ function StepResult({ step, steps, token, runId }: { step: RunStep; steps: RunSt
     case 'website-scraper':       content = <ScraperResult data={data} />; break;
     case 'webflow-structure':     content = <WebflowStructureResult data={data} />; break;
     case 'blog-generation-geo':   content = <BlogGenerationResult data={data} semanticData={undefined} />; break;
+    case 'blog-translation':      content = <TranslationResult data={data} />; break;
     case 'geo-prompt-generator':  content = <GeoPromptResult data={data} />; break;
     case 'prompt-input':          content = <PromptInputResult data={data} />; break;
     case 'chatgpt-analysis':      content = <GeoLlmAnalysisResult data={data} responsesKey="chatgptResponses" />; break;
@@ -1528,25 +1781,54 @@ function RunDetailContent() {
     localStorage.setItem(lsKey, step.module_type);
   }
 
+  // Fetch run + steps, returns true when the run is terminal (done / error)
+  async function fetchRunData(isInitial = false): Promise<boolean> {
+    if (!token || !id) return true;
+    try {
+      const [runData, stepsData] = await Promise.all([
+        fetch(`${API_URL}/workflow/runs/${id}`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
+        fetch(`${API_URL}/workflow/runs/${id}/steps`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
+      ]);
+      setRun(runData);
+      const sortedSteps = Array.isArray(stepsData)
+        ? stepsData.sort((a: RunStep, b: RunStep) => a.step_index - b.step_index)
+        : [];
+      setSteps(sortedSteps);
+      if (isInitial && sortedSteps.length > 0) {
+        const saved = localStorage.getItem(lsKey);
+        const restored = saved ? sortedSteps.find((s: RunStep) => s.module_type === saved) : null;
+        setSelectedStep(restored ?? sortedSteps[0]);
+      } else if (!isInitial && sortedSteps.length > 0) {
+        // On polling updates, keep the selected step in sync (refresh its data)
+        setSelectedStep(prev => prev
+          ? (sortedSteps.find((s: RunStep) => s.id === prev.id) ?? prev)
+          : sortedSteps[0]
+        );
+      }
+      return runData?.status === 'done' || runData?.status === 'error';
+    } catch {
+      return false;
+    }
+  }
+
+  // Initial load
   useEffect(() => {
     if (!token || !id) return;
-    Promise.all([
-      fetch(`${API_URL}/workflow/runs/${id}`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-      fetch(`${API_URL}/workflow/runs/${id}/steps`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-    ])
-      .then(([runData, stepsData]) => {
-        setRun(runData);
-        const sortedSteps = Array.isArray(stepsData) ? stepsData.sort((a: RunStep, b: RunStep) => a.step_index - b.step_index) : [];
-        setSteps(sortedSteps);
-        if (sortedSteps.length > 0) {
-          const saved = localStorage.getItem(lsKey);
-          const restored = saved ? sortedSteps.find((s: RunStep) => s.module_type === saved) : null;
-          setSelectedStep(restored ?? sortedSteps[0]);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    fetchRunData(true).finally(() => setLoading(false));
   }, [token, id]);
+
+  // Polling while the run is still in progress (every 5 s, stops when terminal)
+  useEffect(() => {
+    if (!token || !id || !run) return;
+    if (run.status !== 'running') return;
+
+    const interval = setInterval(async () => {
+      const terminal = await fetchRunData(false);
+      if (terminal) clearInterval(interval);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [token, id, run?.status]);
 
   if (loading) {
     return (
@@ -1577,7 +1859,12 @@ function RunDetailContent() {
           <Clock size={11} />
           <span>{run ? new Date(run.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
         </div>
-        {run?.status && <span className={cn('font-semibold', statusColor)}>{run.status === 'done' ? 'Terminé' : run.status === 'error' ? 'Erreur' : 'En cours'}</span>}
+        {run?.status && (
+          <span className={cn('inline-flex items-center gap-1 font-semibold', statusColor)}>
+            {run.status === 'running' && <Loader2 size={11} className="animate-spin" />}
+            {run.status === 'done' ? 'Terminé' : run.status === 'error' ? 'Erreur' : 'En cours…'}
+          </span>
+        )}
       </div>
     </div>
   );

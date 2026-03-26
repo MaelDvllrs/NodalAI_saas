@@ -23,7 +23,7 @@ import '@xyflow/react/dist/style.css';
 import {
   Search, TrendingUp, Layers, Sparkles, Rocket,
   X, CheckCircle2, AlertCircle, Loader2, Check, SlidersHorizontal, MoreVertical,
-  Play, RefreshCw, FileEdit, Info, MousePointerClick, Zap, Globe, Save, Type, Download, Database, MessageSquarePlus, Lightbulb,
+  Play, RefreshCw, FileEdit, Info, MousePointerClick, Zap, Globe, Save, Type, Download, Database, MessageSquarePlus, Lightbulb, Languages,
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 import type { LogEvent } from './ProgressLog';
@@ -378,6 +378,35 @@ export const MODULE_CATALOG: ModuleDef[] = [
     },
   },
 
+  // ── Translation ─────────────────────────────────────────────────────────────
+  {
+    type: 'blog-translation',
+    label: 'Traduction article',
+    description: 'Claude Sonnet · Liens adaptés · Multi-pays',
+    details: 'Traduit le contenu HTML de l\'article dans la langue cible, adapte les liens internes (swap de domaine) et remplace les liens externes par des équivalents dans la langue/pays cible via Claude Haiku. Les métadonnées Webflow (titre, meta-description…) sont également traduites.',
+    icon: Languages,
+    category: 'generation',
+    accent: { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20' },
+    defaultConfig: {
+      targetLanguage: 'Anglais',
+      targetCountry: 'US',
+      targetSiteUrl: '',
+      translateExternalLinks: true,
+    },
+    ports: {
+      in: [
+        { key: 'htmlBody',     label: 'HTML article',  required: false },
+        { key: 'htmlBodyFull', label: 'HTML complet',   required: false },
+        { key: 'fieldData',    label: 'Champs Webflow', required: false },
+      ],
+      out: [
+        { key: 'htmlBody',     label: 'HTML traduit' },
+        { key: 'htmlBodyFull', label: 'HTML complet traduit' },
+        { key: 'fieldData',    label: 'Champs Webflow traduits' },
+      ],
+    },
+  },
+
   // ── Publish ─────────────────────────────────────────────────────────────────
   {
     type: 'webflow-structure',
@@ -570,13 +599,98 @@ function PromptInputConfig({ config, onChange, readOnly }: { config: BlockConfig
   );
 }
 
+const TRANSLATION_LANGUAGE_OPTIONS = [
+  { value: 'Français',    code: 'FR' },
+  { value: 'Anglais',     code: 'GB' },
+  { value: 'Espagnol',    code: 'ES' },
+  { value: 'Allemand',    code: 'DE' },
+  { value: 'Italien',     code: 'IT' },
+  { value: 'Portugais',   code: 'BR' },
+  { value: 'Néerlandais', code: 'NL' },
+  { value: 'Polonais',    code: 'PL' },
+  { value: 'Japonais',    code: 'JP' },
+];
+
+function LanguageSelect({ value, onChange, readOnly }: { value: string; onChange: (v: string) => void; readOnly?: boolean }) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const Flag = require('react-world-flags').default;
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = TRANSLATION_LANGUAGE_OPTIONS.find(o => o.value === value) ?? TRANSLATION_LANGUAGE_OPTIONS[0];
+
+  useEffect(() => {
+    if (!open) return;
+    const onOut = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as globalThis.Node)) setOpen(false); };
+    document.addEventListener('mousedown', onOut);
+    return () => document.removeEventListener('mousedown', onOut);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative nodrag">
+      <button type="button" disabled={readOnly}
+        onClick={() => setOpen(o => !o)}
+        className={cn('w-full flex items-center justify-between gap-2 input-base text-xs px-2.5 py-1.5', readOnly && 'opacity-60 cursor-default')}>
+        <span className="flex items-center gap-2">
+          <Flag code={selected.code} style={{ width: 18, height: 13, borderRadius: 2, objectFit: 'cover' }} />
+          {selected.value}
+        </span>
+        <svg width="10" height="10" viewBox="0 0 10 10" className="text-text-muted shrink-0"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>
+      </button>
+      {open && !readOnly && (
+        <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-surface border border-border rounded-md shadow-lg overflow-hidden">
+          {TRANSLATION_LANGUAGE_OPTIONS.map(opt => (
+            <button key={opt.value} type="button"
+              onClick={() => { onChange(opt.value); setOpen(false); }}
+              className={cn('w-full flex items-center gap-2 px-2.5 py-1.5 text-xs hover:bg-accent-hover transition-colors text-left',
+                opt.value === value ? 'text-accent' : 'text-text')}>
+              <Flag code={opt.code} style={{ width: 18, height: 13, borderRadius: 2, objectFit: 'cover' }} />
+              {opt.value}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TranslationConfig({ config, onChange, readOnly }: { config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean }) {
+  const targetLanguage         = (config.targetLanguage         as string)  ?? 'Anglais';
+  const targetCountry          = (config.targetCountry          as string)  ?? 'US';
+  const targetSiteUrl          = (config.targetSiteUrl          as string)  ?? '';
+  const translateExternalLinks = (config.translateExternalLinks as boolean) ?? true;
+  return (
+    <div className="space-y-2">
+      <LanguageSelect value={targetLanguage} onChange={v => !readOnly && onChange({ ...config, targetLanguage: v })} readOnly={readOnly} />
+      <input type="text" readOnly={readOnly}
+        placeholder="Pays cible (US, UK, DE, ES…)"
+        value={targetCountry}
+        onChange={e => onChange({ ...config, targetCountry: e.target.value })}
+        className={cn('input-base text-xs nodrag w-full', readOnly && 'opacity-60 cursor-default')}
+      />
+      <input type="text" readOnly={readOnly}
+        placeholder="URL site traduit (optionnel)"
+        value={targetSiteUrl}
+        onChange={e => onChange({ ...config, targetSiteUrl: e.target.value })}
+        className={cn('input-base text-xs nodrag w-full', readOnly && 'opacity-60 cursor-default')}
+      />
+      <label className={cn('flex items-center gap-2 cursor-pointer select-none', readOnly && 'pointer-events-none opacity-60')}>
+        <input type="checkbox" checked={translateExternalLinks}
+          onChange={e => !readOnly && onChange({ ...config, translateExternalLinks: e.target.checked })}
+          className="accent-accent nodrag" />
+        <span className="text-[10px] text-text-muted">Adapter les liens externes</span>
+      </label>
+    </div>
+  );
+}
+
 type ConfigComponent = React.ComponentType<{ config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean }>;
 const CONFIG_RENDERERS: Record<string, ConfigComponent> = {
-  'text-input':          TextInputConfig,
-  'prompt-input':        PromptInputConfig,
-  'website-scraper':     ScraperConfig,
-  'webflow-structure':   WebflowStructureConfig,
-  'webflow-publish':     PublishConfig,
+  'text-input':        TextInputConfig,
+  'prompt-input':      PromptInputConfig,
+  'website-scraper':   ScraperConfig,
+  'webflow-structure': WebflowStructureConfig,
+  'webflow-publish':   PublishConfig,
+  'blog-translation':  TranslationConfig,
 };
 
 // 
@@ -1292,7 +1406,7 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
   const PALETTE_GROUPS = [
     {
       id: 'seo', label: 'SEO', color: '#60a5fa99',
-      types: ['keyword-research', 'serp-analysis', 'semantic-extraction', 'blog-generation'],
+      types: ['keyword-research', 'serp-analysis', 'semantic-extraction', 'blog-generation', 'blog-translation'],
     },
     {
       id: 'website', label: 'Website', color: '#22d3ee99',

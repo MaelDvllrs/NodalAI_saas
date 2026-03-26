@@ -76,3 +76,31 @@ export async function publishItem(collectionId, apiKey, itemId) {
     { headers: headers(apiKey) }
   );
 }
+
+// ── Localization ───────────────────────────────────────────────────────────────
+
+/**
+ * Returns the locales for a site.
+ * @returns {{ primary: { cmsLocaleId, tag }, secondary: { cmsLocaleId, tag }[] }}
+ */
+export async function getSiteLocales(siteId, apiKey) {
+  const res = await axios.get(`${BASE_URL}/sites/${siteId}`, {
+    headers: headers(apiKey),
+  });
+  return res.data?.locales ?? { primary: null, secondary: [] };
+}
+
+/**
+ * Updates an existing CMS item for a specific secondary locale.
+ * Uses the bulk PATCH endpoint so a single call covers one locale.
+ */
+export async function updateItemForLocale(collectionId, apiKey, itemId, cmsLocaleId, fieldData, isDraft) {
+  const res = await axios.patch(
+    `${BASE_URL}/collections/${collectionId}/items`,
+    {
+      items: [{ id: itemId, cmsLocaleId, fieldData, isDraft, isArchived: false }],
+    },
+    { headers: headers(apiKey) }
+  );
+  return res.data;
+}

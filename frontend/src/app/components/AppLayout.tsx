@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { useProject } from '../contexts/ProjectContext';
-import { LayoutDashboard, GitBranch, History, LogOut, Terminal, User, ChevronDown, Globe, Plus, Check, Settings, Sun, Moon, Monitor, Search, BookOpen } from 'lucide-react';
+import { LayoutDashboard, GitBranch, History, LogOut, Terminal, User, ChevronDown, Globe, Plus, Check, Settings, Sun, Moon, Monitor, Search, BookOpen, CommandIcon } from 'lucide-react';
 import { cn } from '../utils/cn';
 import TaskPanel from './TaskPanel';
 import toast from 'react-hot-toast';
@@ -113,7 +113,7 @@ function GlobalSearch({ selectedSiteId, isAdmin }: { selectedSiteId: string | nu
           className="input-base text-xs py-1 pl-7 pr-14 w-64 focus:w-80 transition-all duration-200"
         />
         <kbd className="pointer-events-none absolute right-1 flex items-center gap-0.5 text-[9px] text-text-muted/50 font-mono bg-background border border-border rounded px-1 py-0.5">
-          {isMac ? '⌘' : 'ctrl'} K
+          {isMac ? <CommandIcon size={10}/> : 'ctrl' } + K
         </kbd>
       </div>
 

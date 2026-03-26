@@ -159,6 +159,20 @@ export async function getWorkflowRun(id, userId) {
 
 // ── Workflow run steps ───────────────────────────────────────────────────────
 
+// Strip null bytes and lone surrogates from a JSON-serialisable value so that
+// Supabase / PostgreSQL never rejects the insert with "unsupported Unicode escape".
+function sanitizeJson(value) {
+  if (value == null) return null;
+  try {
+    const str = typeof value === 'string' ? value : JSON.stringify(value);
+    // Remove null bytes (\u0000) and other PostgreSQL-illegal control chars
+    const clean = str.replace(/\u0000/g, '').replace(/\\u0000/g, '');
+    return JSON.parse(clean);
+  } catch {
+    return null;
+  }
+}
+
 export async function saveWorkflowRunStep({ workflowRunId, moduleType, stepIndex, status, resultJson, errorMessage }) {
   const { error } = await supabase
     .from('workflow_run_steps')
@@ -167,7 +181,7 @@ export async function saveWorkflowRunStep({ workflowRunId, moduleType, stepIndex
       module_type:     moduleType,
       step_index:      stepIndex,
       status:          status || 'done',
-      result_json:     resultJson || null,
+      result_json:     sanitizeJson(resultJson),
       error_message:   errorMessage || null,
     });
   if (error) {

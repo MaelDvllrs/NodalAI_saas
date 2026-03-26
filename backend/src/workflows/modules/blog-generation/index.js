@@ -149,11 +149,21 @@ export const BlogGenerationModule = {
       const wordCount = rawBlog.split(/\s+/).filter(Boolean).length;
       emitEvent(jobId, { type: 'step', message: `📝 Article généré : ${wordCount} mots` });
 
-      // Trim if overlong
+      // Trim if overlong — only compress the body (planMece) to preserve section structure.
+      // trimContentToWordCount returns plain text without numbered section markers, so
+      // re-parsing the full rawBlog would lose all section boundaries. Instead we update
+      // parsed.planMece directly and keep rawBlog intact for UI display.
       if (wordCount > wcMax * 1.05) {
         emitEvent(jobId, { type: 'step', message: `✂️ Article trop long (${wordCount} mots > max ${wcMax}) — compression...` });
-        rawBlog = await trimContentToWordCount(rawBlog, wcMin, wcMax, mainKeyword);
-        parsed  = parseBlogContent(rawBlog);
+        const trimmedBody = await trimContentToWordCount(
+          parsed?.planMece || rawBlog, wcMin, wcMax, mainKeyword
+        );
+        if (parsed) {
+          parsed.planMece = trimmedBody;
+        } else {
+          rawBlog = trimmedBody;
+          parsed  = parseBlogContent(rawBlog);
+        }
       }
 
       const finalWords = rawBlog.split(/\s+/).filter(Boolean).length;

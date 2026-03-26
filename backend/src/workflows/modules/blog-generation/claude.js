@@ -9,29 +9,29 @@ function getClient() {
 
 // ── KD → article length ───────────────────────────────────────────────────────
 export function getWordCountBounds(kd) {
-  if (kd === null || kd === undefined) return { min: 1500, max: 2000 };
-  if (kd <= 10)  return { min: 800,  max: 1000 };
-  if (kd <= 20)  return { min: 1000, max: 1300 };
-  if (kd <= 35)  return { min: 1300, max: 1800 };
-  if (kd <= 50)  return { min: 1800, max: 2300 };
-  if (kd <= 70)  return { min: 2300, max: 2700 };
-  return { min: 2700, max: 3000 };
+  if (kd === null || kd === undefined) return { min: 2000, max: 2600 };
+  if (kd <= 10)  return { min: 1200, max: 1600 };
+  if (kd <= 20)  return { min: 1600, max: 2100 };
+  if (kd <= 35)  return { min: 2100, max: 2700 };
+  if (kd <= 50)  return { min: 2700, max: 3300 };
+  if (kd <= 70)  return { min: 3300, max: 3900 };
+  return { min: 3900, max: 4600 };
 }
 
 export function getLengthFromKd(kd) {
   if (kd === null || kd === undefined)
-    return { range: '1 000 – 1 600 mots', objective: 'Article structuré et optimisé SEO', midWords: 1300 };
+    return { range: '2 000 – 2 600 mots', objective: 'Article structuré et optimisé SEO', midWords: 2300 };
   if (kd <= 10)
-    return { range: '800 – 1 000 mots', objective: 'Réponse claire et ciblée', midWords: 900 };
+    return { range: '1 200 – 1 600 mots', objective: 'Réponse claire et ciblée', midWords: 1400 };
   if (kd <= 20)
-    return { range: '1 000 – 1 200 mots', objective: 'Contenu structuré avec sous-parties', midWords: 1100 };
+    return { range: '1 600 – 2 100 mots', objective: 'Contenu structuré avec sous-parties', midWords: 1850 };
   if (kd <= 35)
-    return { range: '1 200 – 1 600 mots', objective: 'Article approfondi + optimisation sémantique', midWords: 1400 };
+    return { range: '2 100 – 2 700 mots', objective: 'Article approfondi + optimisation sémantique', midWords: 2400 };
   if (kd <= 50)
-    return { range: '1 600 – 1 800 mots', objective: 'Guide complet + maillage interne', midWords: 1700 };
+    return { range: '2 700 – 3 300 mots', objective: 'Guide complet + maillage interne', midWords: 3000 };
   if (kd <= 70)
-    return { range: '1 800 – 2 000 mots', objective: 'Contenu expert structuré', midWords: 1900 };
-  return { range: '2 000 – 2 300 mots', objective: 'Contenu pilier + autorité thématique', midWords: 2150 };
+    return { range: '3 300 – 3 900 mots', objective: 'Contenu expert structuré', midWords: 3600 };
+  return { range: '3 900 – 4 600 mots', objective: 'Contenu pilier + autorité thématique', midWords: 4250 };
 }
 
 export function scaleTermCounts(terms, generatedWords, sourceAvgWords) {
@@ -300,22 +300,19 @@ export async function generateBlogContent({
   const systemPrompt = `Tu es un expert SEO et copywriter spécialisé dans la création de contenu optimisé pour les moteurs de recherche.
 Tu génères des articles de blog COMPLETS, intégralement rédigés, prêts à être publiés directement.
 
-## 🚨 CONTRAINTE DE LONGUEUR — RÈGLE N°1, PRIORITÉ ABSOLUE, NON NÉGOCIABLE
+## 📏 LONGUEUR — RÈGLE N°1, PRIORITÉ ABSOLUE
 
-### BUDGET SECTION 5 (Corps de l'article) : ${wcBlogMin}–${wcBlogMax} mots TOTAL.
+### OBJECTIF SECTION 5 (Corps de l'article) : **${wcBlogMin}–${wcBlogMax} mots TOTAL**.
 
-Répartition STRICTE du budget :
-- Chaque H2 (texte + listes) : **120–180 mots maximum**
-- Chaque H3 (texte) : **60–90 mots maximum**
-- Conclusion : **100–150 mots maximum**
-- Total liens + blockquotes + mentions : ~150 mots amortis
+⚠️ Le minimum de **${wcBlogMin} mots** est obligatoire — un article trop court sera refusé.
+✅ Vise le haut de la fourchette (proche de ${wcBlogMax} mots) pour maximiser la couverture SEO.
 
-Avant de rédiger CHAQUE section, compte tes mots depuis le début de la section 5.
-- À partir de ${Math.round(wcBlogMax * 0.8)} mots : rédige uniquement la conclusion et arrête.
-- À ${wcBlogMax} mots : STOP immédiat. Tu n'écriras plus rien dans la section 5.
+Répartition cible par section :
+- Chaque H2 (texte + listes) : **200–350 mots**
+- Chaque H3 (texte) : **100–150 mots**
+- Conclusion : **150–200 mots**
 
-❌ ERREUR FATALE = dépasser ${wcBlogMax} mots dans la section 5. L'article sera rejeté automatiquement.
-✅ OBJECTIF : atteindre ${wcBlogMin}–${wcBlogMax} mots en étant DENSE et PRÉCIS, pas verbeux.
+Stratégie : rédige chaque section de façon dense et substantielle. Si tu atteins ${wcBlogMax} mots avant la conclusion, rédige une conclusion courte (100 mots) et termine proprement.
 
 ---
 
@@ -442,14 +439,14 @@ Rules OBLIGATOIRES — dans cet ordre précis :
 ### 5. CONTENU COMPLET DE L'ARTICLE
 [Champ : Corps de l'article]
 
-🚨 BUDGET RESTANT POUR CETTE SECTION : **${wcBlogMin}–${wcBlogMax} mots TOTAL**. Compte tes mots en permanence.
-Répartition : H2 = 120–180 mots max · H3 = 60–90 mots max · Conclusion = 100–150 mots max.
+📏 OBJECTIF SECTION 5 : **${wcBlogMin}–${wcBlogMax} mots TOTAL**. Vise le haut de la fourchette.
+Répartition : H2 = 200–350 mots · H3 = 100–150 mots · Conclusion = 150–200 mots.
 
 Rédige le CONTENU INTÉGRAL et complet de l'article en suivant la méthode MECE.
 
 RÈGLES OBLIGATOIRES :
-- Chaque H2 : description d'accroche (1-2 phrases) + contenu rédigé complet (**120 à 180 mots max**) + liste à puces si pertinent (3 à 5 items)
-- Chaque H3 : description d'accroche (1 phrase) + contenu rédigé complet (**60 à 90 mots max**)
+- Chaque H2 : description d'accroche (1-2 phrases) + contenu rédigé complet (**200 à 350 mots**) + liste à puces si pertinent (3 à 5 items)
+- Chaque H3 : description d'accroche (1 phrase) + contenu rédigé complet (**100 à 150 mots**)
 
 🚨 **LIENS INTERNES** (CRITIQUE — NON NÉGOCIABLE) :
 - Format exact : [[INTERNE:URL|texte d'ancre riche en mots-clés]]
@@ -514,7 +511,7 @@ Règles de la conclusion :
 ## RÈGLES GÉNÉRALES
 - Tout le contenu est rédigé en français
 - Ton : ${tone ?? 'Expert et pédagogique'}. Jamais générique, toujours à forte valeur ajoutée
-- **🚨 LONGUEUR SECTION 5 : ${wcBlogMin}–${wcBlogMax} mots — LIMITE STRICTE ET ABSOLUE.** Tu dois compter tes mots activement. Si tu dépasses ${wcBlogMax} mots, l'article est automatiquement rejeté. Arrête-toi dès ${wcBlogMax} mots, même si le plan n'est pas terminé.
+- **📏 LONGUEUR SECTION 5 : ${wcBlogMin}–${wcBlogMax} mots — OBJECTIF À ATTEINDRE.** Vise le haut de la fourchette (${wcBlogMax} mots). Un article inférieur à ${wcBlogMin} mots est insuffisant pour le SEO. Si tu approches ${wcBlogMax} mots, rédige la conclusion et termine proprement.
 - **LIENS OBLIGATOIRES dans section 5 : minimum 3 [[INTERNE:URL|ancre]] + minimum 2 [[EXTERNE:URL|ancre]]**. Sans ces liens, l'article est invalide.
 - La section 4 (Points clés + introduction) est un champ séparé : les Points clés et l'introduction sont TOUS les deux comptabilisés dans le décompte de la section 4.
 - Intégrer naturellement tous les termes fournis dans les contextes ci-dessous
@@ -546,9 +543,9 @@ Règles de la conclusion :
 
   // ── Build user prompt ─────────────────────────────────────────────────────
   const userPromptParts = [
-    `🚨 CONTRAINTE ABSOLUE N°1 — LONGUEUR : la section 5 (Corps) doit faire ENTRE ${wcBlogMin} ET ${wcBlogMax} MOTS MAXIMUM.`,
-    `Tu dois compter tes mots en permanence. STOP immédiat à ${wcBlogMax} mots même si le plan n'est pas fini.`,
-    `Budget par H2 = 120-180 mots max · Budget par H3 = 60-90 mots max · Conclusion = 100-150 mots max.`,
+    `📏 CONTRAINTE N°1 — LONGUEUR : la section 5 (Corps) doit faire ENTRE ${wcBlogMin} ET ${wcBlogMax} MOTS.`,
+    `Objectif : vise ${wcBlogMax} mots. Minimum obligatoire : ${wcBlogMin} mots (en dessous = article refusé pour SEO insuffisant).`,
+    `Cible par section : H2 = 200-350 mots · H3 = 100-150 mots · Conclusion = 150-200 mots.`,
     ``,
     `🚨 CONTRAINTE ABSOLUE N°2 — LIENS ET SCHÉMAS (CRITIQUE — ZÉRO TOLÉRANCE) :`,
     ``,

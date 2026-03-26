@@ -54,7 +54,16 @@ export function startGenerationWorker() {
         throw new Error(`Unknown job type: ${type}`);
       }
     },
-    { connection: createRedisConnection(), concurrency: 2 }
+    {
+      connection:      createRedisConnection(),
+      concurrency:     2,
+      // Extend lock duration so long-running jobs (semantic embedding, blog generation)
+      // don't get marked as stalled. BullMQ auto-renews at lockDuration/2 while the
+      // process is alive; this guards against temporary slowdowns without requiring
+      // manual progress() calls.
+      lockDuration:    600_000,  // 10 minutes
+      maxStalledCount: 1,        // allow 1 recovery before failing (default)
+    }
   );
 
   worker.on('failed', (job, err) => {
