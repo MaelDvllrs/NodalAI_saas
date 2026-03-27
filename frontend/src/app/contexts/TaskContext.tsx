@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
 import type { LogEvent } from '../components/ProgressLog';
 import { useAuth } from './AuthContext';
 import { notifySuccess, notifyError } from '../utils/notify';
@@ -42,6 +42,7 @@ interface TaskContextType {
   ) => number;
   appendEvent: (taskId: number, event: LogEvent) => void;
   clearTask: (taskId: number) => void;
+  getTaskByJobId: (jobId: string) => Task | undefined;
 }
 
 const TaskContext = createContext<TaskContextType | null>(null);
@@ -52,6 +53,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
   const { token } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const prevStatusesRef = useRef<Record<number, Task['status']>>({});
 
   // Load saved tasks from DB on auth
   useEffect(() => {
@@ -105,6 +107,18 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     return id;
   }, []);
 
+  // Fire notifications when a task transitions to done/error (outside the setter to avoid StrictMode double-call)
+  useEffect(() => {
+    tasks.forEach(task => {
+      const prev = prevStatusesRef.current[task.id];
+      if (prev === 'running') {
+        if (task.status === 'done')  notifySuccess(`Workflow exécuté - ${task.projectName}`);
+        if (task.status === 'error') notifyError(`Erreur lors de l'exécution - ${task.projectName}`);
+      }
+      prevStatusesRef.current[task.id] = task.status;
+    });
+  }, [tasks]);
+
   const appendEvent = useCallback((taskId: number, event: LogEvent) => {
     setTasks(prev => prev.map(task => {
       if (task.id !== taskId) return task;
@@ -112,15 +126,13 @@ export function TaskProvider({ children }: { children: ReactNode }) {
         event.type === 'done' ? 'done' :
         event.type === 'error' ? 'error' :
         task.status;
-      if (newStatus === 'done' && task.status !== 'done') {
-        notifySuccess(`Blog généré avec succès — ${task.projectName}`);
-      }
-      if (newStatus === 'error' && task.status !== 'error') {
-        notifyError(`Erreur lors de la génération — ${task.projectName}`);
-      }
       return { ...task, events: [...task.events, event], status: newStatus };
     }));
   }, []);
+
+  const getTaskByJobId = useCallback((jobId: string): Task | undefined => {
+    return tasks.find(t => t.jobId === jobId);
+  }, [tasks]);
 
   const clearTask = useCallback((taskId: number) => {
     setTasks(prev => {
@@ -137,7 +149,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   return (
-    <TaskContext.Provider value={{ tasks, addTask, appendEvent, clearTask }}>
+    <TaskContext.Provider value={{ tasks, addTask, appendEvent, clearTask, getTaskByJobId }}>
       {children}
     </TaskContext.Provider>
   );

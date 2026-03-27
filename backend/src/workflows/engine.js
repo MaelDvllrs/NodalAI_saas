@@ -101,6 +101,17 @@ export class WorkflowEngine {
     // Map instanceId → label for readable log messages
     const idToLabel = new Map(template.steps.map(s => [s.instanceId, s.label ?? s.type]));
 
+    // Emit the full module list upfront so the frontend can compute weighted progress
+    // from the very first event (total weight is known before any module runs).
+    const executableModules = template.steps
+      .filter(s => !WorkflowEngine.INPUT_TYPES.has(s.type) && s.enabled !== false)
+      .map(s => ({ type: s.type, instanceId: s.instanceId, label: s.label ?? s.type }));
+
+    this.emitEvent(this.jobId, {
+      type: 'workflow-start',
+      modules: executableModules,
+    });
+
     this.emitEvent(this.jobId, {
       type: 'step',
       message: `▶ Démarrage workflow "${template.name}" (${template.steps.length} étapes)`,

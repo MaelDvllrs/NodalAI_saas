@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { claudeCreate } from '../../../utils/claudeRetry.js';
+import { claudeCreate, claudeCreateWithSearch, extractTextContent } from '../../../utils/claudeRetry.js';
 
 function getClient() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -111,12 +111,15 @@ export async function generateGeoPrompt(siteProfile, sitemapUrls = [], existingP
 Ton rôle est d'identifier des questions précises que les internautes posent à des IA (ChatGPT, Claude, Perplexity, Gemini...)
 sur le thème du site analysé, questions auxquelles le site ne répond pas encore.
 
+Tu as accès à la recherche web : utilise-la pour identifier les questions et tendances actuelles (2026)
+autour du thème du site avant de proposer ta question GEO.
+
 Une bonne question GEO :
 - Est formulée comme une vraie question posée à une IA ("Comment...", "Quelle est...", "Quels sont...", "Pourquoi...", "Est-ce que...")
 - A une réponse factuelle et précise
 - N'est pas déjà couverte par le contenu existant du site
 - Est directement en lien avec le thème du site
-- A du volume de recherche potentiel
+- Reflète des tendances ou actualités récentes (pas uniquement des questions génériques intemporelles)
 
 Tu dois répondre UNIQUEMENT en JSON valide, sans markdown, sans texte avant ou après.`;
 
@@ -124,7 +127,8 @@ Tu dois répondre UNIQUEMENT en JSON valide, sans markdown, sans texte avant ou 
 
 ${siteContext}${existingBlock}
 
-En te basant sur ce profil, propose UNE seule question GEO pertinente que ce site devrait traiter.
+Commence par rechercher sur le web les tendances et questions actuelles (2024-2025) liées au thème du site.
+Puis, en te basant sur ce profil ET sur les résultats de ta recherche, propose UNE seule question GEO pertinente et actuelle que ce site devrait traiter.
 
 Retourne UNIQUEMENT ce JSON :
 {
@@ -133,14 +137,14 @@ Retourne UNIQUEMENT ce JSON :
   "geoRationale": "Explication courte (1-2 phrases) : pourquoi cette question est pertinente pour ce site et n'est pas encore couverte"
 }`;
 
-  const message = await claudeCreate(client, {
+  const message = await claudeCreateWithSearch(client, {
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 512,
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
   });
 
-  const raw = message.content[0].text.trim();
+  const raw = extractTextContent(message);
 
   try {
     const jsonStr = raw.startsWith('{') ? raw : raw.match(/\{[\s\S]*\}/)?.[0] || '{}';

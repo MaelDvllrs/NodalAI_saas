@@ -3,14 +3,14 @@
 import toast from 'react-hot-toast';
 
 const baseStyle: React.CSSProperties = {
-  background: 'rgba(0, 0, 0, 0.5)',
+  background: 'var(--bg-card)',
   backdropFilter: 'blur(20px)',
   WebkitBackdropFilter: 'blur(20px)',
-  color: '#f5f5f7',
-  border: '1px solid rgba(120, 120, 120, 0.47)',
+  color: 'var(--text)',
+  border: '1px solid var(--border)',
   fontSize: '13px',
   fontWeight: '600',
-  borderRadius: '10px',
+  borderRadius: '8px',
   boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
   display: 'flex',
   alignItems: 'center',
@@ -45,7 +45,7 @@ function ToastContent({
       </span>
       <span style={{ flex: 1 }}>{message}</span>
       <button
-        onClick={() => toast.dismiss(id)}
+        onClick={(e) => { e.stopPropagation(); toast.dismiss(id); }}
         style={{
           background: 'none',
           border: 'none',

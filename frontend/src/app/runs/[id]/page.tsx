@@ -59,7 +59,7 @@ const MODULE_META: Record<string, { label: string; icon?: React.ElementType; acc
   'geo-prompt-generator':   { label: 'Générateur de prompt GEO',  icon: Lightbulb,  accent: 'text-yellow-400' },
   'blog-generation-geo':   { label: 'Blog GEO',                  icon: Sparkles,   accent: 'text-violet-400' },
   'blog-translation':      { label: 'Traduction article',         icon: Languages,  accent: 'text-rose-400' },
-  'chatgpt-analysis':      { label: 'Analyse ChatGPT',            brandIcon: ChatGptIcon },
+  'chatgpt-analysis':      { label: 'Analyse Open AI',            brandIcon: ChatGptIcon },
   'gemini-analysis':       { label: 'Analyse Gemini',            brandIcon: GeminiIcon },
   'perplexity-analysis':   { label: 'Analyse Perplexity',        brandIcon: PerplexityIcon },
   'reddit-analyzer':       { label: 'Analyseur Reddit',           brandIcon: RedditIcon },
@@ -1308,8 +1308,8 @@ function PromptInputResult({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-function GeoLlmAnalysisResult({ data, responsesKey }: { data: Record<string, unknown>; responsesKey: string }) {
-  const [tab, setTab] = useState<'questions' | 'sources' | 'gaps' | 'summary' | 'raw'>('summary');
+function GeoLlmAnalysisResult({ data, responsesKey, htmlKey }: { data: Record<string, unknown>; responsesKey: string; htmlKey?: string }) {
+  const [tab, setTab] = useState<'questions' | 'sources' | 'gaps' | 'summary' | 'raw' | 'html' | 'sources-html'>('summary');
   type GeoSource = { url?: string | null; name?: string; type?: string; frequency?: number };
   const questions          = Array.isArray(data.geoQuestions)           ? (data.geoQuestions as string[])           : [];
   const sources            = Array.isArray(data.geoSources)             ? (data.geoSources as GeoSource[])          : [];
@@ -1318,13 +1318,17 @@ function GeoLlmAnalysisResult({ data, responsesKey }: { data: Record<string, unk
   const responseVariations = Array.isArray(data.geoResponseVariations)  ? (data.geoResponseVariations as string[])  : [];
   const summary            = data.geoAnalysis as string                 ?? '';
   const rawResponses       = Array.isArray(data[responsesKey])          ? (data[responsesKey] as string[])          : [];
+  const htmlResponses      = htmlKey && Array.isArray(data[htmlKey])    ? (data[htmlKey] as string[])               : [];
+  const sourcesHtmlArr     = Array.isArray(data.chatgptSourcesHtml)     ? (data.chatgptSourcesHtml as string[])     : [];
 
   const tabs = [
-    { id: 'summary' as const,   label: 'Synthèse' },
-    { id: 'questions' as const, label: `Questions (${questions.length})` },
-    { id: 'sources' as const,   label: `Sources (${sources.length})` },
-    { id: 'gaps' as const,      label: `Opportunités (${contentGaps.length})` },
-    ...(rawResponses.length > 0 ? [{ id: 'raw' as const, label: `Réponses brutes (${rawResponses.length})` }] : []),
+    { id: 'summary' as const,      label: 'Synthèse' },
+    { id: 'questions' as const,    label: `Questions (${questions.length})` },
+    { id: 'sources' as const,      label: `Sources (${sources.length})` },
+    { id: 'gaps' as const,         label: `Opportunités (${contentGaps.length})` },
+    ...(rawResponses.length > 0    ? [{ id: 'raw'          as const, label: `Réponses brutes (${rawResponses.length})` }]  : []),
+    ...(htmlResponses.length > 0   ? [{ id: 'html'         as const, label: `HTML réponse (${htmlResponses.length})` }]   : []),
+    ...(sourcesHtmlArr.length > 0  ? [{ id: 'sources-html' as const, label: `HTML sources (${sourcesHtmlArr.length})` }]  : []),
   ];
 
   return (
@@ -1461,6 +1465,40 @@ function GeoLlmAnalysisResult({ data, responsesKey }: { data: Record<string, unk
               <pre className="text-[11px] font-mono text-text-muted/70 bg-background p-4 overflow-auto max-h-[300px] leading-relaxed whitespace-pre-wrap break-words">
                 {resp}
               </pre>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === 'html' && (
+        <div className="space-y-4">
+          {htmlResponses.map((html, i) => (
+            <div key={i} className="border border-border rounded-lg overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-background">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Réponse HTML {i + 1}</p>
+                <CopyButton text={html} />
+              </div>
+              <div
+                className="p-4 overflow-auto max-h-[500px] text-sm text-text leading-relaxed prose prose-invert prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: html }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === 'sources-html' && (
+        <div className="space-y-4">
+          {sourcesHtmlArr.map((html, i) => (
+            <div key={i} className="border border-border rounded-lg overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-background">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Panel Sources — Variante {i + 1}</p>
+                <CopyButton text={html} />
+              </div>
+              <div
+                className="p-4 overflow-auto max-h-[600px] text-sm text-text leading-relaxed prose prose-invert prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: html }}
+              />
             </div>
           ))}
         </div>
@@ -1748,7 +1786,7 @@ function StepResult({ step, steps, token, runId }: { step: RunStep; steps: RunSt
     case 'blog-translation':      content = <TranslationResult data={data} />; break;
     case 'geo-prompt-generator':  content = <GeoPromptResult data={data} />; break;
     case 'prompt-input':          content = <PromptInputResult data={data} />; break;
-    case 'chatgpt-analysis':      content = <GeoLlmAnalysisResult data={data} responsesKey="chatgptResponses" />; break;
+    case 'chatgpt-analysis':      content = <GeoLlmAnalysisResult data={data} responsesKey="chatgptResponses" htmlKey="chatgptHtml" />; break;
     case 'gemini-analysis':       content = <GeoLlmAnalysisResult data={data} responsesKey="geminiResponses" />; break;
     case 'perplexity-analysis':   content = <GeoLlmAnalysisResult data={data} responsesKey="perplexityResponses" />; break;
     case 'reddit-analyzer':       content = <RedditAnalyzerResult data={data} />; break;

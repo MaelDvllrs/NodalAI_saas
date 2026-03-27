@@ -25,18 +25,9 @@ import { createBlog, updateBlog, getExistingTitles as getDbExistingTitles, getTo
 import { getCrawledPages } from './site.service.js';
 import { generateImageWithGemini } from './image.service.js';
 import { emitEvent, closeJob } from './events.service.js';
-import { createTask, updateTask } from './task.service.js';
-
 // ── SEO Preview (test mode — no DB write, no Webflow) ────────────────────────
-export async function runSeoPreview(jobId, { theme, directKeyword, userId, projectName }) {
+export async function runSeoPreview(jobId, { theme, directKeyword }) {
   try {
-    // Create task record in DB
-    if (userId) {
-      try {
-        await createTask({ userId, jobId, mode: 'seo-test', projectName: projectName || 'SEO Test' });
-      } catch (e) { console.error('[Pipeline] createTask (seo-preview):', e.message); }
-    }
-
     // 1. Keyword
     let mainKeyword, kd, kwSearchVolume;
     if (directKeyword) {
@@ -129,13 +120,8 @@ export async function runSeoPreview(jobId, { theme, directKeyword, userId, proje
 
     emitEvent(jobId, { type: 'done', data: { itemId: '', itemName: mainKeyword, collectionId: '' } });
 
-    // Update task: done
-    if (userId) {
-      try { await updateTask(jobId, { status: 'done', keyword: mainKeyword }); } catch (e) { /* non-blocking */ }
-    }
   } catch (err) {
     emitEvent(jobId, { type: 'error', message: err.message });
-    if (userId) { try { await updateTask(jobId, { status: 'error' }); } catch (e) { /* non-blocking */ } }
   } finally {
     closeJob(jobId);
   }
@@ -143,16 +129,9 @@ export async function runSeoPreview(jobId, { theme, directKeyword, userId, proje
 
 // ── Full generation pipeline ─────────────────────────────────────────────────
 export async function runPipeline(jobId, params) {
-  const { siteId, apiKey, collectionName, theme, tone, status, siteUrl, dbSiteId, userId, directKeyword, projectName } = params;
+  const { siteId, apiKey, collectionName, theme, tone, status, siteUrl, dbSiteId, userId, directKeyword } = params;
 
   try {
-    // Create task record in DB
-    if (userId) {
-      try {
-        await createTask({ userId, siteId: dbSiteId || null, jobId, mode: 'generate', projectName: projectName || theme || 'Article' });
-      } catch (e) { console.error('[Pipeline] createTask:', e.message); }
-    }
-
     // 1. Keyword selection
     let mainKeyword, kd, kwSearchVolume;
 
@@ -890,13 +869,8 @@ export async function runPipeline(jobId, params) {
         dbBlogId: savedBlog?.id || null,
       },
     });
-    // Update task: done + link to blog
-    if (userId) {
-      try { await updateTask(jobId, { status: 'done', blogId: savedBlog?.id, keyword: params.directKeyword || undefined }); } catch (e) { /* non-blocking */ }
-    }
   } catch (err) {
     emitEvent(jobId, { type: 'error', message: err.message });
-    if (userId) { try { await updateTask(jobId, { status: 'error' }); } catch (e) { /* non-blocking */ } }
   } finally {
     closeJob(jobId);
   }

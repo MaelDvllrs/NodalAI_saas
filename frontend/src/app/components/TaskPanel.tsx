@@ -2,18 +2,11 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ListTodo, X, CheckCircle2, AlertCircle, Loader2, ArrowRight } from 'lucide-react';
+import { ListTodo, X, CheckCircle2, AlertCircle, Loader2, ArrowRight, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '../utils/cn';
 import { useTasks, type Task } from '../contexts/TaskContext';
-
-function computeProgress(task: Task): number {
-  if (task.status === 'done') return 100;
-  if (task.status === 'error') return 100;
-  const stepCount = task.events.filter(e => e.type === 'step').length;
-  // Asymptotic formula: approaches 95% but never reaches it while running
-  return Math.round((1 - Math.pow(0.82, stepCount)) * 95);
-}
+import { computeProgress } from '../utils/taskProgress';
 
 function TaskCard({ task, onClear }: { task: Task; onClear: () => void }) {
   const progress = computeProgress(task);
@@ -158,6 +151,18 @@ export default function TaskPanel() {
               ))}
             </div>
           )}
+
+          {/* Footer */}
+          <div className="border-t border-border">
+            <Link
+              href="/tasks"
+              onClick={() => setOpen(false)}
+              className="flex items-center justify-between px-3 py-2 text-[11px] font-medium text-text-muted hover:text-text hover:bg-accent-hover transition-colors"
+            >
+              Voir toutes les tâches
+              <ExternalLink size={11} />
+            </Link>
+          </div>
         </div>
   ) : null;
 

@@ -8,8 +8,6 @@ import { useProject } from '../contexts/ProjectContext';
 import { LayoutDashboard, GitBranch, History, LogOut, Terminal, User, ChevronDown, Globe, Plus, Check, Settings, Sun, Moon, Monitor, Search, BookOpen, CommandIcon } from 'lucide-react';
 import { cn } from '../utils/cn';
 import TaskPanel from './TaskPanel';
-import toast from 'react-hot-toast';
-import { notifySuccess, notifyError } from '../utils/notify';
 import { useTheme } from '../contexts/ThemeContext';
 
 type NavPage = { label: string; href: string; icon: React.ElementType; keywords?: string[] };
@@ -17,7 +15,7 @@ type NavPage = { label: string; href: string; icon: React.ElementType; keywords?
 const BASE_PAGES: NavPage[] = [
   { label: 'Dashboard',            href: '/dashboard',       icon: LayoutDashboard, keywords: ['accueil', 'home'] },
   { label: 'Workflows',            href: '/generate',        icon: GitBranch,       keywords: ['workflow', 'génération', 'builder'] },
-  { label: 'Historique',           href: '/runs',            icon: History,         keywords: ['runs', 'executions', 'logs'] },
+  { label: 'Tâches',               href: '/runs',            icon: History,         keywords: ['runs', 'taches', 'executions', 'logs', 'historique'] },
   { label: 'Projets',              href: '/projects',        icon: Globe,           keywords: ['sites', 'project'] },
   { label: 'Articles',             href: '/blogs',           icon: BookOpen,        keywords: ['blog', 'posts', 'articles'] },
   { label: 'Mon compte',           href: '/account',         icon: User,            keywords: ['profil', 'account', 'email'] },
@@ -214,19 +212,19 @@ export default function AppLayout({ children, header }: { children: React.ReactN
 
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/generate', label: 'Workflow', icon: GitBranch },
-    { href: '/runs', label: 'Historique', icon: History },
+    { href: '/generate',  label: 'Workflow',  icon: GitBranch },
+    { href: '/runs',      label: 'Tâches',    icon: History },
   ];
 
   const selectedSite = sites.find(s => s.id === selectedSiteId) ?? null;
 
   const PAGE_TITLES: Record<string, string> = {
     '/dashboard': 'Dashboard',
-    '/generate': 'Workflows',
-    '/runs': 'Historique',
-    '/projects': 'Projets',
-    '/account': 'Mon compte',
-    '/blogs': 'Articles',
+    '/generate':  'Workflows',
+    '/runs':      'Tâches',
+    '/projects':  'Projets',
+    '/account':   'Mon compte',
+    '/blogs':     'Articles',
   };
   const pageTitle = pathname.startsWith('/settings/') ? 'Paramètres'
     : pathname.startsWith('/runs/') ? 'Résultat'

@@ -301,9 +301,9 @@ export const MODULE_CATALOG: ModuleDef[] = [
   },
   {
     type: 'chatgpt-analysis',
-    label: 'Analyse ChatGPT',
-    description: '6 variantes · Sources citées · Résumé GEO',
-    details: 'Envoie le prompt GEO 3 fois à ChatGPT (gpt-4o-mini), collecte les réponses, puis utilise Claude Haiku pour en extraire les questions pertinentes, les sources citées, les points communs et les opportunités de contenu GEO.',
+    label: 'Analyse Open AI',
+    description: 'Chromium → chatgpt.com · Web search · Sources réelles',
+    details: 'Pilote Chromium vers chatgpt.com avec web search activé. Envoie chaque variante GEO, extrait la réponse et les URLs réellement citées, puis utilise Claude Haiku pour l\'analyse croisée (questions, sources, opportunités GEO).',
     icon: ChatGptIcon,
     category: 'analysis',
     accent: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' },

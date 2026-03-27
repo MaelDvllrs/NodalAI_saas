@@ -7,7 +7,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
-  title: 'Blog Automation Webflow',
+  title: 'Nodal AI | Workflow SEO GEO',
   description: 'Génération automatique d\'articles SEO pour Webflow CMS',
   robots: {
     index: false,

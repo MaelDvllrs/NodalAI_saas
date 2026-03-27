@@ -11,6 +11,7 @@ import { useTasks } from '../../contexts/TaskContext';
 import { Globe, ArrowDownLeft, Save, Play, Download, RefreshCw, Loader2, ChevronLeft, Pencil, Check, X } from 'lucide-react';
 import Link from 'next/link';
 import { Skeleton } from '../../components/UI';
+import { cn } from '../../utils/cn';
 import WorkflowEditor, { CanvasBlock, SavedEdge } from '../../components/WorkflowEditor';
 import type { WorkflowEditorActions } from '../../components/WorkflowEditor';
 
@@ -31,6 +32,7 @@ function BuilderPageContent() {
   const { selectedSite, sites, loading: sitesLoading } = useProject();
   const searchParams = useSearchParams();
   const workflowId = searchParams.get('workflowId');
+  const resumeJobId = searchParams.get('resume');
 
   // Workflow loading
   const [workflow, setWorkflow] = useState<SavedWorkflow | null>(null);
@@ -69,11 +71,12 @@ function BuilderPageContent() {
 
   // Job / SSE state
   const [isLoading, setIsLoading] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const [events, setEvents] = useState<LogEvent[]>([]);
   const esRef = useRef<EventSource | null>(null);
   const jobIdRef = useRef<string | null>(null);
   const taskIdRef = useRef<number | null>(null);
-  const { addTask, appendEvent } = useTasks();
+  const { addTask, appendEvent, getTaskByJobId } = useTasks();
 
   // Restore previous job from localStorage on mount
   useEffect(() => {
@@ -104,6 +107,7 @@ function BuilderPageContent() {
       es.onmessage = (e) => {
         try {
           const event = JSON.parse(e.data) as LogEvent;
+          setIsReconnecting(false);
           if (skipCount.value > 0) { skipCount.value--; return; }
           if (taskIdRef.current !== null) appendEvent(taskIdRef.current, event);
           setEvents((prev) => {
@@ -118,14 +122,48 @@ function BuilderPageContent() {
           }
         } catch { /* ignore */ }
       };
+      // Server may have restarted — do NOT mark the task as error.
+      // EventSource auto-reconnects every ~3 s; when the server comes back the
+      // Supabase fallback replays completed steps and sends the terminal event.
       es.onerror = () => {
-        es.close();
-        setIsLoading(false);
-        if (taskIdRef.current !== null) appendEvent(taskIdRef.current, { type: 'error', message: 'Connexion perdue.' });
+        setIsReconnecting(true);
       };
     } catch { /* ignore */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Reconnect to a running job when navigated from the tasks page (?resume=jobId)
+  useEffect(() => {
+    if (!resumeJobId) return;
+
+    const existingTask = getTaskByJobId(resumeJobId);
+    jobIdRef.current = resumeJobId;
+    setEvents([]);
+    setIsLoading(true);
+
+    // Reuse the existing task so no duplicate appears in the task panel
+    taskIdRef.current = existingTask?.id ?? addTask(resumeJobId, 'Reconnexion...', 'generate', { initialStatus: 'running' });
+
+    const es = new EventSource(`${API_URL}/stream/${resumeJobId}`);
+    esRef.current = es;
+
+    es.onmessage = (e) => {
+      try {
+        const event = JSON.parse(e.data) as LogEvent;
+        setIsReconnecting(false);
+        if (taskIdRef.current !== null) appendEvent(taskIdRef.current, event);
+        setEvents((prev) => [...prev, event]);
+        if (event.type === 'done' || event.type === 'error') {
+          es.close();
+          setIsLoading(false);
+        }
+      } catch { /* ignore */ }
+    };
+    es.onerror = () => setIsReconnecting(true);
+
+    return () => es.close();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeJobId]);
 
   function handleReset() {
     esRef.current?.close();
@@ -241,6 +279,7 @@ function BuilderPageContent() {
       es.onmessage = (e) => {
         try {
           const event = JSON.parse(e.data) as LogEvent;
+          setIsReconnecting(false);
           console.log('[Builder SSE] received event:', event.type, event);
           if (taskIdRef.current !== null) appendEvent(taskIdRef.current, event);
           setEvents((prev) => {
@@ -256,16 +295,11 @@ function BuilderPageContent() {
         } catch { /* ignore */ }
       };
 
+      // Server may have restarted — do NOT mark the task as error.
+      // EventSource auto-reconnects every ~3 s; when the server comes back the
+      // Supabase fallback replays completed steps and sends the terminal event.
       es.onerror = () => {
-        es.close();
-        setIsLoading(false);
-        const errEvent: LogEvent = { type: 'error', message: 'Connexion au serveur perdue.' };
-        if (taskIdRef.current !== null) appendEvent(taskIdRef.current, errEvent);
-        setEvents((prev) => {
-          const next = [...prev, errEvent];
-          localStorage.setItem(STORAGE_KEY, JSON.stringify({ jobId, events: next, done: true, projectName, mode: jobMode }));
-          return next;
-        });
+        setIsReconnecting(true);
       };
     } catch (err) {
       setEvents([{ type: 'error', message: (err as Error).message }]);
@@ -403,9 +437,14 @@ function BuilderPageContent() {
                     Lancer
                   </button>
                 ) : (
-                  <div className="px-3 py-1.5 flex items-center gap-2 rounded-xl bg-accent/5 border border-accent/20 text-accent text-xs font-semibold">
+                  <div className={cn(
+                    'px-3 py-1.5 flex items-center gap-2 rounded-xl border text-xs font-semibold',
+                    isReconnecting
+                      ? 'bg-orange-500/5 border-orange-500/20 text-orange-400'
+                      : 'bg-accent/5 border-accent/20 text-accent',
+                  )}>
                     <Loader2 size={13} className="animate-spin" />
-                    En cours...
+                    {isReconnecting ? 'Reconnexion...' : 'En cours...'}
                   </div>
                 )}
                 {events.length > 0 && !isLoading && (

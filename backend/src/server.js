@@ -8,8 +8,6 @@ import blogsRoutes     from './routes/blogs.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
 import workflowRoutes  from './routes/workflow.routes.js';
 import { startGenerationWorker } from './workers/generation.worker.js';
-import taskRoutes from './routes/task.routes.js';
-
 // Prevent unhandled errors from crashing the process and resetting SSE connections
 process.on('uncaughtException', (err) => {
   console.error('[Server] Uncaught exception (server kept alive):', err);
@@ -41,8 +39,6 @@ app.use('/api/blogs', blogsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api', blogRoutes);        // blog generation + SSE stream
 app.use('/api', workflowRoutes);    // workflow CRUD + execution
-app.use('/api/tasks', taskRoutes);
-
 app.listen(PORT, () => {
   console.log(`Backend running on http://localhost:${PORT}`);
   startGenerationWorker();

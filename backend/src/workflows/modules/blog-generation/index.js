@@ -123,6 +123,18 @@ export const BlogGenerationModule = {
     let rawBlog = '';
     let parsed  = null;
 
+    // Asymptotic time-based progress ticker — blog generation is a long blocking
+    // Claude call (~30-90 s). Emit progress events every 3 s so the frontend bar
+    // keeps moving while waiting. Approaches 90 % asymptotically; the engine emits
+    // module-done (100 %) when the call returns.
+    let _pct = 0;
+    const _progressTick = setInterval(() => {
+      _pct = Math.min(90, _pct + (90 - _pct) * 0.07);
+      emitEvent(jobId, { type: 'progress', moduleType: 'blog-generation', pct: Math.round(_pct) });
+    }, 3000);
+
+    try {
+
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       const attemptLabel = attempt === 1 ? '' : ` (tentative ${attempt}/${MAX_ATTEMPTS})`;
       emitEvent(jobId, { type: 'step', message: `✍️ Génération du blog avec Claude${attemptLabel}...` });
@@ -246,6 +258,9 @@ export const BlogGenerationModule = {
       htmlBodyFull,
       fieldData,
     };
+  } finally {
+    clearInterval(_progressTick);
+  }
   },
 };
 

@@ -34,9 +34,11 @@ export type SemanticAnalysis = {
 
 export type LogEvent =
   | { type: 'step'; message: string }
+  | { type: 'workflow-start'; modules: { type: string; instanceId: string; label: string }[] }
   | { type: 'module-start'; moduleType: string; instanceId: string; label: string }
   | { type: 'module-done'; moduleType: string; instanceId: string; label: string }
   | { type: 'module-error'; moduleType: string; instanceId: string; label: string; error: string }
+  | { type: 'progress'; moduleType: string; pct: number }
   | { type: 'data'; key: string; value: unknown }
   | { type: 'preview'; data: { titleTag: string; h1: string; metaDescription: string } }
   | { type: 'embeds'; data: { faqEmbed: string | null; schemas: { position: string; code: string }[] } }

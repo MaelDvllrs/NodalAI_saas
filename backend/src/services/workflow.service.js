@@ -110,6 +110,19 @@ export async function getPublicWorkflows() {
 
 // ── Workflow runs ────────────────────────────────────────────────────────────
 
+/**
+ * Lightweight run lookup used by the SSE stream fallback.
+ * No userId guard — the jobId UUID is the only secret needed.
+ */
+export async function getWorkflowRunForStream(runId) {
+  const { data } = await supabase
+    .from('workflow_runs')
+    .select('id, status')
+    .eq('id', runId)
+    .single();
+  return data ?? null;
+}
+
 export async function createWorkflowRun({ workflowId, projectId, userId }) {
   const { data, error } = await supabase
     .from('workflow_runs')

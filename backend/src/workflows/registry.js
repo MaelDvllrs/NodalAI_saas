@@ -252,11 +252,11 @@ const MODULES = [
     module:      WebflowStructureModule,
   },
 
-  // ── ChatGPT Analysis ───────────────────────────────────────────────────────
+  // ── Open AI Analysis (Chromium → chatgpt.com) ─────────────────────────────
   {
     id:          'chatgpt-analysis',
-    label:       'Analyse ChatGPT',
-    description: 'Envoie le prompt 3× à ChatGPT et analyse les réponses (questions, sources, résumé GEO).',
+    label:       'Analyse Open AI',
+    description: 'Pilote Chromium vers chatgpt.com (web search activé) — sources réelles, URLs vérifiables.',
     ports: {
       in:  [
         { key: 'geoPrompt', label: 'Prompt GEO', required: true },

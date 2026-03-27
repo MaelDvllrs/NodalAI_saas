@@ -69,3 +69,62 @@ export async function claudeCreate(client, params, { maxRetries = 3, baseDelayMs
 
   throw lastErr;
 }
+
+/**
+ * Like claudeCreate but with Anthropic web search enabled (web_search_20250305).
+ * Claude will autonomously search the web when needed and include results in its response.
+ *
+ * @param {import('@anthropic-ai/sdk').default} client
+ * @param {object} params  - Same as claudeCreate; tools will be prepended automatically
+ * @param {object} [opts]
+ * @returns {Promise<import('@anthropic-ai/sdk').Message>}
+ */
+export async function claudeCreateWithSearch(client, params, { maxRetries = 3, baseDelayMs = 2000 } = {}) {
+  const betaParams = {
+    ...params,
+    tools: [
+      { type: 'web_search_20260209', name: 'web_search' },
+      ...(params.tools ?? []),
+    ],
+  };
+
+  let lastErr;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await client.messages.create(betaParams, {
+        headers: { 'anthropic-beta': 'web-search-2025-03-05' },
+      });
+    } catch (err) {
+      lastErr = err;
+
+      if (!isRetryable(err) || attempt === maxRetries) {
+        throw err;
+      }
+
+      const delay = baseDelayMs * Math.pow(2, attempt) * (0.8 + Math.random() * 0.4);
+      console.warn(
+        `[Claude+Search] Erreur ${err.status ?? '?'} (${err.error?.type ?? err.message?.slice(0, 40)}) — ` +
+        `retry ${attempt + 1}/${maxRetries} dans ${Math.round(delay)}ms...`
+      );
+      await sleep(delay);
+    }
+  }
+
+  throw lastErr;
+}
+
+/**
+ * Extract plain text from a message that may contain web_search tool_use / tool_result blocks.
+ * Only returns the final text blocks (the actual Claude answer).
+ *
+ * @param {import('@anthropic-ai/sdk').Message} message
+ * @returns {string}
+ */
+export function extractTextContent(message) {
+  return (message.content ?? [])
+    .filter(b => b.type === 'text')
+    .map(b => b.text)
+    .join('\n')
+    .trim();
+}
