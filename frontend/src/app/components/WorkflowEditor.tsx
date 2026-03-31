@@ -23,7 +23,10 @@ import '@xyflow/react/dist/style.css';
 import {
   Search, TrendingUp, Layers, Sparkles, Rocket,
   X, CheckCircle2, AlertCircle, Loader2, Check, SlidersHorizontal, MoreVertical,
-  Play, RefreshCw, FileEdit, Info, MousePointerClick, Zap, Globe, Save, Type, Download, Database, MessageSquarePlus, Lightbulb, Languages,
+  Play, RefreshCw, FileEdit, Info, MousePointerClick, Zap, Globe, Save, Type, Download, Database, MessageSquarePlus, Lightbulb, Languages, Plus,
+  ChevronDown, PanelRight, ArrowDownToLine, ArrowUpFromLine,
+  DeleteIcon,
+  TrashIcon,
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 import type { LogEvent } from './ProgressLog';
@@ -68,7 +71,7 @@ interface ModuleDef {
   label: string;
   description: string;
   details: string;
-  icon: ComponentType<{ size?: number | string; className?: string }>;
+  icon: ComponentType<{ size?: number | string; className?: string; monochrome?: boolean }>;
   category: 'trigger' | 'input' | 'research' | 'analysis' | 'generation' | 'publish';
   accent: { bg: string; text: string; border: string };
   defaultConfig: BlockConfig;
@@ -554,10 +557,11 @@ function TextInputConfig({ config, onChange, readOnly }: { config: BlockConfig; 
         options={TEXT_INPUT_KEY_OPTIONS}
         className={cn('w-full nodrag [&>button]:w-full [&>button]:justify-between', readOnly && 'pointer-events-none opacity-60')}
       />
-      <input type="text" readOnly={readOnly}
+      <textarea readOnly={readOnly}
         placeholder="Entrez une valeur..."
+        rows={3}
         value={value} onChange={e => onChange({ ...config, value: e.target.value })}
-        className={cn('input-base text-xs nodrag', readOnly && 'opacity-60 cursor-default')} />
+        className={cn('input-base text-xs nodrag w-full resize-none', readOnly && 'opacity-60 cursor-default')} />
     </div>
   );
 }
@@ -702,13 +706,15 @@ interface WorkflowNodeData {
   def: ModuleDef;
   status: BlockStatus;
   readOnly: boolean;
+  configHidden: boolean;
+  isSelected: boolean;
   onChange: (instanceId: string, config: BlockConfig) => void;
   onRemove: (instanceId: string) => void;
   [key: string]: unknown;
 }
 
 function WorkflowNode({ data }: NodeProps) {
-  const { block, def, status, readOnly, onChange, onRemove } = data as WorkflowNodeData;
+  const { block, def, status, readOnly, onChange, onRemove, isSelected } = data as WorkflowNodeData;
   const [ioOpen, setIoOpen] = useState(false);
   const Icon = def.icon;
   const ConfigRenderer = CONFIG_RENDERERS[block.type];
@@ -743,11 +749,12 @@ function WorkflowNode({ data }: NodeProps) {
 
       {/* ── Card ── */}
       <div className={cn(
-        'w-64 rounded-xl border shadow-md transition-all duration-300 group',
-        status === 'idle'   && 'border-border bg-card',
-        status === 'active' && cn(def.accent.border, 'bg-card'),
-        status === 'done'   && 'border-green-500 bg-card',
-        status === 'error'  && 'border-red-500 bg-card',
+        'w-64 rounded-xl border bg-primary shadow-md transition-all duration-300 group shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+        isSelected         ? 'border-text' :
+        status === 'idle'   ? 'border-border' :
+        status === 'active' ? cn(def.accent.border) :
+        status === 'done'   ? 'border-green-500 ' :
+                              'border-red-500 ',
       )}>
         {/* Target handle — only when the module accepts inputs */}
         {def.ports.in.length > 0 && (
@@ -755,22 +762,21 @@ function WorkflowNode({ data }: NodeProps) {
             type="target"
             position={Position.Top}
             style={{
-              width: 16, height: 16,
+              width: 12, height: 12,
               background: 'var(--surface)',
-              border: '2px solid var(--accent)',
+              border: '1px solid var(--text-muted)',
               borderRadius: '50%',
               cursor: 'crosshair',
-              boxShadow: '0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent)',
             }}
           />
         )}
 
         {/* Header: icon + label + IO button + X */}
-        <div className="flex items-center gap-2.5 px-3.5 py-3">
-          <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center shrink-0', def.accent.bg)}>
+        <div className="flex items-center gap-2 px-3.5 py-3">
+          <div className="h-6 flex items-center">
             {status === 'active'
-              ? <Loader2 size={14} className={cn('animate-spin', def.accent.text)} />
-              : <Icon size={14} className={status === 'idle' ? 'text-text-muted/50' : def.accent.text} />
+              ? <Loader2 size={15} className={cn('animate-spin', def.accent.text)} />
+              : <Icon size={15} className={def.accent.text} />
             }
           </div>
           <span className="flex-1 text-sm font-semibold text-text truncate leading-tight">{def.label}</span>
@@ -802,7 +808,6 @@ function WorkflowNode({ data }: NodeProps) {
               'inline-flex items-center gap-1 text-[9px] font-semibold px-2 py-0.5 rounded-full border',
               def.accent.bg, def.accent.text, def.accent.border,
             )}>
-              <span className="font-mono opacity-50 text-[8px]">→</span>
               {block.type === 'text-input'
                 ? (TEXT_INPUT_KEY_OPTIONS.find(o => o.value === block.config.outputKey)?.label ?? mainOutput.label)
                 : mainOutput.label}
@@ -810,8 +815,8 @@ function WorkflowNode({ data }: NodeProps) {
           </div>
         )}
 
-        {/* Config renderer */}
-        {ConfigRenderer && (
+        {/* Config renderer — hidden when info panel is open */}
+        {ConfigRenderer && !data.configHidden && (
           <div className={cn('px-3.5 pb-3 border-t pt-3', def.accent.border)}>
             <ConfigRenderer
               config={block.config}
@@ -826,12 +831,11 @@ function WorkflowNode({ data }: NodeProps) {
           type="source"
           position={Position.Bottom}
           style={{
-            width: 16, height: 16,
+            width: 12, height: 12,
             background: 'var(--surface)',
-            border: '2px solid var(--accent)',
+            border: '1px solid var(--text-muted)',
             borderRadius: '50%',
             cursor: 'crosshair',
-            boxShadow: '0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent)',
           }}
         />
       </div>
@@ -856,7 +860,7 @@ function WorkflowNode({ data }: NodeProps) {
 
           {def.ports.in.length > 0 && (
             <div className="mb-3.5">
-              <p className="text-[8px] font-bold uppercase tracking-widest text-text-muted/40 mb-2">Entrées</p>
+              <p className="text-[8px] uppercase tracking-widest text-text-muted/40 mb-2">Entrées</p>
               <div className="space-y-1.5">
                 {def.ports.in.map(p => (
                   <div key={p.key} className="flex items-center gap-1.5">
@@ -874,7 +878,7 @@ function WorkflowNode({ data }: NodeProps) {
 
           {def.ports.out.length > 0 && (
             <div>
-              <p className="text-[8px] font-bold uppercase tracking-widest text-text-muted/40 mb-2">Sorties</p>
+              <p className="text-[8px] uppercase tracking-widest text-text-muted/40 mb-2">Sorties</p>
               <div className="space-y-1.5">
                 {def.ports.out.map(p => (
                   <div key={p.key} className={cn('flex items-center gap-1.5', def.accent.text)}>
@@ -897,7 +901,7 @@ function WorkflowNode({ data }: NodeProps) {
 //
 
 function DeletableEdge({
-  id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition,
+  id, source, target, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition,
   style, markerEnd, animated,
 }: EdgeProps) {
   const [hovered, setHovered] = useState(false);
@@ -909,8 +913,7 @@ function DeletableEdge({
     setHovered(true);
   };
   const onLeave = () => {
-    // Short delay so moving from path → button doesn't close the label
-    leaveTimer.current = setTimeout(() => setHovered(false), 80);
+    leaveTimer.current = setTimeout(() => setHovered(false), 120);
   };
 
   return (
@@ -934,22 +937,32 @@ function DeletableEdge({
             pointerEvents: hovered ? 'all' : 'none',
             transition: 'opacity 0.12s',
           }}
-          className="absolute nopan"
+          className="absolute nopan cursor-pointer"
           onMouseEnter={onEnter}
           onMouseLeave={onLeave}
         >
-          <button
-            type="button"
-            onClick={() => {
-              const event = new CustomEvent('delete-edge', { detail: { id } });
-              window.dispatchEvent(event);
-            }}
-            className="w-5 h-5 rounded-full bg-background border border-border flex items-center justify-center
-              hover:bg-red-500/10 hover:border-red-500/40 hover:text-red-400
-              text-text-muted transition-all duration-150 shadow-sm"
-          >
-            <X size={10} />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* + insert button */}
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('insert-on-edge', { detail: { id, source, target, x: labelX, y: labelY } }))}
+              className="w-4 h-4 rounded-sm bg-primary flex items-center justify-center
+                hover:border-accent/50 hover:text-accent
+                text-text-muted transition-all duration-150 shadow-sm"
+            >
+              <Plus size={10} />
+            </button>
+            {/* X delete button */}
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('delete-edge', { detail: { id } }))}
+              className="w-4 h-4 rounded-sm bg-primary flex items-center justify-center
+                hover:border-accent/50 hover:text-accent
+                text-text-muted transition-all duration-150 shadow-sm"
+            >
+              <TrashIcon size={9} />
+            </button>
+          </div>
         </div>
       </EdgeLabelRenderer>
     </>
@@ -992,13 +1005,12 @@ function TriggerNode({ data }: NodeProps) {
         type="source"
         position={Position.Bottom}
         style={{
-          width: 16,
-          height: 16,
+          width: 12,
+          height: 12,
           background: 'var(--surface)',
-          border: '2px solid var(--accent)',
+          border: '1px solid var(--accent)',
           borderRadius: '50%',
           cursor: 'crosshair',
-          boxShadow: '0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent)',
         }}
       />
     </div>
@@ -1012,13 +1024,16 @@ const edgeTypes = { deletable: DeletableEdge };
 // Palette card
 // 
 
-function PaletteCard({ def, disabled, onAdd }: { def: ModuleDef; disabled: boolean; onAdd: () => void }) {
+function PaletteCard({ def, disabled, onAdd, isInserting, wiggleIndex = 0 }: { def: ModuleDef; disabled: boolean; onAdd: () => void; isInserting?: boolean; wiggleIndex?: number }) {
   const Icon = def.icon;
   return (
     <div className={cn('relative flex items-center gap-2.5 px-2  rounded-lg  transition-all duration-150 group/card',
       disabled
         ? ' bg-accent-hover/60 opacity-40 cursor-not-allowed shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
-        : ' bg-primary hover:border-border hover:bg-accent-hover cursor-grab active:cursor-grabbing shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]')}
+        : isInserting
+          ? cn('bg-primary border border-accent/30 cursor-pointer shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] palette-wiggle')
+          : ' bg-primary hover:border-border hover:bg-accent-hover cursor-grab active:cursor-grabbing shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]')}
+      style={isInserting ? { animationDelay: `${wiggleIndex * 90}ms` } : undefined}
       draggable={!disabled}
       onDragStart={!disabled ? e => {
         e.dataTransfer.setData('module-type', def.type);
@@ -1045,7 +1060,7 @@ function PaletteCard({ def, disabled, onAdd }: { def: ModuleDef; disabled: boole
       onClick={!disabled ? onAdd : undefined}>
       <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-transform',
         !disabled && 'group-hover/card:scale-105')}>
-        <Icon size={13} className={def.accent.text} />
+        <Icon size={13} className={def.accent.text} monochrome />
       </div>
       <p className="flex-1 text-xs font-semibold text-text truncate">{def.label}</p>
       {!disabled && (
@@ -1083,12 +1098,12 @@ const DEFAULT_MODULE_TYPES = [
   'webflow-publish',
 ];
 const ALL_DEFAULT_TYPES = [TRIGGER_TYPE, ...DEFAULT_MODULE_TYPES];
-const NODE_GAP = 230;
+const NODE_GAP = 220;
 const noop = () => {};
 
-const EDGE_STYLE = { stroke: 'var(--accent)', strokeWidth: 1.5, opacity: 0.5 };
-const EDGE_STYLE_RUNNING = { stroke: 'var(--accent)', strokeWidth: 2, opacity: 0.9 };
-const MARKER_END = { type: MarkerType.ArrowClosed, color: 'var(--accent)' };
+const EDGE_STYLE = { stroke: 'var(--text-muted)', strokeWidth: 1.5, opacity: 1 };
+const EDGE_STYLE_RUNNING = { stroke: 'var(--text-muted)', strokeWidth: 1.5, opacity: 0.5 };
+const MARKER_END = { type: MarkerType.ArrowClosed, color: 'var(--text-muted)' };
 
 function getRfNodeType(type: string) {
   const def = MODULE_CATALOG.find(m => m.type === type);
@@ -1107,6 +1122,8 @@ const INITIAL_NODES: Node[] = ALL_DEFAULT_TYPES.map((type, i) => {
       def,
       status: 'idle' as BlockStatus,
       readOnly: false,
+      configHidden: false,
+      isSelected: false,
       onChange: noop,
       onRemove: noop,
     } as WorkflowNodeData,
@@ -1142,6 +1159,8 @@ function blocksToNodes(blocks: CanvasBlock[]): Node[] {
           def,
           status: 'idle' as BlockStatus,
           readOnly: false,
+          configHidden: false,
+          isSelected: false,
           onChange: noop,
           onRemove: noop,
         } as WorkflowNodeData,
@@ -1169,6 +1188,7 @@ function blocksToEdges(nodes: Node[]): Edge[] {
 
 function DroppableCanvas({
   rfNodes, rfEdges, onNodesChange, onEdgesChange, onConnect, visibleCount, onDropModule,
+  onNodeSelect, onPaneClick,
 }: {
   rfNodes: Node[];
   rfEdges: Edge[];
@@ -1177,6 +1197,8 @@ function DroppableCanvas({
   onConnect: (params: Connection) => void;
   visibleCount: number;
   onDropModule: (type: string, position: { x: number; y: number }) => void;
+  onNodeSelect: (instanceId: string) => void;
+  onPaneClick: () => void;
 }) {
   const { screenToFlowPosition } = useReactFlow();
 
@@ -1213,8 +1235,10 @@ function DroppableCanvas({
         snapGrid={[16, 16]}
         connectionLineStyle={{ stroke: 'var(--accent)', strokeWidth: 2, strokeDasharray: '6 3' }}
         className="bg-background"
+        onNodeClick={(_e, node) => onNodeSelect((node.data as WorkflowNodeData).block.instanceId)}
+        onPaneClick={onPaneClick}
       >
-        <FixedDotBackground gap={20} dotSize={0.7} color="var(--border)" />
+        <FixedDotBackground gap={20} dotSize={0.7} color="color-mix(in srgb, var(--text-muted) 40%, transparent)" />
         <Controls showInteractive={false}
           className="border-border !shadow-none [&>button]:border-border [&>button]:!text-text-muted rounded-md overflow-hidden !bg-[var(--primary)] [&>button]:!bg-[var(--primary)]" />
         <MiniMap nodeStrokeWidth={0} nodeColor={() => 'var(--primary)'}
@@ -1226,6 +1250,177 @@ function DroppableCanvas({
           <p className="text-[11px] text-text-muted/30">Glissez un module depuis la palette</p>
         </div>
       )}
+    </div>
+  );
+}
+
+//
+// Module info panel (right sidebar)
+//
+
+function ModuleInfoPanel({
+  nodes,
+  onChange,
+  readOnly,
+  selectedInstanceId,
+  onClearSelection,
+}: {
+  nodes: WorkflowNodeData[];
+  onChange: (instanceId: string, config: BlockConfig) => void;
+  readOnly: boolean;
+  selectedInstanceId: string | null;
+  onClearSelection: () => void;
+}) {
+  // per-module section open state: key = `${instanceId}:section`
+  const [sections, setSections] = useState<Set<string>>(new Set());
+
+  function toggleSection(key: string) {
+    setSections(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
+
+  // ── Options view (module selected on canvas) ──────────────────────────────
+  const selectedNode = selectedInstanceId
+    ? nodes.find(n => n.block.instanceId === selectedInstanceId)
+    : null;
+
+  if (selectedNode) {
+    const { block, def } = selectedNode;
+    const Icon = def.icon;
+    const ConfigRenderer = CONFIG_RENDERERS[block.type];
+
+    return (
+      <div className="w-72 shrink-0 border-l flex flex-col overflow-hidden bg-surface">
+        {/* Header with back button */}
+        <div className="px-4 py-3 border-b shrink-0 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onClearSelection}
+            className="p-1 -ml-1 rounded hover:bg-bg/60 text-text-muted hover:text-text transition-colors"
+          >
+            <ChevronDown size={14} className="rotate-90" />
+          </button>
+          <div className={cn('w-6 h-6 rounded-md flex items-center justify-center shrink-0', def.accent.bg)}>
+            <Icon size={11} className={def.accent.text} monochrome />
+          </div>
+          <p className="text-xs font-semibold flex-1 truncate">{def.label}</p>
+        </div>
+
+        {/* Options */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {ConfigRenderer ? (
+            <>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-text-muted mb-3">Options</p>
+              <ConfigRenderer
+                config={block.config}
+                onChange={c => onChange(block.instanceId, c)}
+                readOnly={readOnly}
+              />
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-text-muted/30 text-center">
+              <SlidersHorizontal size={20} className="mb-2" />
+              <p className="text-xs">Aucune option disponible</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Default list view (inputs / outputs) ─────────────────────────────────
+  return (
+    <div className="w-72 shrink-0 border-l flex flex-col overflow-hidden bg-surface">
+
+
+      <div className="flex-1 overflow-y-auto">
+        {nodes.length === 0 && (
+          <div className="flex items-center justify-center py-16 text-text-muted/30 text-xs">
+            Aucun module
+          </div>
+        )}
+
+        {nodes.map(({ block, def, status }) => {
+          const Icon = def.icon;
+          const inKey  = `${block.instanceId}:in`;
+          const outKey = `${block.instanceId}:out`;
+
+          return (
+            <div key={block.instanceId} className='py-3 flex flex-col gap-3'>
+              {/* Header — icon status + title */}
+              <div className="flex items-center gap-2.5 px-4">
+                <span className="shrink-0 w-4 flex items-center justify-center">
+                  {status === 'active' && <Loader2 size={14} className="animate-spin text-accent" />}
+                  {status === 'done'   && <CheckCircle2 size={14} className="text-green-400" />}
+                  {status === 'error'  && <AlertCircle  size={14} className="text-red-400" />}
+                  {(status === 'idle' || !status) && <Icon size={14} className="text-text-muted/50" monochrome />}
+                </span>
+                <p className="text-xs font-semibold flex-1 truncate">{def.label}</p>
+              </div>
+
+              {/* Body — left connector line + port sections */}
+              {(def.ports.in.length > 0 || def.ports.out.length > 0) && (
+                <div className="ml-[22px] mr-4 border-l border-border/50 pl-3 space-y-1">
+
+                  {/* Inputs */}
+                  {def.ports.in.length > 0 && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(inKey)}
+                        className="w-full flex items-center gap-2.5 px-2 py-1 rounded-lg bg-primary hover:bg-accent-hover transition-all duration-150 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] text-left"
+                      >
+                        <span className="flex-1 text-xs text-text truncate">Entrées</span>
+                        <ChevronDown size={10} className={cn('text-text-muted/30 shrink-0 transition-transform duration-200', sections.has(inKey) && 'rotate-180')} />
+                      </button>
+                      {sections.has(inKey) && (
+                        <div className="space-y-1 pt-1 pb-1 px-1">
+                          {def.ports.in.map(p => (
+                            <div key={p.key} className="flex items-center gap-1.5">
+                              <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', p.required ? 'bg-red-400/60' : 'bg-text-muted/20')} />
+                              <span className="text-[9px] font-mono text-text-muted/60 flex-1 truncate">{p.key}</span>
+                              <span className="text-[9px] text-text-muted/35 truncate max-w-[80px] text-right">{p.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Outputs */}
+                  {def.ports.out.length > 0 && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(outKey)}
+                        className="w-full flex items-center gap-2.5 px-2 py-1 rounded-lg bg-primary hover:bg-accent-hover transition-all duration-150 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] text-left"
+                      >
+                        <span className="flex-1 text-xs  text-text truncate">Sorties</span>
+                        <ChevronDown size={10} className={cn('text-text-muted/30 shrink-0 transition-transform duration-200', sections.has(outKey) && 'rotate-180')} />
+                      </button>
+                      {sections.has(outKey) && (
+                        <div className="space-y-1 pt-1 pb-1 px-1">
+                          {def.ports.out.map(p => (
+                            <div key={p.key} className={cn('flex items-center gap-1.5', def.accent.text)}>
+                              <span className="w-1.5 h-1.5 rounded-full bg-current shrink-0 opacity-50" />
+                              <span className="text-[9px] font-mono flex-1 truncate opacity-70">{p.key}</span>
+                              <span className="text-[9px] opacity-35 truncate max-w-[80px] text-right">{p.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1289,7 +1484,10 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState(startNodes);
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState<Edge>(startEdges);
   const [isSaving, setIsSaving] = useState(false);
+  const [showInfoPanel, setShowInfoPanel] = useState(true);
+  const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   const [showLogsInternal, setShowLogsInternal] = useState(false);
+  const [insertingEdge, setInsertingEdge] = useState<{ edgeId: string; source: string; target: string; x: number; y: number } | null>(null);
   const showLogs = showLogsProp !== undefined ? showLogsProp : showLogsInternal;
   const setShowLogs = showLogsProp !== undefined ? () => {} : setShowLogsInternal;
 
@@ -1335,6 +1533,24 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
     return () => window.removeEventListener('delete-edge', handler);
   }, [setRfEdges]);
 
+  // Insert-on-edge custom event (from DeletableEdge + button)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { id, source, target, x, y } = (e as CustomEvent<{ id: string; source: string; target: string; x: number; y: number }>).detail;
+      setInsertingEdge({ edgeId: id, source, target, x, y });
+    };
+    window.addEventListener('insert-on-edge', handler);
+    return () => window.removeEventListener('insert-on-edge', handler);
+  }, []);
+
+  // Escape cancels inserting mode
+  useEffect(() => {
+    if (!insertingEdge) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setInsertingEdge(null); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [insertingEdge]);
+
   // Inject callbacks + update status/visibility whenever deps change
   useEffect(() => {
     console.log(`[WorkflowEditor] status update — isRunning: ${isRunning} | events: ${events.length}`);
@@ -1350,6 +1566,7 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
           onRemove: handleRemove,
           status,
           readOnly: isRunning,
+          configHidden: showInfoPanel,
         },
       };
     }));
@@ -1359,7 +1576,15 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
       style: isRunning ? EDGE_STYLE_RUNNING : EDGE_STYLE,
       markerEnd: MARKER_END,
     })));
-  }, [handleChangeConfig, handleRemove, events, isRunning, setRfNodes, setRfEdges]);
+  }, [handleChangeConfig, handleRemove, events, isRunning, showInfoPanel, setRfNodes, setRfEdges]);
+
+  // Sync isSelected flag on nodes when selection changes
+  useEffect(() => {
+    setRfNodes(prev => prev.map(n => ({
+      ...n,
+      data: { ...n.data, isSelected: n.id === selectedInstanceId },
+    })));
+  }, [selectedInstanceId, setRfNodes]);
 
   const onConnect = useCallback((params: Connection) => {
     setRfEdges(eds => addEdge({
@@ -1391,6 +1616,7 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
           def,
           status: 'idle' as BlockStatus,
           readOnly: isRunning,
+          configHidden: showInfoPanel,
           onChange: handleChangeConfig,
           onRemove: handleRemove,
         } as WorkflowNodeData,
@@ -1398,6 +1624,41 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
       }];
     });
   }
+
+  function insertBlockOnEdge(type: string) {
+    if (!insertingEdge) return;
+    const { edgeId, source, target, x, y } = insertingEdge;
+    const def = MODULE_CATALOG.find(m => m.type === type);
+    if (!def) return;
+    const instanceId = `${type}-${Date.now()}`;
+    const position = { x: x - 128, y: y - 40 };
+    setRfNodes(prev => [...prev, {
+      id: instanceId,
+      type: getRfNodeType(type),
+      position,
+      data: {
+        block: { instanceId, type, config: { ...def.defaultConfig } },
+        def,
+        status: 'idle' as BlockStatus,
+        readOnly: isRunning,
+        configHidden: showInfoPanel,
+        onChange: handleChangeConfig,
+        onRemove: handleRemove,
+      } as WorkflowNodeData,
+      draggable: true,
+    }]);
+    const ts = Date.now();
+    setRfEdges(prev => [
+      ...prev.filter(e => e.id !== edgeId),
+      { id: `e-ins-${ts}-a`, source, target: instanceId, type: 'deletable' as const, animated: false, style: EDGE_STYLE, markerEnd: MARKER_END },
+      { id: `e-ins-${ts}-b`, source: instanceId, target, type: 'deletable' as const, animated: false, style: EDGE_STYLE, markerEnd: MARKER_END },
+    ]);
+    setInsertingEdge(null);
+  }
+
+  const sortedPanelNodes = [...rfNodes]
+    .sort((a, b) => a.position.y - b.position.y)
+    .map(n => n.data as WorkflowNodeData);
 
   const usedTypes = new Set(rfNodes.map(n => (n.data as WorkflowNodeData).block.type));
   const paletteTriggers = MODULE_CATALOG.filter(m => m.category === 'trigger');
@@ -1435,64 +1696,81 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
 
       {/* Palette */}
       <div className="w-60 shrink-0 flex flex-col overflow-auto space-y-2 p-2 border-r">
-
         {/* Triggers */}
-        <div className="flex items-center gap-2 px-0.5 mb-2">
-          <Zap size={9} />
-          <p className="text-[9px] font-bold uppercase tracking-[0.18em]">Déclencheurs</p>
+        <div>
+            <div className="flex items-center gap-2 px-0.5 mb-2">
+              <Zap size={9} />
+              <p className="text-[9px] font-bold uppercase tracking-[0.18em]">Déclencheurs</p>
+            </div>
+            {paletteTriggers.map((def, i) => (
+              <PaletteCard
+                key={def.type}
+                def={def}
+                wiggleIndex={i}
+                disabled={isRunning || (!!def.unique && usedTypes.has(def.type)) || (!!insertingEdge && !(def.ports.in.length > 0 && def.ports.out.length > 0))}
+                isInserting={!!insertingEdge && !isRunning && def.ports.in.length > 0 && def.ports.out.length > 0 && !(!!def.unique && usedTypes.has(def.type))}
+                onAdd={() => insertingEdge && def.ports.in.length > 0 && def.ports.out.length > 0 ? insertBlockOnEdge(def.type) : (!insertingEdge ? addBlock(def.type) : undefined)}
+              />
+            ))}
+    
+            {paletteInputs.length > 0 && (
+              <div className="border-t border-border/40 pt-3 mt-3">
+                <div className="flex items-center gap-2 px-0.5 mb-2">
+                  <Type size={9} />
+                  <p className="text-[9px] font-bold uppercase tracking-[0.18em]">Entrées</p>
+                </div>
+                <div className="space-y-1">
+                  {paletteInputs.map((def, i) => (
+                    <PaletteCard
+                      key={def.type}
+                      def={def}
+                      wiggleIndex={paletteTriggers.length + i}
+                      disabled={isRunning || (!!def.unique && usedTypes.has(def.type)) || (!!insertingEdge && !(def.ports.in.length > 0 && def.ports.out.length > 0))}
+                      isInserting={!!insertingEdge && !isRunning && def.ports.in.length > 0 && def.ports.out.length > 0 && !(!!def.unique && usedTypes.has(def.type))}
+                      onAdd={() => insertingEdge && def.ports.in.length > 0 && def.ports.out.length > 0 ? insertBlockOnEdge(def.type) : (!insertingEdge ? addBlock(def.type) : undefined)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+    
+            {paletteGroups.map((group, gi) => {
+              const groupBase = paletteTriggers.length + paletteInputs.length + paletteGroups.slice(0, gi).reduce((s, g) => s + g.modules.length, 0);
+              return (
+                <div key={group.id} className={gi === 0 ? 'border-t border-border/40 pt-3 mt-3' : 'pt-3 mt-1'}>
+                  <div className="flex items-center gap-2 px-0.5 mb-2">
+                    <p className="text-[9px] font-bold uppercase tracking-[0.18em]">{group.label}</p>
+                  </div>
+                  <div className="space-y-1">
+                    {group.modules.map((def, i) => (
+                      <PaletteCard
+                        key={def.type}
+                        def={def}
+                        wiggleIndex={groupBase + i}
+                        disabled={isRunning || (!!def.unique && usedTypes.has(def.type)) || (!!insertingEdge && !(def.ports.in.length > 0 && def.ports.out.length > 0))}
+                        isInserting={!!insertingEdge && !isRunning && def.ports.in.length > 0 && def.ports.out.length > 0 && !(!!def.unique && usedTypes.has(def.type))}
+                        onAdd={() => insertingEdge && def.ports.in.length > 0 && def.ports.out.length > 0 ? insertBlockOnEdge(def.type) : (!insertingEdge ? addBlock(def.type) : undefined)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
         </div>
-        {paletteTriggers.map(def => (
-          <PaletteCard
-            key={def.type}
-            def={def}
-            disabled={isRunning || (!!def.unique && usedTypes.has(def.type))}
-            onAdd={() => addBlock(def.type)}
-          />
-        ))}
-
-        {paletteInputs.length > 0 && (
-          <div className="border-t border-border/40 pt-3 mt-3">
-            <div className="flex items-center gap-2 px-0.5 mb-2">
-              <Type size={9} />
-              <p className="text-[9px] font-bold uppercase tracking-[0.18em]">Entrées</p>
-            </div>
-            <div className="space-y-1">
-              {paletteInputs.map(def => (
-                <PaletteCard
-                  key={def.type}
-                  def={def}
-                  disabled={isRunning || (!!def.unique && usedTypes.has(def.type))}
-                  onAdd={() => addBlock(def.type)}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {paletteGroups.map((group, gi) => (
-          <div key={group.id} className={gi === 0 ? 'border-t border-border/40 pt-3 mt-3' : 'pt-3 mt-1'}>
-            <div className="flex items-center gap-2 px-0.5 mb-2">
-              <p className="text-[9px] font-bold uppercase tracking-[0.18em]">{group.label}</p>
-            </div>
-            <div className="space-y-1">
-              {group.modules.map(def => (
-                <PaletteCard
-                  key={def.type}
-                  def={def}
-                  disabled={isRunning || (!!def.unique && usedTypes.has(def.type))}
-                  onAdd={() => addBlock(def.type)}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
-
       </div>
 
       {/* React Flow canvas */}
       <div className={cn('flex flex-col min-w-0', monitoring && showLogs ? 'w-[520px] shrink-0' : 'flex-1')}>
         {!hideActions && (
           <div className="flex items-center justify-end gap-2 mb-2">
+            <button
+              type="button"
+              onClick={() => setShowInfoPanel(v => !v)}
+              className={cn('btn-secondary gap-2', showInfoPanel && 'border-accent/40 text-accent')}
+              title="Panneau d'informations"
+            >
+              <PanelRight size={13} />
+            </button>
             {onExport && !isRunning && (
               <button type="button" onClick={onExport} className="btn-secondary gap-2">
                 <Download size={13} />
@@ -1545,6 +1823,8 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
               onConnect={onConnect}
               visibleCount={visibleCount}
               onDropModule={(type, pos) => addBlock(type, pos)}
+              onNodeSelect={id => { setSelectedInstanceId(id); if (!showInfoPanel) setShowInfoPanel(true); }}
+              onPaneClick={() => { setSelectedInstanceId(null); setInsertingEdge(null); }}
             />
           </ReactFlowProvider>
           
@@ -1591,6 +1871,17 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
           )}
         </div>
       </div>
+
+      {/* Module info panel */}
+      {showInfoPanel && (
+        <ModuleInfoPanel
+          nodes={sortedPanelNodes}
+          onChange={handleChangeConfig}
+          readOnly={isRunning}
+          selectedInstanceId={selectedInstanceId}
+          onClearSelection={() => setSelectedInstanceId(null)}
+        />
+      )}
 
       {/* Results panel */}
       {monitoring && showLogs && (

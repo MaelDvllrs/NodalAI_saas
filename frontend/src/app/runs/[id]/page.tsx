@@ -1168,12 +1168,17 @@ function WebflowStructureResult({ data }: { data: Record<string, unknown> }) {
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(detectedFields).map(([role, slug], i) => (
-                  <tr key={role} className={cn('border-b border-border/50 last:border-0', i % 2 === 0 ? 'bg-card' : 'bg-background/30')}>
-                    <td className="px-3 py-2 text-text-muted uppercase tracking-wider text-[10px] font-semibold">{role}</td>
-                    <td className="px-3 py-2 font-mono text-accent/80">{slug}</td>
-                  </tr>
-                ))}
+                {Object.entries(detectedFields).map(([role, slugVal], i) => {
+                  const slugStr = typeof slugVal === 'object' && slugVal !== null
+                    ? (slugVal as { slug?: string }).slug ?? JSON.stringify(slugVal)
+                    : String(slugVal);
+                  return (
+                    <tr key={role} className={cn('border-b border-border/50 last:border-0', i % 2 === 0 ? 'bg-card' : 'bg-background/30')}>
+                      <td className="px-3 py-2 text-text-muted uppercase tracking-wider text-[10px] font-semibold">{role}</td>
+                      <td className="px-3 py-2 font-mono text-accent/80">{slugStr}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1937,7 +1942,7 @@ function RunDetailContent() {
                       )}
                     >
                       {BrandIcon ? (
-                        <BrandIcon size={17} className={cn(isSelected ? 'text-text' : 'text-text-muted', 'shrink-0')} />
+                        (() => { const B = BrandIcon as React.ComponentType<{size?: number | string; className?: string; monochrome?: boolean}>; return <B size={17} className={cn(isSelected ? 'text-text' : 'text-text-muted', 'shrink-0')} monochrome />; })()
                       ) : Icon ? (
                         (() => { const I = Icon as React.ComponentType<{size?: number | string; className?: string; monochrome?: boolean}>; return <I size={15} className={cn(isSelected ? 'text-text' : 'text-text-muted', 'shrink-0')} monochrome />; })()
                       ) : null}

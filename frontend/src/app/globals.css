@@ -154,6 +154,28 @@ body {
   to { background-position: -200% 0; }
 }
 
+@keyframes wiggle {
+  0%, 100% { transform: rotate(-1deg); }
+  50%       { transform: rotate(1deg); }
+}
+.palette-wiggle {
+  animation: wiggle 0.20s ease-in-out infinite;
+  transform-origin: 50% 10%;
+  cursor: pointer !important;
+}
+
+/* ReactFlow handle hover scale */
+.react-flow__handle-top,
+.react-flow__handle-bottom {
+  transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+}
+.react-flow__handle-top:hover {
+  transform: translate(-50%, -50%) scale(1.35) !important;
+}
+.react-flow__handle-bottom:hover {
+  transform: translate(-50%, 50%) scale(1.35) !important;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

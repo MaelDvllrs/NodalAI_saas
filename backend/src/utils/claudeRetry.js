@@ -79,11 +79,11 @@ export async function claudeCreate(client, params, { maxRetries = 3, baseDelayMs
  * @param {object} [opts]
  * @returns {Promise<import('@anthropic-ai/sdk').Message>}
  */
-export async function claudeCreateWithSearch(client, params, { maxRetries = 3, baseDelayMs = 2000 } = {}) {
-  const betaParams = {
+export async function claudeCreateWithSearch(client, params, { maxRetries = 3, baseDelayMs = 2000, maxUses = 5 } = {}) {
+  const searchParams = {
     ...params,
     tools: [
-      { type: 'web_search_20260209', name: 'web_search' },
+      { type: 'web_search_20250305', name: 'web_search', max_uses: maxUses },
       ...(params.tools ?? []),
     ],
   };
@@ -92,9 +92,7 @@ export async function claudeCreateWithSearch(client, params, { maxRetries = 3, b
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await client.messages.create(betaParams, {
-        headers: { 'anthropic-beta': 'web-search-2025-03-05' },
-      });
+      return await client.messages.create(searchParams);
     } catch (err) {
       lastErr = err;
 

@@ -21,23 +21,26 @@ export async function suggestKeywordCandidates(theme) {
   const client = getClient();
 
   const message = await claudeCreateWithSearch(client, {
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-sonnet-4-6',
     max_tokens: 1024,
-    system: `Tu es un expert SEO français. Tu dois extraire des mots-clés réels à partir d'une analyse de résultats web, pas inventer des expressions.
+    system: `Tu es un expert SEO français spécialisé en recherche de mots-clés longue-traîne.
 Ta réponse finale doit être UNIQUEMENT un tableau JSON valide, sans texte avant ou après.`,
     messages: [
       {
         role: 'user',
-        content: `Thème à analyser : "${theme}"
+        content: `Thème principal : "${theme}"
 
 Étape 1 — Recherche web :
-Effectue une recherche sur "${theme}" et une seconde recherche sur "${theme} guide" ou "${theme} comment" pour récupérer des résultats actuels.
+Effectue une recherche sur "${theme}" pour récupérer les résultats actuels Google.
 
-Étape 2 — Analyse des résultats :
-Examine les titres des articles, les sous-titres (H2/H3), les questions "People also ask" et les expressions qui reviennent dans les résultats.
+Étape 2 — Analyse :
+Examine les titres, H2/H3 et questions "People also ask" des résultats.
 
-Étape 3 — Extraction des mots-clés :
-À partir de cette analyse, identifie 5 expressions longue-traîne (2 à 5 mots) en français que les internautes tapent réellement, différentes du thème brut.
+Étape 3 — Extraction :
+Identifie 5 expressions longue-traîne (2 à 5 mots) en français qui :
+- Contiennent le mot "${theme}" ou un synonyme très proche (même sujet, même intention)
+- Sont des variantes de recherche réelles autour de "${theme}" (pas un sujet connexe différent)
+- Ont une intention informationnelle claire
 
 Retourne UNIQUEMENT ce tableau JSON :
 ["expression 1", "expression 2", "expression 3", "expression 4", "expression 5"]`,

@@ -512,15 +512,12 @@ export async function runPipeline(jobId, params) {
             const rw0 = await rewriteArticleForSeo({
               body:             parsed.planMece,
               introduction:     parsed.introduction,
-              mainKeyword,
               tone,
               serpModel,
               semanticAnalysis,
               coverageData:     null,
               wcMin:            wMin0,
               wcMax:            wMax0,
-              forceTermDensity: true,
-              termRangeDetails: densityCheck0.details.filter((d) => !d.inRange).slice(0, 20),
             });
             parsed.planMece     = rw0.body;
             parsed.introduction = rw0.introduction;
@@ -570,7 +567,6 @@ export async function runPipeline(jobId, params) {
             const rewritten = await rewriteArticleForSeo({
               body:              parsed.planMece,
               introduction:      parsed.introduction,
-              mainKeyword,
               tone,
               serpModel,
               semanticAnalysis,
@@ -646,15 +642,12 @@ export async function runPipeline(jobId, params) {
             const rewritten2 = await rewriteArticleForSeo({
               body:             parsed.planMece,
               introduction:     parsed.introduction,
-              mainKeyword,
               tone,
               serpModel,
               semanticAnalysis,
               coverageData,
               wcMin:            wcMin2,
               wcMax:            wcMax2,
-              forceTermDensity: true,
-              termRangeDetails: termRangeResult.details.filter((d) => !d.inRange).slice(0, 20),
             });
             parsed.planMece     = rewritten2.body;
             parsed.introduction = rewritten2.introduction;

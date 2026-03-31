@@ -12,7 +12,7 @@
 
 import axios from 'axios';
 import Anthropic from '@anthropic-ai/sdk';
-import { claudeCreate } from '../../../utils/claudeRetry.js';
+import { claudeCreateWithSearch, extractTextContent } from '../../../utils/claudeRetry.js';
 
 const BASE_URL   = 'https://api.dataforseo.com/v3';
 const MAX_PAGES        = 8;    // Nombre de pages à intégrer dans l'analyse TF-IDF
@@ -1172,13 +1172,13 @@ Réponds UNIQUEMENT avec ce JSON (aucun texte avant ou après) :
 }`;
 
   try {
-    const message = await claudeCreate(client, {
-      model:      'claude-haiku-4-5-20251001',
+    const message = await claudeCreateWithSearch(client, {
+      model:      'claude-sonnet-4-5-20250929',
       max_tokens: 2000,
       messages:   [{ role: 'user', content: prompt }],
     });
 
-    const raw     = message.content[0].text.trim();
+    const raw     = extractTextContent(message);
     const jsonStr = raw.startsWith('{') ? raw : raw.match(/\{[\s\S]*\}/)?.[0] || '{}';
     const parsed  = JSON.parse(jsonStr);
 

@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { claudeCreate } from '../../../utils/claudeRetry.js';
+import { claudeCreate, claudeCreateWithSearch, extractTextContent } from '../../../utils/claudeRetry.js';
 
 function getClient() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -55,17 +55,50 @@ export async function generateOptimizedOutline(mainKeyword, serpModel, theme, to
   const faqNote       = serpModel.hasFaq ? 'Inclure une section FAQ.' : '';
   const targetWordsToUse = targetWords ?? Math.round(serpModel.avgWordCount * 1.1);
 
+  console.log(`[Claude] generateOptimizedOutline — mainKeyword: "${mainKeyword}", theme: "${theme}", targetWords: ${targetWordsToUse}, sous-thèmes: ${subtopicsText}, `);
+
   const prompt = `Tu es un expert SEO.
 
 Génère un plan d'article optimisé pour le mot-clé "${mainKeyword}" (thème : "${theme ?? mainKeyword}").
 
 RÈGLES OBLIGATOIRES :
+
 1. Couverture 100% des sous-thèmes SERP — chaque sous-thème doit apparaître dans un H2 ou H3 :
 ${subtopicsText}
-2. Intègre naturellement ces entités dans les titres ou descriptions : ${entitiesText}
-3. Intention de recherche dominante : ${serpModel.intent}
-4. Format de contenu dominant : ${serpModel.contentFormat}
-5. Longueur cible : ~${targetWordsToUse} mots
+
+2. Intègre naturellement ces entités dans les titres ou descriptions :
+${entitiesText}
+
+3. Intention de recherche dominante :
+${serpModel.intent}
+
+4. Format de contenu dominant :
+${serpModel.contentFormat}
+
+5. CONTRAINTE STRUCTURELLE (CRITIQUE) :
+Tu dois respecter STRICTEMENT la longueur cible (~${targetWordsToUse} mots).
+
+- Introduction : 180–220 mots
+- Conclusion : 150–200 mots
+- H2 : 200–250 mots
+- H3 : 100–150 mots
+
+👉 AVANT de générer le plan :
+- Calcule le budget de mots restant après introduction + conclusion
+- Déduis le nombre MAXIMUM de sections possibles
+- Adapte le nombre de H2 et H3 pour NE PAS dépasser ce budget
+
+6. OPTIMISATION :
+- Priorise les H2
+- Utilise des H3 uniquement si nécessaire pour couvrir les sous-thèmes
+- Regroupe les sous-thèmes proches dans un même H2 quand possible
+- Ne dépasse jamais le nombre de sections autorisé
+
+7. SORTIE :
+- Donne uniquement le plan (H1, H2, H3)
+- Pas de contenu
+- Structure optimisée SEO + lisibilité
+
 ${faqNote}
 
 Retourne UNIQUEMENT le plan en format texte, avec des H2 (## Titre) et H3 (### Titre) :
@@ -110,7 +143,7 @@ MÉTHODE DE CONDENSATION (par ordre de priorité) :
 6. **Supprimer** les digressions qui n'apportent pas de valeur SEO directe
 
 CONTRAINTES ABSOLUES (ne jamais toucher à) :
-- Tous les marqueurs : [[INTERNE:...]], [[EXTERNE:...]], [[QUOTE:...]], [[IMAGE:...]] — les conserver intégralement, ne jamais couper un marqueur en deux
+- Tous les marqueurs : [[INTERNE:...]], [[EXTERNE:...]], [[QUOTE:...]] — les conserver intégralement, ne jamais couper un marqueur en deux
 - Tous les titres H2 (## ...) et H3 (### ...) — les conserver tous
 - Le mot-clé principal "${mainKeyword}" — doit apparaître autant de fois qu'avant
 - L'intention de recherche et le plan logique de l'article — la structure sémantique doit rester cohérente
@@ -132,9 +165,8 @@ ${content}`,
 
 // ── Rewrite article for SEO ───────────────────────────────────────────────────
 export async function rewriteArticleForSeo({
-  body, introduction, mainKeyword, tone,
+  body, introduction, tone,
   serpModel, semanticAnalysis, coverageData, wcMin, wcMax,
-  forceTermDensity = false, termRangeDetails = [],
 }) {
   const client = getClient();
 
@@ -157,21 +189,7 @@ export async function rewriteArticleForSeo({
 
   const top30Terms = (semanticAnalysis?.intentTopTerms || []).slice(0, 30).map((t) => t.display || t.term);
   const top30Block = top30Terms.length > 0
-    ? `\n\n### ⭐ TOP ${top30Terms.length} MOTS-CLÉS PRIORITAIRES (classés par importance SEO) :\nRÈGLE : utilise AU MOINS 20 de ces termes dans la réécriture. Chaque H2 doit en contenir ≥ 3.\n${top30Terms.map((t, i) => `${i+1}. **${t}**`).join('  |  ')}`
-    : '';
-
-  const rewriteTargetWords = Math.round((wcMin + wcMax) / 2);
-  const rewriteSourceWords = serpModel?.avgWordCount || rewriteTargetWords;
-  const scaledTerms = scaleTermCounts(
-    (semanticAnalysis?.intentTopTerms || []).filter((t) => t.maxCount > 0).slice(0, 60),
-    rewriteTargetWords,
-    rewriteSourceWords,
-  );
-  const freqGuideLines = scaledTerms
-    .map((t) => `| ${(t.display || t.term).padEnd(22)} | ${String(t.minCount).padStart(3)} | ${String(t.maxCount).padStart(3)} | ~${t.target} |`)
-    .join('\n');
-  const freqGuideBlock = freqGuideLines
-    ? `\n\n### Guide de fréquence des termes (occurrences absolues pour ~${rewriteTargetWords} mots) :\nObjectif : utiliser chaque terme autour de la valeur Cible dans l'article complet. Un terme absent = opportunité SEO manquée.\n| Terme                   | Min | Max | Cible |\n|-------------------------|-----|-----|-------|\n${freqGuideLines}`
+    ? `\n\n### Champ lexical prioritaire (à intégrer naturellement) :\n${top30Terms.map((t, i) => `${i+1}. ${t}`).join('  ·  ')}`
     : '';
 
   const missingTopicBlock = missingTopics.length > 0
@@ -182,51 +200,66 @@ export async function rewriteArticleForSeo({
     ? `\n### Entités SERP manquantes (à intégrer naturellement) :\n${missingEntities.join(', ')}`
     : '\n✅ Entités déjà présentes.';
 
+  const hasInternalLinks = (body + introduction).includes('[[INTERNE:');
+
   const prompt = `Tu es un expert SEO et rédacteur web senior. Tu dois RÉÉCRIRE INTÉGRALEMENT le corps et l'introduction d'un article qui a obtenu un score SEO insuffisant.
 
-## DIAGNOSTIC DU PROBLÈME
-Score SEO actuel : **${totalScore}/100** (seuil minimum : 65)
-- Couverture des sous-thèmes SERP : ${topicCoverage}%
-- Couverture des entités : ${entityCoverage}%
-- Score volume de contenu : ${wordScore}%
+## PRIORITÉS (ORDRE STRICT)
+1. Qualité rédactionnelle et valeur pour le lecteur
+2. Couverture des sous-thèmes SERP manquants
+3. Intégration naturelle du champ lexical
+4. Contraintes techniques (liens, schémas)
+⚠️ Si deux contraintes entrent en conflit, privilégie toujours la qualité du contenu.
 
-## OBJECTIF DE LA RÉÉCRITURE
-Produire une version améliorée qui atteint au minimum 70/100 en :
-1. Couvrant TOUS les sous-thèmes SERP manquants
-2. Intégrant TOUTES les entités manquantes
-3. Utilisant abondamment les termes sémantiques principaux
-4. Respectant l'intention de recherche : **${serpModel?.intent ?? 'informationnelle'}**
-5. Longueur cible : **${wcMin}–${wcMax} mots** pour le CORPS UNIQUEMENT
+## DIAGNOSTIC
+Score SEO actuel : **${totalScore}/100** (seuil minimum : 65)
+- Couverture sous-thèmes SERP : ${topicCoverage}%
+- Couverture entités : ${entityCoverage}%
+- Score volume : ${wordScore}%
+
+## OBJECTIF
+Longueur cible : **${wcMin}–${wcMax} mots** pour le CORPS. Intention de recherche : **${serpModel?.intent ?? 'informationnelle'}**.
 ${missingTopicBlock}
 ${missingEntityBlock}${top30Block}
 
-### Termes sémantiques principaux TF-IDF (à intégrer densément) :
+## DENSITÉ SÉMANTIQUE (OPTIMISATION INTELLIGENTE)
+- Intègre naturellement les termes du champ lexical ci-dessus
+- Priorité : fluidité, lisibilité et valeur utilisateur
+- Évite toute répétition artificielle ou sur-optimisation
+- Chaque terme important doit apparaître 2 à 5 fois selon sa pertinence
+- Favorise les variantes sémantiques et synonymes
+
+### Termes TF-IDF principaux :
 ${primaryTerms}
 
-### Expressions longue traîne (utiliser dans les H3 et l'intro) :
+### Expressions longue traîne (utiliser dans H3 et intro) :
 ${longTailList}
 
-### Gaps de contenu identifiés chez les concurrents (si pertinent, traiter) :
-${contentGaps}${freqGuideBlock}${forceTermDensity && termRangeDetails.length > 0 ? `
+### Gaps de contenu (si pertinent) :
+${contentGaps}
 
-## ⚠️ ALERTE DENSITÉ TERMES-CLÉS — PRIORITÉ MAXIMALE
-Une analyse automatique a détecté que les termes suivants sont ABSENTS ou sous-utilisés dans l'article.
-Tu DOIS les intégrer dans la réécriture — sans exception. Chaque terme manquant nuit directement au référencement.
-Utilise-les naturellement dans les paragraphes, les H3, les listes à puces et l'introduction.
-La comparaison est insensible aux accents : "référencement" et "referencement" sont considérés identiques.
+## STYLE RÉDACTIONNEL
+- Écris comme un expert humain, pas comme une IA
+- Évite les formulations génériques ("Dans cet article...")
+- Apporte des insights, exemples concrets ou angles différenciants
+- Paragraphes courts (3-5 lignes max), listes à puces régulières
+- Phrases de transition naturelles entre les sections
 
-### Termes à intégrer d'urgence (hors plage de fréquence cible) :
-${termRangeDetails.map((d) => `- **${d.term}** : présent ${d.density} fois/1000 mots (plage cible : ${d.minCount}–${d.maxCount})`).join('\n')}` : ''}
-
-## RÈGLES ABSOLUES DE RÉÉCRITURE
+## RÈGLES DE RÉÉCRITURE
 - Conserver INTÉGRALEMENT tous les titres H2 (## ...) et H3 (### ...) du corps
-- Conserver INTÉGRALEMENT tous les marqueurs : [[INTERNE:...]], [[EXTERNE:...]], [[QUOTE:...]], [[IMAGE:...]]
-- L'introduction DOIT commencer par une accroche forte (chiffre, question, affirmation) avec le mot-clé "${mainKeyword}" dans les 15 premiers mots
-- Ne JAMAIS commencer l'introduction par un résumé descriptif ou une définition générale
+- Conserver INTÉGRALEMENT tous les marqueurs : [[INTERNE:...]], [[EXTERNE:...]], [[QUOTE:...]]
+- Introduction : accroche forte (chiffre, question ou constat), mot-clé dès le début, promesse claire au lecteur
 - Ton : ${tone}
 - Langue : français uniquement
-- Ne PAS répéter le même sous-thème dans plusieurs sections — chaque H2 doit traiter un angle unique
-- Inclure MINIMUM 1 marqueur [[QUOTE:...]] si absent
+- Chaque H2 traite un angle unique, sans répétition de sous-thème
+${hasInternalLinks ? '- Les liens internes [[INTERNE:...]] existants doivent être conservés et enrichis si possible' : '- Aucune URL interne disponible — ne pas forcer de liens internes fictifs'}
+
+## VALIDATION INTERNE (AVANT FIN)
+Avant de terminer, vérifie que :
+- Au moins 3 liens externes fiables [[EXTERNE:...]] sont présents
+- Au moins 3 schémas [[SCHEMA:...]] dont [[SCHEMA:faq]] sont présents
+- Au moins 1 citation [[QUOTE:...]] est incluse
+Si un élément manque, ajoute-le avant la conclusion.
 
 ## FORMAT DE SORTIE OBLIGATOIRE
 Retourne EXACTEMENT ce format JSON (aucun texte avant ou après) :
@@ -269,6 +302,45 @@ ${body}`;
   }
 }
 
+// ── Find real external links via web search ───────────────────────────────────
+/**
+ * Use Claude + web search to find 6-8 real, current, verifiable external URLs
+ * relevant to the article topic. Returns an array of { url, title, anchor } objects.
+ */
+export async function findExternalLinks(mainKeyword, secondaryKeywords = []) {
+  const client = getClient();
+  const context = secondaryKeywords.slice(0, 3).join(', ');
+
+  const message = await claudeCreateWithSearch(client, {
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 1024,
+    messages: [{
+      role: 'user',
+      content: `Tu es un expert SEO. Recherche sur le web des sources fiables et actuelles pour un article sur : "${mainKeyword}"${context ? ` (contexte : ${context})` : ''}.
+
+Trouve 6 à 8 URLs réelles provenant de sources de référence (sites officiels, études, statistiques, guides d'autorité).
+Exemples de sources acceptables : HubSpot, Statista, INSEE, Forbes, Wikipedia, MDN, Google, Semrush, Search Engine Journal, Moz, etc.
+
+IMPORTANT : utilise uniquement des URLs que tu as trouvées dans les résultats de recherche web — aucune URL inventée.
+
+Retourne UNIQUEMENT un tableau JSON valide, sans texte avant ou après :
+[
+  { "url": "https://...", "title": "Titre de la page", "anchor": "texte d'ancre naturel pour l'article" },
+  ...
+]`,
+    }],
+  });
+
+  try {
+    const raw = extractTextContent(message);
+    const jsonStr = raw.startsWith('[') ? raw : raw.match(/\[[\s\S]*\]/)?.[0] || '[]';
+    const parsed = JSON.parse(jsonStr);
+    return Array.isArray(parsed) ? parsed.filter(l => l.url && l.url.startsWith('http')).slice(0, 8) : [];
+  } catch {
+    return [];
+  }
+}
+
 // ── Full blog generation ──────────────────────────────────────────────────────
 /**
  * Generate a full SEO blog article.
@@ -297,36 +369,51 @@ export async function generateBlogContent({
     ? internalUrls.map((u) => `- ${u.title} : ${u.url}`).join('\n')
     : 'Aucune URL interne disponible.';
 
+  // ── Fetch real external links via web search ─────────────────────────────
+  let externalLinksText = '';
+  try {
+    const externalLinks = await findExternalLinks(mainKeyword, secondaryKeywords);
+    if (externalLinks.length > 0) {
+      externalLinksText = externalLinks
+        .map(l => `- [[EXTERNE:${l.url}|${l.anchor || l.title}]] (${l.title})`)
+        .join('\n');
+      console.log(`[Blog] ${externalLinks.length} liens externes trouvés via web search`);
+    }
+  } catch (err) {
+    console.warn('[Blog] findExternalLinks échoué (non bloquant):', err.message);
+  }
+
   const systemPrompt = `Tu es un expert SEO et copywriter spécialisé dans la création de contenu optimisé pour les moteurs de recherche.
 Tu génères des articles de blog COMPLETS, intégralement rédigés, prêts à être publiés directement.
 
-## 📏 LONGUEUR — RÈGLE N°1, PRIORITÉ ABSOLUE
-
-### OBJECTIF SECTION 5 (Corps de l'article) : **${wcBlogMin}–${wcBlogMax} mots TOTAL**.
-
-⚠️ Le minimum de **${wcBlogMin} mots** est obligatoire — un article trop court sera refusé.
-✅ Vise le haut de la fourchette (proche de ${wcBlogMax} mots) pour maximiser la couverture SEO.
-
-Répartition cible par section :
-- Chaque H2 (texte + listes) : **200–350 mots**
-- Chaque H3 (texte) : **100–150 mots**
-- Conclusion : **150–200 mots**
-
-Stratégie : rédige chaque section de façon dense et substantielle. Si tu atteins ${wcBlogMax} mots avant la conclusion, rédige une conclusion courte (100 mots) et termine proprement.
+## PRIORITÉS (ORDRE STRICT)
+1. Qualité rédactionnelle et valeur pour le lecteur
+2. Respect de la structure demandée
+3. Couverture des sujets SEO importants
+4. Intégration naturelle des mots-clés
+5. Contraintes techniques (liens, schémas)
+⚠️ Si deux contraintes entrent en conflit, privilégie toujours la qualité du contenu.
 
 ---
 
-AVANT le début des sections numérotées, tu dois impérativement générer un marqueur d'image principale avec le format suivant (une seule ligne) :
-[[FEATURED_IMAGE:Prompt très détaillé en anglais pour Gemini AI image generation]]
+## 📏 LONGUEUR — RÈGLE N°1
 
-Ce prompt doit :
-- Être rédigé en ANGLAIS (Gemini performe mieux en anglais)
-- Faire 2 à 4 phrases très descriptives
-- Préciser le sujet exact (lien direct avec le thème et mot-clé de l'article)
-- Préciser le style visuel : photographie professionnelle OU illustration OU infographie
-- Préciser la lumière, les couleurs dominantes, l'ambiance
-- Préciser la composition : plan large / cadrage / perspective
-- Interdire tout texte, watermark, logo sur l'image
+### Objectif : article long et complet (~${wcBlogMax} mots)
+
+- **Minimum :** ${wcBlogMin} mots
+- **Maximum recommandé :** ${Math.round(wcBlogMax * 1.06)} mots
+- Si tu dépasses légèrement le maximum, privilégie la qualité plutôt que de couper brutalement
+
+Répartition cible par section :
+- Introduction : **180–220 mots**
+- Chaque H2 (texte + listes) : **200–300 mots**
+- Chaque H3 (texte) : **80–150 mots**
+- Conclusion : **120–180 mots**
+
+Stratégie : rédige chaque section de façon dense et substantielle.
+
+---
+
 Tu respectes SCRUPULEUSEMENT le format de sortie ci-dessous, sans jamais déroger à la structure.
 
 ---
@@ -407,86 +494,73 @@ Règles :
 
 ---
 
-#### BLOC B — INTRODUCTION (180 à 200 mots)
-Rédige une introduction de 180 à 200 mots, conçue pour optimiser simultanément le référencement Google ET la lecture par les LLMs (ChatGPT, Perplexity, Gemini).
+#### BLOC B — INTRODUCTION (180 à 220 mots)
+Rédige une introduction naturelle et engageante, optimisée pour Google et les LLMs.
 
-Rules OBLIGATOIRES — dans cet ordre précis :
-
-**Phrase 1 — Accroche + mot-clé principal dans les 12 premiers mots**
-- Commence par un chiffre fort, une question directe ou une affirmation provocatrice
-- Le mot-clé principal DOIT apparaître dans la première phrase
-
-**Phrases 2-3 — Contexte + reformulation de l'intention**
-- Reformule l'intention de recherche en 1-2 phrases naturelles
-- Intègre le contexte problème (à qui s'adresse l'article, quel problème résout-il)
-
-**Phrases 4-6 — Intégration des termes obligatoires**
-- Intègre naturellement les mots-clés secondaires principaux (au moins 4 différents)
-- Intègre les entités et groupes de mots clés définis dans les contraintes SERP
-- Aucun terme doit apparaître comme du bourrage — fluidité totale exigée
-
-**Dernière phrase — Promesse + invite à lire**
-- Annonce brièvement ce que l'article apporte (sans tout dévoiler)
-- Crée de la curiosité ou du FOMO
+- Commence par une accroche forte : question, chiffre marquant ou constat percutant
+- Intègre le mot-clé principal dès le début du texte, de façon fluide
+- Reformule l'intention de recherche naturellement (à qui s'adresse l'article, quel problème résout-il)
+- Introduis les concepts clés sans en faire une liste mécanique
+- Termine par une promesse claire au lecteur
 
 ⚠️ INTERDITS :
-- Introduction générique ou bateau ("Dans cet article, nous allons...")
+- Introduction générique ("Dans cet article, nous allons...")
 - Répétition du title tag ou du H1 mot pour mot
-- Moins de 150 mots ou plus de 220 mots pour le Bloc B
+- Structure rigide type "Phrase 1 : ... Phrase 2 : ..."
 
 ---
 
 ### 5. CONTENU COMPLET DE L'ARTICLE
 [Champ : Corps de l'article]
 
-📏 OBJECTIF SECTION 5 : **${wcBlogMin}–${wcBlogMax} mots TOTAL**. Vise le haut de la fourchette.
-Répartition : H2 = 200–350 mots · H3 = 100–150 mots · Conclusion = 150–200 mots.
+📏 OBJECTIF SECTION 5 : ~${wcBlogMax} mots (minimum ${wcBlogMin}, maximum recommandé ${Math.round(wcBlogMax * 1.06)}).
+Répartition : H2 = 200–300 mots · H3 = 80–150 mots · Conclusion = 120–180 mots.
 
 Rédige le CONTENU INTÉGRAL et complet de l'article en suivant la méthode MECE.
 
-RÈGLES OBLIGATOIRES :
-- Chaque H2 : description d'accroche (1-2 phrases) + contenu rédigé complet (**200 à 350 mots**) + liste à puces si pertinent (3 à 5 items)
-- Chaque H3 : description d'accroche (1 phrase) + contenu rédigé complet (**100 à 150 mots**)
+## STYLE RÉDACTIONNEL (OBLIGATOIRE)
+- Écris comme un expert humain, pas comme une IA
+- Évite les formulations génériques ("Dans cet article...", "Il est important de noter...")
+- Apporte des insights concrets, exemples ou angles différenciants
+- Paragraphes courts (3-5 lignes max)
+- Utilise des listes à puces régulièrement pour aérer
+- Phrases de transition naturelles entre les sections
 
-🚨 **LIENS INTERNES** (CRITIQUE — NON NÉGOCIABLE) :
-- Format exact : [[INTERNE:URL|texte d'ancre riche en mots-clés]]
-- **MINIMUM 3 LIENS OBLIGATOIRES** — utilise les URLs fournies dans "URLs internes disponibles"
-- ⚠️ REJET AUTOMATIQUE si moins de 3 liens internes dans l'article final
+## DENSITÉ SÉMANTIQUE (OPTIMISATION INTELLIGENTE)
+- Intègre naturellement les termes fournis dans les contextes ci-dessous
+- Priorité : fluidité, lisibilité et valeur utilisateur
+- Évite toute répétition artificielle ou sur-optimisation
+- Chaque terme important doit apparaître 2 à 5 fois selon sa pertinence
+- Favorise les variantes sémantiques et synonymes
 
-🚨 **LIENS EXTERNES** (CRITIQUE — NON NÉGOCIABLE) :
-- Format exact : [[EXTERNE:URL|texte d'ancre descriptif]]
-- **MINIMUM 3 SOURCES FIABLES OBLIGATOIRES** (Google, HubSpot, INSEE, Forbes, Statista, Wikipedia, MDN, W3C, etc.)
-- Cite des URLs RÉELLES et VÉRIFIABLES — pas d'invention
-- ⚠️ REJET AUTOMATIQUE si moins de 3 liens externes dans l'article final
-- 💡 ASTUCE : Place 1-2 liens externes dans l'introduction, 1-2 dans le corps, 1 dans la conclusion
+**LIENS INTERNES :**
+- Format : [[INTERNE:URL|texte d'ancre]]
+- Si des URLs internes sont disponibles → minimum 3 liens obligatoires, répartis dans l'article
+- Si aucune URL n'est fournie → ne pas forcer de liens internes fictifs
 
-🚨 **SCHÉMAS VISUELS** (CRITIQUE — NON NÉGOCIABLE) :
-- Format exact : [[SCHEMA:position]] où position = "faq" OU "table" OU "timeline" OU "comparison" OU "process"
-- **MINIMUM 3 SCHÉMAS OBLIGATOIRES** : 1 [[SCHEMA:faq]] (OBLIGATOIRE) + 2 autres types au choix
-- ⚠️ REJET AUTOMATIQUE si [[SCHEMA:faq]] absent OU si moins de 3 schémas au total
-- 💡 ASTUCE : Place [[SCHEMA:faq]] vers la fin de l'article, [[SCHEMA:table]] ou [[SCHEMA:comparison]] dans les sections principales
-- ⚠️ IMPORTANT : Insère UNIQUEMENT les marqueurs [[SCHEMA:xxx]] dans le texte — NE GÉNÈRE PAS les tableaux HTML toi-même. Les schémas visuels (tableaux, timelines, etc.) seront générés automatiquement dans un second appel dédié.
+**LIENS EXTERNES :**
+- Format : [[EXTERNE:URL|texte d'ancre]]
+- Minimum 3 sources fiables (HubSpot, INSEE, Forbes, Statista, Wikipedia, MDN, W3C, etc.)
+- URLs RÉELLES et vérifiables uniquement — ne jamais inventer une URL
 
-- BLOCKQUOTES : MINIMUM 1 citation [[QUOTE:...]] OBLIGATOIRE (idéalement 2 à 4). Format : [[QUOTE:Texte de la citation]]
-- IMAGES : ajoute 3 à 5 marqueurs [[IMAGE:Detailed English prompt for Gemini]] placés après les H2/H3 importants
-- Intègre tous les marqueurs naturellement dans les paragraphes
-- Intègre tous les termes sémantiques fournis dans les contextes ci-dessous
+**SCHÉMAS VISUELS :**
+- Format : [[SCHEMA:type]] où type = faq · table · timeline · comparison · process
+- Minimum 3 schémas : 1 [[SCHEMA:faq]] (obligatoire) + 2 autres
+- Insère UNIQUEMENT les marqueurs — ne génère pas les tableaux HTML
 
-FORMAT OBLIGATOIRE POUR CHAQUE SECTION :
+**CITATIONS :**
+- Format : [[QUOTE:Texte de la citation]]
+- Minimum 1 citation, idéalement 2 à 4, placées naturellement
 
-## H2 : [Titre de la section]
-→ Description : [Phrase d'accroche ou teaser en 1-2 phrases]
+FORMAT POUR CHAQUE SECTION :
 
-[Contenu rédigé complet (2 à 4 paragraphes substantiels)]
+## [Titre H2]
 
-- [Item de liste si pertinent]
-- [Item de liste]
-- [Item de liste]
+[Contenu rédigé (2 à 4 paragraphes, listes si pertinent)]
 
-### H3 : [Titre de la sous-section]
-→ Description : [Description courte en 1-2 phrases]
+### [Titre H3]
 
-[Contenu rédigé complet (1 à 2 paragraphes)]
+[Contenu rédigé (1 à 2 paragraphes)]
 
 ---
 
@@ -510,100 +584,46 @@ Règles de la conclusion :
 
 ## RÈGLES GÉNÉRALES
 - Tout le contenu est rédigé en français
-- Ton : ${tone ?? 'Expert et pédagogique'}. Jamais générique, toujours à forte valeur ajoutée
-- **📏 LONGUEUR SECTION 5 : ${wcBlogMin}–${wcBlogMax} mots — OBJECTIF À ATTEINDRE.** Vise le haut de la fourchette (${wcBlogMax} mots). Un article inférieur à ${wcBlogMin} mots est insuffisant pour le SEO. Si tu approches ${wcBlogMax} mots, rédige la conclusion et termine proprement.
-- **LIENS OBLIGATOIRES dans section 5 : minimum 3 [[INTERNE:URL|ancre]] + minimum 2 [[EXTERNE:URL|ancre]]**. Sans ces liens, l'article est invalide.
-- La section 4 (Points clés + introduction) est un champ séparé : les Points clés et l'introduction sont TOUS les deux comptabilisés dans le décompte de la section 4.
-- Intégrer naturellement tous les termes fournis dans les contextes ci-dessous
+- Ton : ${tone ?? 'Expert et pédagogique'}
+- La section 4 (Points clés + introduction) est un champ séparé du corps (section 5)
 - Ne jamais inventer des données chiffrées sans les sourcer ou les formuler comme estimations
-- Ne jamais utiliser le tiret cadratin (—) dans le contenu : remplace-le par une virgule, un point ou une reformulation
-- **🚨 VALIDATION FINALE OBLIGATOIRE 🚨** — AVANT de terminer la section 5, compte IMPÉRATIVEMENT tes marqueurs :
-  
-  ✅ **CHECKLIST DE VALIDATION** (si un seul critère échoue, l'article est REJETÉ) :
-  
-  1️⃣ **Liens internes** : AU MOINS 3 × [[INTERNE:URL|ancre]]
-     → Compte-les : ____ /3 (si < 3, ajoute-en immédiatement)
-  
-  2️⃣ **Liens externes** : AU MOINS 3 × [[EXTERNE:URL|ancre]]
-     → Compte-les : ____ /3 (si < 3, ajoute-en immédiatement)
-     → Exemple: "[[EXTERNE:https://www.google.com/search/howsearchworks|Google explique]]" ou "[[EXTERNE:https://www.hubspot.com/marketing-statistics|HubSpot révèle]]"
-  
-  3️⃣ **Schémas visuels** : AU MOINS 3 marqueurs [[SCHEMA:...]] dont 1 FAQ obligatoire
-     → [[SCHEMA:faq]] présent ? ☐ OUI ☐ NON (si NON, ajoute-le immédiatement)
-     → Autres schémas : ____ /2 minimum (table, timeline, comparison, process)
-     → Total : ____ /3 minimum
-     → ⚠️ NE GÉNÈRE PAS les tableaux HTML — insère seulement les marqueurs [[SCHEMA:xxx]]
-  
-  4️⃣ **Citation** : AU MOINS 1 × [[QUOTE:...]]
-  
-  ⚠️ Si tu détectes qu'il manque des liens externes ou des schémas, ARRÊTE-TOI et ajoute-les AVANT de conclure.
-  ⚠️ NE JAMAIS envoyer un article incomplet — la validation automatique le rejettera de toute façon.
+- Ne jamais utiliser le tiret cadratin (—) : remplace par une virgule, un point ou une reformulation
+
+## VALIDATION INTERNE (OBLIGATOIRE AVANT FIN)
+Avant de terminer l'article, vérifie que :
+- Au moins 3 liens externes fiables [[EXTERNE:...]] sont présents
+- Au moins 3 schémas [[SCHEMA:...]] dont [[SCHEMA:faq]] sont présents
+- Au moins 1 citation [[QUOTE:...]] est incluse
+Si un élément manque, ajoute-le avant la conclusion.
 
 - La FAQ et les schémas visuels seront générés dans un second appel dédié — NE LES INCLUS PAS dans cette réponse. Ta réponse se termine après la section 5.`;
 
   // ── Build user prompt ─────────────────────────────────────────────────────
   const userPromptParts = [
-    `📏 CONTRAINTE N°1 — LONGUEUR : la section 5 (Corps) doit faire ENTRE ${wcBlogMin} ET ${wcBlogMax} MOTS.`,
-    `Objectif : vise ${wcBlogMax} mots. Minimum obligatoire : ${wcBlogMin} mots (en dessous = article refusé pour SEO insuffisant).`,
-    `Cible par section : H2 = 200-350 mots · H3 = 100-150 mots · Conclusion = 150-200 mots.`,
-    ``,
-    `🚨 CONTRAINTE ABSOLUE N°2 — LIENS ET SCHÉMAS (CRITIQUE — ZÉRO TOLÉRANCE) :`,
-    ``,
-    `Tu DOIS ABSOLUMENT insérer dans la section 5 :`,
-    ``,
-    `📌 **3 LIENS INTERNES minimum** : [[INTERNE:URL|texte d'ancre]]`,
-    `   → Utilise les URLs listées ci-dessous dans "URLs internes disponibles"`,
-    ``,
-    `📌 **3 LIENS EXTERNES minimum** : [[EXTERNE:URL_REELLE|texte d'ancre]]`,
-    `   → Sources FIABLES uniquement : Google, HubSpot, INSEE, Statista, Forbes, Wikipedia, MDN, W3C, etc.`,
-    `   → URLs RÉELLES vérifiables — NE JAMAIS inventer d'URL`,
-    `   → Exemples valides :`,
-    `      • [[EXTERNE:https://www.hubspot.com/marketing-statistics|HubSpot rapporte]]`,
-    `      • [[EXTERNE:https://www.google.com/search/howsearchworks|Google explique]]`,
-    `      • [[EXTERNE:https://www.statista.com/statistics/|Statista révèle]]`,
-    ``,
-    `📌 **3 SCHÉMAS minimum (FAQ + 2 autres)** : [[SCHEMA:position]]`,
-    `   → 1 × [[SCHEMA:faq]] — OBLIGATOIRE (place-le vers la fin de l'article)`,
-    `   → 2 × autres types : [[SCHEMA:table]], [[SCHEMA:timeline]], [[SCHEMA:comparison]], ou [[SCHEMA:process]]`,
-    `   → Place-les aux endroits stratégiques (après H2 importants ou avant la conclusion)`,
-    `   → ⚠️ N'INSÈRE QUE LES MARQUEURS [[SCHEMA:xxx]] — ne génère PAS les tableaux/schémas HTML toi-même`,
-    ``,
-    `⚠️ ⚠️ ⚠️ VALIDATION AUTOMATIQUE — REJET IMMÉDIAT si :`,
-    `   • Moins de 3 liens internes OU`,
-    `   • Moins de 3 liens externes OU`,
-    `   • Moins de 3 schémas OU`,
-    `   • [[SCHEMA:faq]] absent`,
-    ``,
-    `💡 CONSEIL : Répartis les liens externes dans tout l'article (intro, corps, conclusion) pour maximiser la crédibilité.`,
-    ``,
-    `Génère un article de blog complet avec les paramètres suivants :`,
+    `Génère un article de blog complet sur le sujet suivant :`,
     ``,
     `**Mot-clé principal :** ${mainKeyword}`,
     ``,
+    `**Longueur cible :** ~${wcBlogMax} mots pour le corps (min ${wcBlogMin}, max recommandé ${Math.round(wcBlogMax * 1.06)})`,
+    ``,
+    `**URLs internes disponibles :**`,
+    internalUrlsText,
+    ``,
+    ...(externalLinksText ? [
+      `**Liens externes vérifiés (trouvés via recherche web — utilise-les en priorité pour [[EXTERNE:...]]):**`,
+      externalLinksText,
+      ``,
+    ] : []),
   ];
 
-  // ── Secondary keywords (explicit integration) ────────────────────────────
+  // ── Secondary keywords ────────────────────────────────────────────────────
   if (secondaryKeywords.length > 0) {
     userPromptParts.push(
-      `🚨 CONTRAINTE ABSOLUE N°3 — MOTS-CLÉS SECONDAIRES OBLIGATOIRES :`,
-      `Tu DOIS intégrer TOUS ces mots-clés secondaires de manière NATURELLE et PERTINENTE dans l'article :`,
-      ``,
+      `**Mots-clés secondaires à intégrer naturellement :**`,
       secondaryKeywords.map((kw, i) => `${i + 1}. "${kw}"`).join('\n'),
-      ``,
-      `RÈGLES D'INTÉGRATION :`,
-      `- Chaque mot-clé doit apparaître AU MOINS 2 fois dans l'article (titre, introduction, H2, H3, ou paragraphes)`,
-      `- Intègre-les de façon FLUIDE et CONTEXTUELLE : aucun bourrage de mots-clés détectable`,
-      `- Priorise l'introduction et les sous-titres H2/H3 pour placer ces termes`,
-      `- Utilise des variations naturelles si nécessaire (singulier/pluriel, synonymes)`,
-      `- Si un mot-clé est trop artificiel à insérer dans le contenu principal, intègre-le dans une liste à puces`,
       ``,
     );
   }
-
-  userPromptParts.push(
-    `**URLs internes disponibles pour le maillage [[INTERNE:URL|ancre]] :**`,
-    internalUrlsText,
-  );
 
   // Append all prompt snippets contributed by upstream modules
   for (const snippet of promptSnippets.filter(Boolean)) {
@@ -616,9 +636,8 @@ Règles de la conclusion :
     const avgRating = Math.round(ratingExamples.reduce((s, b) => s + (b.rating || 5), 0) / ratingExamples.length * 10) / 10;
     userPromptParts.push('\n---\n');
     userPromptParts.push(
-      `## EXEMPLES D'ARTICLES BIEN NOTÉS (référence de qualité et de style)\n` +
-      `Ces articles ont été évalués ${avgRating}/5 par l'utilisateur. Inspire-toi de leur **style d'accroche**, ` +
-      `de la **densité de l'introduction**, du **niveau de détail**, et de la **structure des paragraphes**. Ne copie pas le contenu — adapte l'approche.\n\n` +
+      `## EXEMPLES DE STYLE (note moyenne : ${avgRating}/5)\n` +
+      `Inspire-toi du style d'accroche, du niveau de détail et de la structure. Ne copie pas le contenu.\n\n` +
       ratingExamples.map((b, i) => {
         const intro = (b.introduction || '').slice(0, 300).replace(/\n+/g, ' ');
         return `### Exemple ${i + 1} — Note ${b.rating}/5 (thème : ${b.theme || '—'}, ton : ${b.tone || '—'})\n**Titre** : ${b.title}\n**Début de l'introduction** : ${intro}${(b.introduction || '').length > 300 ? '...' : ''}`;
@@ -626,23 +645,7 @@ Règles de la conclusion :
     );
   }
 
-  // Final reminder before generation
-  userPromptParts.push(
-    '\n---\n',
-    '🚨 RAPPEL FINAL AVANT GÉNÉRATION 🚨',
-    '',
-    'Avant de commencer à rédiger, mémorise ces 3 contraintes NON NÉGOCIABLES :',
-    '',
-    '✅ 3 liens internes [[INTERNE:URL|ancre]] minimum',
-    '✅ 3 liens externes [[EXTERNE:URL|ancre]] minimum (HubSpot, Google, Statista, Forbes, Wikipedia...)',
-    '✅ 3 schémas minimum : [[SCHEMA:faq]] (OBLIGATOIRE) + 2 autres ([[SCHEMA:table]], [[SCHEMA:timeline]], [[SCHEMA:comparison]], ou [[SCHEMA:process]])',
-    '',
-    '⚠️ Pense à RÉPARTIR les liens externes dans tout l\'article (pas tous au même endroit).',
-    '⚠️ Place les schémas stratégiquement : FAQ vers la fin, tableaux/comparaisons dans les sections principales.',
-    '⚠️ IMPORTANT : Insère UNIQUEMENT les marqueurs [[SCHEMA:xxx]] — NE GÉNÈRE PAS les tableaux/schémas HTML. Ils seront créés automatiquement dans un second appel.',
-    '',
-    '🎯 Maintenant, génère l\'article complet en respectant TOUTES ces contraintes.',
-  );
+  userPromptParts.push('\n---\n', 'Génère maintenant l\'article complet.');
 
   const userPrompt = userPromptParts.join('\n');
 
