@@ -257,8 +257,7 @@ ${hasInternalLinks ? '- Les liens internes [[INTERNE:...]] existants doivent êt
 ## VALIDATION INTERNE (AVANT FIN)
 Avant de terminer, vérifie que :
 - Au moins 3 liens externes fiables [[EXTERNE:...]] sont présents
-- Au moins 3 schémas [[SCHEMA:...]] dont [[SCHEMA:faq]] sont présents
-- Au moins 1 citation [[QUOTE:...]] est incluse
+- Au moins 2 citations [[QUOTE:...]] sont présentes dans des sections différentes
 Si un élément manque, ajoute-le avant la conclusion.
 
 ## FORMAT DE SORTIE OBLIGATOIRE
@@ -341,17 +340,46 @@ Retourne UNIQUEMENT un tableau JSON valide, sans texte avant ou après :
   }
 }
 
+// ── Internal URL text builder (grouped by priority) ──────────────────────────
+
+const _BLOG_PAT    = /\/(blog|article|articles|actualite|actualites|news|post|posts|guide|guides|ressource|ressources|dossier|conseil|conseils|tuto|tutoriel|tutorial)\//i;
+const _SERVICE_PAT = /\/(service|services|solution|solutions|produit|produits|product|products|offre|offres|prestation|prestations|expertise|competence)\//i;
+const _SKIP_PAT    = /\/(contact|about|qui-sommes-nous|a-propos|mentions-legales|cgv|cgu|politique-de-confidentialite|confidentialite|privacy|legal|sitemap|404|403|login|connexion|inscription|register|panier|cart|checkout|mon-compte|account)\b/i;
+
+function buildInternalUrlsText(links) {
+  const blog    = links.filter(u => _BLOG_PAT.test(u.url ?? ''));
+  const service = links.filter(u => !_BLOG_PAT.test(u.url ?? '') && _SERVICE_PAT.test(u.url ?? ''));
+  const other   = links.filter(u => !_BLOG_PAT.test(u.url ?? '') && !_SERVICE_PAT.test(u.url ?? '') && !_SKIP_PAT.test(u.url ?? ''));
+
+  const fmt = (u) => `- ${u.title} : ${u.url}`;
+  const parts = [];
+
+  if (blog.length > 0) {
+    parts.push(`⭐ Articles de blog (À PRIORISER pour le maillage interne) :\n${blog.map(fmt).join('\n')}`);
+  }
+  if (service.length > 0) {
+    parts.push(`🛠️ Pages services / solutions (À PRIORISER) :\n${service.map(fmt).join('\n')}`);
+  }
+  if (other.length > 0) {
+    parts.push(`📄 Autres pages :\n${other.map(fmt).join('\n')}`);
+  }
+
+  return parts.length > 0 ? parts.join('\n\n') : links.map(fmt).join('\n');
+}
+
 // ── Full blog generation ──────────────────────────────────────────────────────
 /**
- * Generate a full SEO blog article.
+ * Generate a full SEO/GEO blog article.
  *
  * @param {object} params
- * @param {string}   params.mainKeyword   - Required
- * @param {string}   params.tone          - Rédactionnel tone
- * @param {number}   params.kd            - Keyword difficulty (used for length)
- * @param {string[]} params.promptSnippets - Prompt sections contributed by upstream modules
- * @param {Array}    params.internalUrls   - Internal links available for [[INTERNE:...]]
- * @param {Array}    params.ratingExamples - Rated past articles for style reference
+ * @param {string}   params.mainKeyword      - Required (or use geoPrompt)
+ * @param {string}   params.tone             - Rédactionnel tone
+ * @param {number}   params.kd               - Keyword difficulty (used for length)
+ * @param {string[]} params.promptSnippets   - Prompt sections contributed by upstream modules
+ * @param {Array}    params.internalUrls     - Internal links available for [[INTERNE:...]]
+ * @param {Array}    params.ratingExamples   - Rated past articles for style reference
+ * @param {string}   params.geoPrompt        - GEO question → becomes H1 if present
+ * @param {Array}    params.geoSources       - Sources cited by AIs → priority external links
  */
 export async function generateBlogContent({
   mainKeyword,
@@ -361,18 +389,23 @@ export async function generateBlogContent({
   internalUrls   = [],
   ratingExamples = [],
   secondaryKeywords = [],
+  geoPrompt = null,
+  geoSources = [],
 }) {
+  const hasGeo = !!geoPrompt;
+  const effectiveKeyword = mainKeyword ?? geoPrompt;
+
   const client = getClient();
   const { min: wcBlogMin, max: wcBlogMax } = getWordCountBounds(kd);
 
   const internalUrlsText = internalUrls.length > 0
-    ? internalUrls.map((u) => `- ${u.title} : ${u.url}`).join('\n')
+    ? buildInternalUrlsText(internalUrls)
     : 'Aucune URL interne disponible.';
 
   // ── Fetch real external links via web search ─────────────────────────────
   let externalLinksText = '';
   try {
-    const externalLinks = await findExternalLinks(mainKeyword, secondaryKeywords);
+    const externalLinks = await findExternalLinks(effectiveKeyword, secondaryKeywords);
     if (externalLinks.length > 0) {
       externalLinksText = externalLinks
         .map(l => `- [[EXTERNE:${l.url}|${l.anchor || l.title}]] (${l.title})`)
@@ -383,22 +416,75 @@ export async function generateBlogContent({
     console.warn('[Blog] findExternalLinks échoué (non bloquant):', err.message);
   }
 
+  // ── GEO sources as priority external links ────────────────────────────────
+  const geoSourcesText = geoSources.length > 0
+    ? geoSources
+        .filter(s => s.url)
+        .map(s => `- [[EXTERNE:${s.url}|${s.name ?? s.url}]]${s.type ? ` (${s.type})` : ''}`)
+        .join('\n')
+    : '';
+
+  // Combine GEO sources (priority) + web-searched links
+  const combinedExternalLinksText = [geoSourcesText, externalLinksText].filter(Boolean).join('\n');
+
+  const hasSeo = !!mainKeyword;
+
+  // Bloc GEO — injecté dans le system prompt si contexte GEO présent
+  const geoSystemBlock = hasGeo ? `
+
+## OPTIMISATION GEO — RÈGLES ADDITIONNELLES
+Cet article doit aussi être optimisé pour être extrait comme réponse directe par les IA (ChatGPT, Perplexity, Gemini).
+- Chaque H2 commence par 1-2 phrases de réponse directe (principe "answer first")
+- Les affirmations importantes sont sourcées avec des liens externes fiables
+- Structure factuelle : affirmation → preuve → exemple → implication
+- H1 de l'article = reformulation de "${geoPrompt}" (percutante, max 90 caractères)
+` : '';
+
+  // Bloc SEO de base — injecté uniquement en mode GEO pur (pas de module keyword-research en amont)
+  // En mode SEO ou mix, les snippets SERP/sémantique fournis par les modules amont couvrent déjà ce besoin
+  const seoBaseBlock = (!hasSeo && hasGeo) ? `
+
+## OPTIMISATION SEO — RÈGLES DE BASE
+En l'absence d'analyse SERP en amont, applique ces règles SEO fondamentales :
+- **Mot-clé SEO principal :** "${effectiveKeyword}" — intègre-le dans le H1, l'introduction, au moins 2 H2 et la conclusion
+- Variantes sémantiques : utilise des synonymes et reformulations naturelles pour éviter la sur-optimisation
+- Intention de recherche : identifie si la requête est informationnelle, commerciale ou navigationnelle et adapte le contenu
+- **Titre SEO (section 1)** : intègre le mot-clé principal naturellement (55-60 caractères)
+- **Meta description (section 2)** : inclut le mot-clé et une promesse claire (max 160 caractères)
+- Maillage interne : si des URLs sont disponibles, crée au moins 3 liens internes pertinents
+` : '';
+
   const systemPrompt = `Tu es un expert SEO et copywriter spécialisé dans la création de contenu optimisé pour les moteurs de recherche.
 Tu génères des articles de blog COMPLETS, intégralement rédigés, prêts à être publiés directement.
 
+## RÈGLES NON NÉGOCIABLES (à respecter même si cela semble superflu)
+Ces règles sont ABSOLUES — elles ne sont jamais optionnelles :
+
+🔗 **LIENS INTERNES — OBLIGATION STRICTE**
+Les URLs internes fournies dans le user prompt DOIVENT apparaître dans l'article sous forme de liens [[INTERNE:URL|texte d'ancre]].
+- Si des URLs internes sont listées → place-en minimum 3 dans le corps de l'article
+- Choisis un texte d'ancre naturel (jamais l'URL brute)
+- Répartis-les dans des sections différentes (pas tous dans la conclusion)
+
+🔗 **LIENS EXTERNES — OBLIGATION STRICTE**
+Les liens externes fournis dans le user prompt DOIVENT être utilisés dans l'article sous forme [[EXTERNE:URL|texte d'ancre]].
+- Si des liens externes sont listés → utilise-en minimum 3
+- Ajoute-les naturellement là où ils sourcent une affirmation
+- Ne jamais inventer une URL non fournie
+
 ## PRIORITÉS (ORDRE STRICT)
 1. Qualité rédactionnelle et valeur pour le lecteur
-2. Respect de la structure demandée
-3. Couverture des sujets SEO importants
-4. Intégration naturelle des mots-clés
-5. Contraintes techniques (liens, schémas)
-⚠️ Si deux contraintes entrent en conflit, privilégie toujours la qualité du contenu.
-
+2. Intégration des liens internes et externes fournis (règle non négociable ci-dessus)
+3. Respect de la structure demandée
+4. Couverture des sujets SEO importants
+5. Intégration naturelle des mots-clés
+⚠️ Si deux contraintes entrent en conflit, privilégie toujours la qualité du contenu — SAUF pour les liens qui restent obligatoires.
+${geoSystemBlock}${seoBaseBlock}
 ---
 
 ## 📏 LONGUEUR — RÈGLE N°1
 
-### Objectif : article long et complet (~${wcBlogMax} mots)
+### Objectif : article complet (~${wcBlogMax} mots)
 
 - **Minimum :** ${wcBlogMin} mots
 - **Maximum recommandé :** ${Math.round(wcBlogMax * 1.06)} mots
@@ -406,7 +492,7 @@ Tu génères des articles de blog COMPLETS, intégralement rédigés, prêts à 
 
 Répartition cible par section :
 - Introduction : **180–220 mots**
-- Chaque H2 (texte + listes) : **200–300 mots**
+- Chaque H2 (texte + listes) : **100–150 mots**
 - Chaque H3 (texte) : **80–150 mots**
 - Conclusion : **120–180 mots**
 
@@ -478,7 +564,7 @@ Ce champ contient DEUX blocs séparés, dans cet ordre :
 #### BLOC A — POINTS CLÉS DE L'ARTICLE
 Génère un encadré synthétique en tête de section avec ce format EXACT :
 
-📌 **Points clés de l'article**
+**Points clés de l'article**
 - [Point clé 1 : bénéfice ou information essentielle, 10-15 mots max]
 - [Point clé 2]
 - [Point clé 3]
@@ -514,17 +600,36 @@ Rédige une introduction naturelle et engageante, optimisée pour Google et les 
 [Champ : Corps de l'article]
 
 📏 OBJECTIF SECTION 5 : ~${wcBlogMax} mots (minimum ${wcBlogMin}, maximum recommandé ${Math.round(wcBlogMax * 1.06)}).
-Répartition : H2 = 200–300 mots · H3 = 80–150 mots · Conclusion = 120–180 mots.
+Répartition : H2 = 100–150 mots · H3 = 80–150 mots · Conclusion = 120–180 mots.
 
 Rédige le CONTENU INTÉGRAL et complet de l'article en suivant la méthode MECE.
+
+## LISIBILITÉ — RÈGLE ABSOLUE DE MISE EN PAGE
+❌ INTERDIT : les blocs de texte continus de plus de 5 lignes sans rupture visuelle.
+Chaque section H2 DOIT alterner obligatoirement entre ces formats :
+1. Court paragraphe (2-3 phrases max, 1-2 lignes)
+2. Liste à puces ou numérotée (3-5 items)
+3. Citation [[QUOTE:...]] ou lien externe [[EXTERNE:...|...]]
+4. Court paragraphe de transition
+
+✅ Structure type d'un bon H2 :
+→ 1 paragraphe d'intro (2 phrases max)
+→ 1 liste à puces (4-5 points)
+→ 1 paragraphe de développement (2-3 phrases)
+→ 1 citation [[QUOTE:...]] ou lien externe sourcé
+→ 1 phrase de transition vers le H2 suivant
 
 ## STYLE RÉDACTIONNEL (OBLIGATOIRE)
 - Écris comme un expert humain, pas comme une IA
 - Évite les formulations génériques ("Dans cet article...", "Il est important de noter...")
 - Apporte des insights concrets, exemples ou angles différenciants
-- Paragraphes courts (3-5 lignes max)
-- Utilise des listes à puces régulièrement pour aérer
-- Phrases de transition naturelles entre les sections
+- **Phrases courtes et simples** : 15 mots max par phrase. Coupe les longues phrases en deux.
+- **Aucun pavé de texte** : jamais 2 paragraphes consécutifs sans liste ou rupture visuelle
+- Transitions naturelles entre les sections (1 phrase max)
+
+## LISTES ET BLOCKQUOTES — MINIMUMS SUR L'ARTICLE ENTIER
+- **Listes à puces ou numérotées : minimum 2 dans l'article total**, placées là où elles apportent de la clarté (énumération, étapes, comparaison) — ne pas en abuser ni en mettre dans chaque section
+- **Citations [[QUOTE:...]] : minimum 2 dans l'article**, placées dans des H2 différents
 
 ## DENSITÉ SÉMANTIQUE (OPTIMISATION INTELLIGENTE)
 - Intègre naturellement les termes fournis dans les contextes ci-dessous
@@ -535,32 +640,38 @@ Rédige le CONTENU INTÉGRAL et complet de l'article en suivant la méthode MECE
 
 **LIENS INTERNES :**
 - Format : [[INTERNE:URL|texte d'ancre]]
-- Si des URLs internes sont disponibles → minimum 3 liens obligatoires, répartis dans l'article
-- Si aucune URL n'est fournie → ne pas forcer de liens internes fictifs
+- ❗ Les URLs listées dans le user prompt ("URLs internes disponibles") DOIVENT toutes être utilisées — minimum 3
+- Texte d'ancre = mot ou groupe de mots naturel dans la phrase, jamais l'URL brute
+- Si aucune URL n'est fournie → ne pas forcer de liens fictifs
 
 **LIENS EXTERNES :**
 - Format : [[EXTERNE:URL|texte d'ancre]]
-- Minimum 3 sources fiables (HubSpot, INSEE, Forbes, Statista, Wikipedia, MDN, W3C, etc.)
-- URLs RÉELLES et vérifiables uniquement — ne jamais inventer une URL
+- ❗ Les liens listés dans le user prompt ("Liens externes vérifiés") DOIVENT être utilisés — minimum 3
+- Insère-les là où ils sourcent une affirmation concrète dans le texte
+- Ne jamais inventer une URL absente de la liste fournie
 
-**SCHÉMAS VISUELS :**
-- Format : [[SCHEMA:type]] où type = faq · table · timeline · comparison · process
-- Minimum 3 schémas : 1 [[SCHEMA:faq]] (obligatoire) + 2 autres
-- Insère UNIQUEMENT les marqueurs — ne génère pas les tableaux HTML
 
 **CITATIONS :**
 - Format : [[QUOTE:Texte de la citation]]
-- Minimum 1 citation, idéalement 2 à 4, placées naturellement
+- Minimum 2 citations obligatoires, placées dans des H2 différents — jamais deux dans la même section
 
 FORMAT POUR CHAQUE SECTION :
 
 ## [Titre H2]
 
-[Contenu rédigé (2 à 4 paragraphes, listes si pertinent)]
+[1-2 phrases d'intro directe]
+
+- [Item de liste]
+- [Item de liste]
+- [Item de liste]
+
+[1-2 phrases de développement ou exemple concret]
+
+[[SCHEMA:type]] ou [[QUOTE:...]] (1 par section, réparti sur l'article)
 
 ### [Titre H3]
 
-[Contenu rédigé (1 à 2 paragraphes)]
+[1-2 phrases max — dense et direct]
 
 ---
 
@@ -590,11 +701,10 @@ Règles de la conclusion :
 - Ne jamais utiliser le tiret cadratin (—) : remplace par une virgule, un point ou une reformulation
 
 ## VALIDATION INTERNE (OBLIGATOIRE AVANT FIN)
-Avant de terminer l'article, vérifie que :
-- Au moins 3 liens externes fiables [[EXTERNE:...]] sont présents
-- Au moins 3 schémas [[SCHEMA:...]] dont [[SCHEMA:faq]] sont présents
-- Au moins 1 citation [[QUOTE:...]] est incluse
-Si un élément manque, ajoute-le avant la conclusion.
+Avant de terminer l'article, compte et vérifie :
+- ✅ Au moins 3 liens [[INTERNE:URL|ancre]] présents (depuis la liste fournie) — si manquants, ajoute-les maintenant
+- ✅ Au moins 3 liens [[EXTERNE:URL|ancre]] présents (depuis la liste fournie) — si manquants, ajoute-les maintenant
+- ✅ Au moins 2 citations [[QUOTE:...]] dans des sections différentes — si manquantes, ajoute-les maintenant
 
 - La FAQ et les schémas visuels seront générés dans un second appel dédié — NE LES INCLUS PAS dans cette réponse. Ta réponse se termine après la section 5.`;
 
@@ -602,16 +712,20 @@ Si un élément manque, ajoute-le avant la conclusion.
   const userPromptParts = [
     `Génère un article de blog complet sur le sujet suivant :`,
     ``,
-    `**Mot-clé principal :** ${mainKeyword}`,
+    `**Mot-clé principal :** ${effectiveKeyword}`,
     ``,
+    ...(hasGeo ? [
+      `**Question GEO (H1 de l'article) :** ${geoPrompt}`,
+      ``,
+    ] : []),
     `**Longueur cible :** ~${wcBlogMax} mots pour le corps (min ${wcBlogMin}, max recommandé ${Math.round(wcBlogMax * 1.06)})`,
     ``,
     `**URLs internes disponibles :**`,
     internalUrlsText,
     ``,
-    ...(externalLinksText ? [
-      `**Liens externes vérifiés (trouvés via recherche web — utilise-les en priorité pour [[EXTERNE:...]]):**`,
-      externalLinksText,
+    ...(combinedExternalLinksText ? [
+      `**Liens externes vérifiés :**`,
+      combinedExternalLinksText,
       ``,
     ] : []),
   ];

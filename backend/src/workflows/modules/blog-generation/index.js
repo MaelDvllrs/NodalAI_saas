@@ -39,23 +39,67 @@ export const BlogGenerationModule = {
    * @param {{ emitEvent: Function, jobId: string }} runtime
    */
   async execute(ctx, config, { emitEvent, jobId }) {
+    // ── GEO context ───────────────────────────────────────────────────────────
+    const geoPrompt       = ctx.geoPrompt      ?? null;
+    const geoQuestions    = Array.isArray(ctx.geoQuestions)    ? ctx.geoQuestions    : [];
+    const geoSources      = Array.isArray(ctx.geoSources)      ? ctx.geoSources      : [];
+    const geoCommonPoints = Array.isArray(ctx.geoCommonPoints)  ? ctx.geoCommonPoints : [];
+    const geoContentGaps  = Array.isArray(ctx.geoContentGaps)   ? ctx.geoContentGaps  : [];
+    const geoAnalysis     = ctx.geoAnalysis    ?? '';
+
     const {
-      mainKeyword,
       serpModel,
       semanticAnalysis,
-      internalLinks    = [],
       ratingExamples   = [],
       detectedFields   = null,
       resolvedRefs     = {},
     } = ctx;
 
-    if (!mainKeyword) throw new Error('mainKeyword requis pour BlogGenerationModule');
+    // mainKeyword fallback sur geoPrompt si absent
+    const mainKeyword = ctx.mainKeyword ?? geoPrompt;
+
+    // internalLinks : depuis ctx direct, avec fallback sitemapUrls si vide
+    let internalLinks = Array.isArray(ctx.internalLinks) ? ctx.internalLinks : [];
+    const sitemapUrls = Array.isArray(ctx.sitemapUrls) ? ctx.sitemapUrls : [];
+    if (internalLinks.length === 0 && sitemapUrls.length > 0) {
+      internalLinks = sitemapUrls.map(url => {
+        try {
+          const slug = new URL(url).pathname.replace(/\/$/, '').split('/').pop() ?? url;
+          const title = slug.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || url;
+          return { title, url };
+        } catch { return { title: url, url }; }
+      });
+    }
+    // Prioritize blog/service URLs for internal linking
+    internalLinks = prioritizeInternalLinks(internalLinks).slice(0, 40);
+    if (!mainKeyword) throw new Error('mainKeyword ou geoPrompt requis pour BlogGenerationModule');
+
+    // Émettre des messages contextuels si GEO détecté
+    if (geoPrompt) {
+      emitEvent(jobId, { type: 'step', message: `✍️ Mode SEO+GEO — Question : "${geoPrompt.slice(0, 80)}${geoPrompt.length > 80 ? '…' : ''}"` });
+    }
+    if (geoQuestions.length > 0) {
+      emitEvent(jobId, { type: 'step', message: `📋 ${geoQuestions.length} question(s) IA → structure H2` });
+    }
+    if (geoSources.filter(s => s.url).length > 0) {
+      emitEvent(jobId, { type: 'step', message: `🔗 ${geoSources.filter(s => s.url).length} source(s) IA → liens externes prioritaires` });
+    }
 
     // Tone resolution: ctx.tone → siteProfile recommendation → config value → default
     const tone = ctx.tone ?? ctx.siteProfile?.recommendedToneForGeneration ?? config?.tone ?? 'Expert et pédagogique';
 
     // Collect snippets already pushed by upstream modules
     const promptSnippets = [...(ctx.promptSnippets ?? [])];
+
+    // ── 0. GEO snippets (injected BEFORE SERP snippets) ──────────────────────
+    const geoQuestionsSnippet = buildGeoQuestionsSnippet(geoQuestions);
+    if (geoQuestionsSnippet) promptSnippets.unshift(geoQuestionsSnippet);
+
+    const geoSourcesSnippet = buildGeoSourcesSnippet(geoSources);
+    if (geoSourcesSnippet) promptSnippets.unshift(geoSourcesSnippet);
+
+    const geoAnalysisSnippet = buildGeoAnalysisSnippet(geoCommonPoints, geoContentGaps, geoAnalysis);
+    if (geoAnalysisSnippet) promptSnippets.unshift(geoAnalysisSnippet);
 
     // ── 1. Density table snippet (needs kd for scaling) ──────────────────────
     const kd = ctx.kd ?? null;
@@ -147,6 +191,8 @@ export const BlogGenerationModule = {
         internalUrls: internalLinks,
         ratingExamples,
         secondaryKeywords: ctx.secondaryKeywords ?? [],
+        geoPrompt,
+        geoSources,
       });
 
       rawBlog = result.content;
@@ -414,4 +460,68 @@ Les plages sont proportionnelles à la taille de l'article cible et à la densit
 | Terme                             | Min | Max | Cible |
 |-----------------------------------|-----|-----|-------|
 ${rows}`;
+}
+
+// ── GEO Snippet builders ──────────────────────────────────────────────────────
+
+function buildGeoQuestionsSnippet(geoQuestions) {
+  if (!geoQuestions.length) return null;
+  return [
+    `## STRUCTURE GEO — H2s issus de l'analyse IA`,
+    `Ces questions ont été posées aux LLMs (ChatGPT / Gemini / Perplexity) et constituent les axes les plus pertinents pour une réponse extractible.`,
+    `RÈGLE : chaque H2 correspondant doit répondre directement à la question de façon factuelle.`,
+    `RÈGLE GEO : commence chaque H2 par 1-2 phrases de réponse directe (principe "answer first").`,
+    ``,
+    ...geoQuestions.slice(0, 8).map((q, i) => `${i + 1}. ${q}`),
+  ].join('\n');
+}
+
+function buildGeoSourcesSnippet(geoSources) {
+  if (!geoSources.length) return null;
+  return [
+    `## SOURCES IDENTIFIÉES PAR LES LLMs`,
+    `Ces sources ont été citées spontanément par les IA lors de l'analyse — utilise-les en priorité pour les liens externes [[EXTERNE:...]].`,
+    ``,
+    ...geoSources.map(s => {
+      const url = s.url ?? null;
+      const name = s.name ?? (typeof s === 'string' ? s : '?');
+      const type = s.type ? ` (${s.type})` : '';
+      return url ? `- ${name}${type} : ${url}` : `- ${name}${type}`;
+    }),
+  ].join('\n');
+}
+
+function buildGeoAnalysisSnippet(geoCommonPoints, geoContentGaps, geoAnalysis) {
+  const parts = [];
+  if (geoAnalysis) parts.push(`## SYNTHÈSE DE L'ANALYSE IA\n${geoAnalysis}`);
+  if (geoCommonPoints.length > 0) {
+    parts.push(`## POINTS COMMUNS DES RÉPONSES IA (à reprendre et enrichir)\n` +
+      geoCommonPoints.map((p, i) => `${i + 1}. ${p}`).join('\n'));
+  }
+  if (geoContentGaps.length > 0) {
+    parts.push(`## OPPORTUNITÉS GEO (angles non couverts — à traiter si pertinent)\n` +
+      geoContentGaps.map((g, i) => `${i + 1}. ${g}`).join('\n'));
+  }
+  return parts.length > 0 ? parts.join('\n\n') : null;
+}
+
+// ── Internal link prioritization ──────────────────────────────────────────────
+
+const BLOG_PATTERNS   = /\/(blog|article|articles|actualite|actualites|news|post|posts|guide|guides|ressource|ressources|dossier|conseil|conseils|tuto|tutoriel|tutorial)\//i;
+const SERVICE_PATTERNS = /\/(service|services|solution|solutions|produit|produits|product|products|offre|offres|prestation|prestations|expertise|competence)\//i;
+const SKIP_PATTERNS    = /\/(contact|about|qui-sommes-nous|a-propos|mentions-legales|cgv|cgu|politique-de-confidentialite|confidentialite|privacy|legal|sitemap|404|403|login|connexion|inscription|register|panier|cart|checkout|mon-compte|account)\b/i;
+
+/**
+ * Sort internal links: blog posts first, service pages second, other pages last.
+ * Generic/utility pages (contact, legal, etc.) are deprioritized.
+ */
+function prioritizeInternalLinks(links) {
+  function score(link) {
+    const url = link.url ?? '';
+    if (SKIP_PATTERNS.test(url))    return 3;
+    if (BLOG_PATTERNS.test(url))    return 0;
+    if (SERVICE_PATTERNS.test(url)) return 1;
+    return 2;
+  }
+  return [...links].sort((a, b) => score(a) - score(b));
 }

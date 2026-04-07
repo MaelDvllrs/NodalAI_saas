@@ -21,9 +21,9 @@ export async function getWorkflows(userId, projectId) {
   let q = supabase
     .from('workflows')
     .select('id, name, project_id, workflow_json, created_at, updated_at')
-    .eq('user_id', userId)
     .order('created_at', { ascending: false });
   if (projectId) q = q.eq('project_id', projectId);
+  else q = q.eq('user_id', userId);
   const { data, error } = await q;
   if (error) throw new Error(`[workflow.service] getWorkflows: ${error.message}`);
   return data;
@@ -34,7 +34,6 @@ export async function getWorkflow(id, userId) {
     .from('workflows')
     .select('*')
     .eq('id', id)
-    .eq('user_id', userId)
     .single();
   if (error) throw new Error(`[workflow.service] getWorkflow: ${error.message}`);
   return data;
@@ -150,21 +149,20 @@ export async function getWorkflowRuns(userId, projectId) {
   let q = supabase
     .from('workflow_runs')
     .select('id, user_id, workflow_id, project_id, status, created_at, updated_at, workflows!workflow_id(name), sites!project_id(name)')
-    .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(50);
   if (projectId) q = q.eq('project_id', projectId);
+  else q = q.eq('user_id', userId);
   const { data, error } = await q;
   if (error) throw new Error(`[workflow.service] getWorkflowRuns: ${error.message}`);
   return data;
 }
 
-export async function getWorkflowRun(id, userId) {
+export async function getWorkflowRun(id, _userId) {
   const { data, error } = await supabase
     .from('workflow_runs')
     .select('id, workflow_id, project_id, status, created_at, updated_at, workflows!workflow_id(name), sites!project_id(name)')
     .eq('id', id)
-    .eq('user_id', userId)
     .single();
   if (error) throw new Error(`[workflow.service] getWorkflowRun: ${error.message}`);
   return data;

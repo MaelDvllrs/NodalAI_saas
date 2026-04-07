@@ -208,8 +208,8 @@ export const MODULE_CATALOG: ModuleDef[] = [
   {
     type: 'blog-generation',
     label: 'Génération de blog',
-    description: 'Claude Sonnet · SEO-optimisé',
-    details: 'Génère un article de blog long format optimisé SEO. Seul le mot-clé principal est requis. Connectez optionnellement : analyse SERP, extraction sémantique, profil site (liens internes), ton rédactionnel, structure Webflow (pour buildFieldData).',
+    description: 'SEO + GEO · Claude Sonnet · S\'adapte au contexte',
+    details: 'Génère un article complet optimisé SEO et GEO. En mode SEO : s\'appuie sur le modèle SERP, l\'analyse sémantique et le KD pour calibrer la longueur. En mode GEO : utilise le prompt GEO comme H1, les questions IA comme H2, et applique le principe "answer first" pour être extrait par les IA. Les deux modes se combinent automatiquement.',
     icon: Sparkles,
     category: 'generation',
     accent: { bg: 'bg-accent/10', text: 'text-accent', border: 'border-accent/20' },
@@ -217,14 +217,20 @@ export const MODULE_CATALOG: ModuleDef[] = [
 
     ports: {
       in:  [
-        { key: 'mainKeyword',      label: 'Mot-clé principal',      required: true  },
-        { key: 'serpModel',        label: 'Modèle SERP',            required: false },
-        { key: 'semanticAnalysis', label: 'Analyse sémantique',     required: false },
-        { key: 'siteProfile',      label: 'Profil du site',          required: false },
-        { key: 'sitemapUrls',      label: 'URLs sitemap',            required: false },
-        { key: 'internalLinks',    label: 'Liens internes',          required: false },
-        { key: 'tone',             label: 'Ton rédactionnel',        required: false },
-        { key: 'detectedFields',   label: 'Champs Webflow détectés', required: false },
+        { key: 'mainKeyword',      label: 'Mot-clé principal',        required: false },
+        { key: 'serpModel',        label: 'Modèle SERP',              required: false },
+        { key: 'semanticAnalysis', label: 'Analyse sémantique',       required: false },
+        { key: 'siteProfile',      label: 'Profil du site',            required: false },
+        { key: 'sitemapUrls',      label: 'URLs sitemap',              required: false },
+        { key: 'internalLinks',    label: 'Liens internes',            required: false },
+        { key: 'tone',             label: 'Ton rédactionnel',          required: false },
+        { key: 'detectedFields',   label: 'Champs Webflow détectés',   required: false },
+        { key: 'geoPrompt',        label: 'Prompt GEO (H1)',           required: false },
+        { key: 'geoQuestions',     label: 'Questions IA → H2s',        required: false },
+        { key: 'geoSources',       label: 'Sources citées par les IA', required: false },
+        { key: 'geoCommonPoints',  label: 'Points communs IA',         required: false },
+        { key: 'geoContentGaps',   label: 'Opportunités GEO',          required: false },
+        { key: 'geoAnalysis',      label: 'Synthèse IA',               required: false },
       ],
       out: [
         { key: 'blogContent', label: 'Contenu article' },
@@ -347,39 +353,6 @@ export const MODULE_CATALOG: ModuleDef[] = [
     },
   },
 
-
-  // ── Generation GEO ──────────────────────────────────────────────────────────
-  {
-    type: 'blog-generation-geo',
-    label: 'Génération de blog GEO',
-    description: 'Claude Sonnet · GEO-optimisé · Extractible IA',
-    details: 'Génère un article GEO-optimisé dont le H1 est la question GEO et les H2 sont les questions extraites par les modules d\'analyse IA. Inclut maillage interne (sitemap), liens externes fiables, FAQ thématique avec schema.org et schémas visuels.',
-    icon: Sparkles,
-    category: 'generation',
-    accent: { bg: 'bg-violet-500/10', text: 'text-violet-400', border: 'border-violet-500/20' },
-    defaultConfig: {},
-    ports: {
-      in: [
-        { key: 'geoPrompt',       label: 'Prompt GEO (question)',    required: true  },
-        { key: 'geoQuestions',    label: 'Questions IA → H2s',       required: false },
-        { key: 'geoSources',      label: 'Sources citées par les IA', required: false },
-        { key: 'geoCommonPoints', label: 'Points communs IA',         required: false },
-        { key: 'geoContentGaps',  label: 'Opportunités GEO',          required: false },
-        { key: 'geoAnalysis',     label: 'Synthèse IA',               required: false },
-        { key: 'sitemapUrls',     label: 'URLs sitemap (maillage)',    required: false },
-        { key: 'siteProfile',     label: 'Profil du site',            required: false },
-        { key: 'detectedFields',  label: 'Champs Webflow détectés',   required: false },
-        { key: 'webflowFields',   label: 'Champs Webflow bruts',      required: false },
-      ],
-      out: [
-        { key: 'blogContent',  label: 'Contenu article' },
-        { key: 'parsedBlog',   label: 'Article parsé' },
-        { key: 'htmlBody',     label: 'HTML généré' },
-        { key: 'htmlBodyFull', label: 'HTML complet (FAQ + schémas)' },
-        { key: 'fieldData',    label: 'Champs Webflow' },
-      ],
-    },
-  },
 
   // ── Translation ─────────────────────────────────────────────────────────────
   {
@@ -1675,7 +1648,7 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
     },
     {
       id: 'geo', label: 'GEO', color: '#a78bfa99',
-      types: ['geo-prompt-generator', 'chatgpt-analysis', 'gemini-analysis', 'perplexity-analysis', 'reddit-analyzer', 'blog-generation-geo'],
+      types: ['geo-prompt-generator', 'chatgpt-analysis', 'gemini-analysis', 'perplexity-analysis', 'reddit-analyzer'],
     },
     {
       id: 'webflow', label: 'Webflow', color: '#146EF599',
@@ -1695,7 +1668,7 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
     <div className="flex h-full">
 
       {/* Palette */}
-      <div className="w-60 shrink-0 flex flex-col overflow-auto space-y-2 p-2 border-r">
+      <div className="w-60 shrink-0 flex flex-col overflow-y-auto border-r relative"><div className="flex flex-col space-y-2 p-2 pb-4">
         {/* Triggers */}
         <div>
             <div className="flex items-center gap-2 px-0.5 mb-2">
@@ -1712,7 +1685,7 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
                 onAdd={() => insertingEdge && def.ports.in.length > 0 && def.ports.out.length > 0 ? insertBlockOnEdge(def.type) : (!insertingEdge ? addBlock(def.type) : undefined)}
               />
             ))}
-    
+
             {paletteInputs.length > 0 && (
               <div className="border-t border-border/40 pt-3 mt-3">
                 <div className="flex items-center gap-2 px-0.5 mb-2">
@@ -1733,7 +1706,7 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
                 </div>
               </div>
             )}
-    
+
             {paletteGroups.map((group, gi) => {
               const groupBase = paletteTriggers.length + paletteInputs.length + paletteGroups.slice(0, gi).reduce((s, g) => s + g.modules.length, 0);
               return (
@@ -1757,7 +1730,7 @@ export default function WorkflowEditor({ isRunning, events, onRun, onReset, onSa
               );
             })}
         </div>
-      </div>
+      </div></div>
 
       {/* React Flow canvas */}
       <div className={cn('flex flex-col min-w-0', monitoring && showLogs ? 'w-[520px] shrink-0' : 'flex-1')}>

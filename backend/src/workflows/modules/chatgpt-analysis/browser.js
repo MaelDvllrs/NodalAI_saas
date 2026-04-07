@@ -18,7 +18,7 @@ const RESPONSE_TIMEOUT_MS = 180_000; // 3 min max par variante
 
 // ── Sélecteurs DOM (stables sur chatgpt.com à partir de mai 2024) ────────────
 const SEL_INPUT       = '#prompt-textarea';
-const SEL_SEND        = 'button[data-testid="send-button"]:not([disabled])';
+const SEL_SEND        = 'button[data-testid="send-button"]';
 const SEL_STOP        = 'button[data-testid="stop-button"]';
 const SEL_ANSWER      = '[data-message-author-role="assistant"]';
 const SEL_SOURCES_BTN = 'button[aria-label="Sources"]';
@@ -86,7 +86,7 @@ async function sendPrompt(page, prompt) {
   await page.waitForSelector(SEL_INPUT, { timeout: 30_000 });
   await new Promise(r => setTimeout(r, 600));
 
-  // Insérer le texte via execCommand (fiable sur les contenteditable)
+  // Insérer le texte : execCommand + InputEvent pour déclencher les handlers React
   await page.click(SEL_INPUT);
   await page.evaluate((text) => {
     const el = document.querySelector('#prompt-textarea');
@@ -94,12 +94,14 @@ async function sendPrompt(page, prompt) {
     el.focus();
     document.execCommand('selectAll');
     document.execCommand('insertText', false, text);
+    // Forcer la détection React via un InputEvent natif
+    el.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: text }));
   }, prompt);
 
-  await new Promise(r => setTimeout(r, 400));
+  await new Promise(r => setTimeout(r, 800));
 
   // Envoyer
-  await page.waitForSelector(SEL_SEND, { timeout: 10_000 });
+  await page.waitForSelector(SEL_SEND, { timeout: 20_000 });
   await page.click(SEL_SEND);
 
   // Attendre que la réponse commence (bouton Stop apparaît)

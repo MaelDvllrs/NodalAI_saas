@@ -146,7 +146,7 @@ Puis développe le contexte, l'enjeu et annonce le plan.
 La première phrase DOIT répondre partiellement à la question.
 
 ### 5. CONTENU COMPLET DE L'ARTICLE
-Budget : ${WC_MIN}–${WC_MAX} mots. Chaque H2 = 150–200 mots max.
+Budget : ${WC_MIN}–${WC_MAX} mots. Chaque H2 = 100–150 mots max.
 
 RÈGLES GEO CRITIQUES :
 - Chaque H2 commence par 1-2 phrases de réponse directe avant le développement

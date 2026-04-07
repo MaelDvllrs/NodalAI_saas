@@ -30,7 +30,6 @@ import { InternalLinkingModule }     from './modules/internal-linking/index.js';
 import { WebflowStructureModule }    from './modules/webflow-structure/index.js';
 import { WebflowPublishModule }      from './modules/webflow-publish/index.js';
 import { GeoPromptGeneratorModule }  from './modules/geo-prompt-generator/index.js';
-import { BlogGenerationGeoModule }   from './modules/blog-generation-geo/index.js';
 import { ChatGptAnalysisModule }      from './modules/chatgpt-analysis/index.js';
 import { GeminiAnalysisModule }      from './modules/gemini-analysis/index.js';
 import { PerplexityAnalysisModule }  from './modules/perplexity-analysis/index.js';
@@ -147,10 +146,10 @@ const MODULES = [
   {
     id:          'blog-generation',
     label:       'Génération de blog',
-    description: 'Génère un article de blog SEO optimisé avec Claude Sonnet.',
+    description: 'Génère un article optimisé SEO + GEO avec Claude Sonnet — s\'adapte au contexte disponible.',
     ports: {
       in:  [
-        { key: 'mainKeyword',      label: 'Mot-clé principal',      required: true  },
+        { key: 'mainKeyword',      label: 'Mot-clé principal',      required: false },
         { key: 'serpModel',        label: 'Modèle SERP',            required: false },
         { key: 'semanticAnalysis', label: 'Analyse sémantique',     required: false },
         { key: 'siteProfile',      label: 'Profil du site',          required: false },
@@ -158,6 +157,12 @@ const MODULES = [
         { key: 'internalLinks',    label: 'Liens internes',          required: false },
         { key: 'tone',             label: 'Ton rédactionnel',        required: false },
         { key: 'detectedFields',   label: 'Champs Webflow détectés', required: false },
+        { key: 'geoPrompt',        label: 'Prompt GEO (H1)',         required: false },
+        { key: 'geoQuestions',     label: 'Questions IA → H2s',      required: false },
+        { key: 'geoSources',       label: 'Sources citées par les IA', required: false },
+        { key: 'geoCommonPoints',  label: 'Points communs IA',       required: false },
+        { key: 'geoContentGaps',   label: 'Opportunités GEO',        required: false },
+        { key: 'geoAnalysis',      label: 'Synthèse IA',             required: false },
       ],
       out: [
         { key: 'blogContent', label: 'Contenu article' },
@@ -337,36 +342,6 @@ const MODULES = [
     },
     defaultConfig: {},
     module:      RedditAnalyzerModule,
-  },
-
-  // ── Blog Generation GEO ───────────────────────────────────────────────────
-  {
-    id:          'blog-generation-geo',
-    label:       'Génération de blog GEO',
-    description: 'Génère un article GEO-optimisé conçu pour être extrait par les IA (ChatGPT, Gemini, Perplexity).',
-    ports: {
-      in: [
-        { key: 'geoPrompt',      label: 'Prompt GEO (question)',   required: true  },
-        { key: 'geoQuestions',   label: 'Questions IA → H2s',      required: false },
-        { key: 'geoSources',     label: 'Sources citées par les IA', required: false },
-        { key: 'geoCommonPoints',label: 'Points communs IA',        required: false },
-        { key: 'geoContentGaps', label: 'Opportunités GEO',         required: false },
-        { key: 'geoAnalysis',    label: 'Synthèse IA',              required: false },
-        { key: 'sitemapUrls',    label: 'URLs sitemap (maillage)',   required: false },
-        { key: 'siteProfile',    label: 'Profil du site',           required: false },
-        { key: 'detectedFields', label: 'Champs Webflow détectés',  required: false },
-        { key: 'webflowFields',  label: 'Champs Webflow bruts',     required: false },
-      ],
-      out: [
-        { key: 'blogContent',  label: 'Contenu article' },
-        { key: 'parsedBlog',   label: 'Article parsé' },
-        { key: 'htmlBody',     label: 'HTML généré' },
-        { key: 'htmlBodyFull', label: 'HTML complet' },
-        { key: 'fieldData',    label: 'Champs Webflow' },
-      ],
-    },
-    defaultConfig: {},
-    module: BlogGenerationGeoModule,
   },
 
   // ── GEO Prompt Generator ───────────────────────────────────────────────────
