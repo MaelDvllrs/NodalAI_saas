@@ -12,7 +12,7 @@
  * Outputs (ctx): collectionId, webflowFields, detectedFields
  */
 
-import { getCollectionByName, getCollectionFields } from '../webflow-publish/webflow.js';
+import { getCollectionByName, getCollectionFields, getSiteLocales } from '../webflow-publish/webflow.js';
 import { detectFields } from '../../../utils/htmlBuilder.js';
 
 export const WebflowStructureModule = {
@@ -36,7 +36,11 @@ export const WebflowStructureModule = {
 
     emitEvent(jobId, { type: 'step', message: '📋 Récupération de la structure Webflow...' });
 
-    const collection = await getCollectionByName(siteId, apiKey, collectionName);
+    const [collection, siteLocales] = await Promise.all([
+      getCollectionByName(siteId, apiKey, collectionName),
+      getSiteLocales(siteId, apiKey).catch(() => ({ primary: null, secondary: [] })),
+    ]);
+
     if (!collection) {
       throw new Error(`Collection "${collectionName}" introuvable sur ce site Webflow.`);
     }
@@ -44,15 +48,34 @@ export const WebflowStructureModule = {
     const fields         = await getCollectionFields(collection.id, apiKey);
     const detectedFields = detectFields(fields);
 
+    const secondary = siteLocales.secondary ?? [];
+    const primaryTag = siteLocales.primary?.tag ?? '?';
+
     emitEvent(jobId, {
       type: 'step',
-      message: `✅ Structure Webflow récupérée : ${fields.length} champ${fields.length > 1 ? 's' : ''} (body → "${detectedFields.body || 'NON DÉTECTÉ'}")`,
+      message: `✅ Structure Webflow récupérée : ${fields.length} champ${fields.length > 1 ? 's' : ''}`,
     });
+
+    emitEvent(jobId, {
+      type: 'step',
+      message: `🌐 Locale principale : ${primaryTag}`,
+    });
+
+    if (secondary.length > 0) {
+      emitEvent(jobId, {
+        type: 'step',
+        message: `🌍 ${secondary.length} locale(s) secondaire(s) détectée(s) : ${secondary.map(l => `${l.tag} (${l.cmsLocaleId})`).join(', ')}`,
+      });
+    } else {
+      emitEvent(jobId, { type: 'step', message: '🌐 Site monolingue (aucune locale secondaire)' });
+    }
 
     return {
       collectionId:   collection.id,
       webflowFields:  fields,
       detectedFields,
+      siteId,           // propagated so webflow-publish can use it without reconfiguring
+      webflowLocales:   siteLocales,
     };
   },
 };

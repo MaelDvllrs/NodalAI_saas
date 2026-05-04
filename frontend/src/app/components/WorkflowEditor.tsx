@@ -630,6 +630,74 @@ function LanguageSelect({ value, onChange, readOnly }: { value: string; onChange
   );
 }
 
+function ColorField({ label, value, onChange, readOnly }: { label: string; value: string; onChange: (v: string) => void; readOnly?: boolean }) {
+  const safe = value.startsWith('#') ? value : '#000000';
+  return (
+    <div className="space-y-1">
+      <span className="text-[10px] text-text-muted">{label}</span>
+      <div className="flex items-center gap-2">
+        <input type="color" value={safe} disabled={readOnly}
+          onChange={e => onChange(e.target.value)}
+          className="h-7 w-8 rounded cursor-pointer nodrag border border-border bg-transparent p-0.5 disabled:opacity-50" />
+        <input type="text" value={value} readOnly={readOnly}
+          onChange={e => onChange(e.target.value)}
+          className={cn('input-base text-xs nodrag flex-1 font-mono', readOnly && 'opacity-60 cursor-default')} />
+      </div>
+    </div>
+  );
+}
+
+function BlogGenerationConfig({ config, onChange, readOnly }: { config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean }) {
+  const sg = (config.styleGuide as Record<string, string>) ?? {};
+  const set = (key: string, val: string) => !readOnly && onChange({ ...config, styleGuide: { ...sg, [key]: val } });
+
+  const primaryColor    = sg.primaryColor    ?? '#2563eb';
+  const secondaryColor  = sg.secondaryColor  ?? '#f9fafb';
+  const textPrimary     = sg.textPrimary     ?? '#111827';
+  const textSecondary   = sg.textSecondary   ?? '#374151';
+  const textAlternate   = sg.textAlternate   ?? '#6b7280';
+  const borderRadiusPx  = sg.borderRadiusPx  ?? '8';
+  const shadow          = sg.shadow          ?? 'none';
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Couleurs de fond</p>
+      <ColorField label="Primaire" value={primaryColor} readOnly={readOnly} onChange={v => set('primaryColor', v)} />
+      <ColorField label="Secondaire" value={secondaryColor} readOnly={readOnly} onChange={v => set('secondaryColor', v)} />
+
+      <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider pt-1">Couleurs de texte</p>
+      <ColorField label="Texte primaire" value={textPrimary} readOnly={readOnly} onChange={v => set('textPrimary', v)} />
+      <ColorField label="Texte secondaire" value={textSecondary} readOnly={readOnly} onChange={v => set('textSecondary', v)} />
+      <ColorField label="Texte alternatif" value={textAlternate} readOnly={readOnly} onChange={v => set('textAlternate', v)} />
+
+      <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider pt-1">Mise en forme</p>
+
+      {/* Border radius */}
+      <div className="space-y-1">
+        <span className="text-[10px] text-text-muted">Border radius</span>
+        <div className="flex items-center gap-2">
+          <input type="number" min="0" max="32" value={borderRadiusPx} readOnly={readOnly}
+            onChange={e => set('borderRadiusPx', e.target.value)}
+            className={cn('input-base text-xs nodrag w-16 text-center', readOnly && 'opacity-60 cursor-default')} />
+          <span className="text-[10px] text-text-muted">px</span>
+        </div>
+      </div>
+
+      {/* Shadow */}
+      <div className="space-y-1">
+        <span className="text-[10px] text-text-muted">Ombre (box-shadow)</span>
+        <select value={shadow} disabled={readOnly}
+          onChange={e => set('shadow', e.target.value)}
+          className={cn('input-base text-xs nodrag w-full', readOnly && 'opacity-60 cursor-default')}>
+          <option value="none">Aucune</option>
+          <option value="0 1px 3px rgba(0,0,0,0.08)">Légère</option>
+          <option value="0 2px 8px rgba(0,0,0,0.12)">Prononcée</option>
+        </select>
+      </div>
+    </div>
+  );
+}
+
 function TranslationConfig({ config, onChange, readOnly }: { config: BlockConfig; onChange: (c: BlockConfig) => void; readOnly?: boolean }) {
   const targetLanguage         = (config.targetLanguage         as string)  ?? 'Anglais';
   const targetCountry          = (config.targetCountry          as string)  ?? 'US';
@@ -668,6 +736,7 @@ const CONFIG_RENDERERS: Record<string, ConfigComponent> = {
   'webflow-structure': WebflowStructureConfig,
   'webflow-publish':   PublishConfig,
   'blog-translation':  TranslationConfig,
+  'blog-generation':   BlogGenerationConfig,
 };
 
 // 

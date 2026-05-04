@@ -66,7 +66,6 @@ router.get('/workflows', requireAuth, async (req, res) => {
   try {
     const { projectId } = req.query;
     const workflows = await getWorkflows(req.user.id, projectId || null);
-    console.log('Workflows récupérés:', workflows);
     res.json(workflows);
   } catch (err) {
     res.status(500).json({ error: err.message });

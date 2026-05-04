@@ -134,12 +134,6 @@ export const BlogGenerationModule = {
       if (introSnippet) promptSnippets.push(introSnippet);
     }
 
-    // ── 1c. FAQ snippet (from serpModel) ─────────────────────────────
-    if (serpModel?.hasFaq || serpModel?.faqQuestions?.length > 0) {
-      const faqSnippet = buildFaqSnippet(serpModel);
-      if (faqSnippet) promptSnippets.push(faqSnippet);
-    }
-
     // ── 2. Optimized outline (from serpModel — fast Haiku call) ───────────────
     let optimizedOutline = ctx.outline ?? '';
     if (!optimizedOutline && serpModel?.dominantSubtopics?.length > 0) {
@@ -236,12 +230,14 @@ export const BlogGenerationModule = {
     // (separated from main generation to avoid token exhaustion)
     if (parsed) {
       emitEvent(jobId, { type: 'step', message: '❓ Génération FAQ + schémas visuels...' });
+      const styleGuide = config?.styleGuide ?? {};
       try {
         const { faqEmbed, schemas } = await generateFaqAndSchemas({
           mainKeyword,
           bodyContent: parsed.planMece || rawBlog,
           faqQuestions: ctx.faqQuestions ?? [],
           tone: ctx.tone,
+          styleGuide,
         });
         if (faqEmbed) parsed.faqEmbed = faqEmbed;
         if (schemas?.length) parsed.schemas = schemas;
@@ -257,6 +253,7 @@ export const BlogGenerationModule = {
           mainKeyword,
           bodyContent: parsed.planMece || rawBlog,
           tone,
+          styleGuide,
         });
         if (tableSchemas.length) {
           parsed.schemas = [...(parsed.schemas ?? []), ...tableSchemas];
@@ -398,22 +395,6 @@ function buildSerpSnippet(serpModel, mainKeyword, wcMin, wcMax) {
   ].filter((l) => l !== null).join('\n');
 }
 
-function buildFaqSnippet(serpModel) {
-  if (!serpModel) return null;
-  const questions = serpModel.faqQuestions ?? [];
-
-  const lines = [
-    `## FAQ — Questions à intégrer`,
-    `Les concurrents incluent une FAQ — tu DOIS inclure une section FAQ dans l'article.`,
-  ];
-  if (questions.length > 0) {
-    lines.push(``);
-    lines.push(`### Questions FAQ à traiter prioritairement :`);
-    questions.forEach((q, i) => lines.push(`${i + 1}. ${q}`));
-  }
-
-  return lines.join('\n');
-}
 
 function buildIntroSnippet(serpModel, mainKeyword) {
   if (!serpModel || !mainKeyword) return null;

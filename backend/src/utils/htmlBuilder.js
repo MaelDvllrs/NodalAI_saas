@@ -314,16 +314,21 @@ export function buildFieldData(fields, parsed, bodyHtml, _isDraft, secondaryKeyw
   }
 
   // ── Auto-generated fields (reading time, word count, etc.) ────────────────
-  // Calculate content stats
   const wordCount = calculateWordCount(bodyHtml);
-  const readingTime = calculateReadingTime(wordCount);
+  const readingMinutes = Math.ceil(wordCount / 200);
 
   if (detected.readingTime) {
-    fieldData[detected.readingTime] = readingTime;
+    const rtField = fields.find(f => f.slug === detected.readingTime);
+    fieldData[detected.readingTime] = rtField?.type === 'Number'
+      ? readingMinutes
+      : `${readingMinutes} min`;
   }
 
   if (detected.wordCount) {
-    fieldData[detected.wordCount] = wordCount.toString();
+    const wcField = fields.find(f => f.slug === detected.wordCount);
+    fieldData[detected.wordCount] = wcField?.type === 'Number'
+      ? wordCount
+      : wordCount.toString();
   }
 
   if (detected.author) {
@@ -553,16 +558,6 @@ function calculateWordCount(html) {
   return words.length;
 }
 
-/**
- * Calculate reading time in minutes
- * @param {number} wordCount - Number of words
- * @returns {string} Reading time (e.g., "5 min", "12 min")
- */
-function calculateReadingTime(wordCount) {
-  // Average reading speed: 200 words per minute
-  const minutes = Math.ceil(wordCount / 200);
-  return `${minutes} min`;
-}
 
 /**
  * Estimate content difficulty based on word count

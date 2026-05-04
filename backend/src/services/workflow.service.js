@@ -48,7 +48,6 @@ export async function updateWorkflow(id, userId, { name, workflowJson }) {
     .from('workflows')
     .update(updates)
     .eq('id', id)
-    .eq('user_id', userId)
     .select()
     .single();
   if (error) throw new Error(`[workflow.service] updateWorkflow: ${error.message}`);
@@ -59,8 +58,7 @@ export async function deleteWorkflow(id, userId) {
   const { error } = await supabase
     .from('workflows')
     .delete()
-    .eq('id', id)
-    .eq('user_id', userId);
+    .eq('id', id);
   if (error) throw new Error(`[workflow.service] deleteWorkflow: ${error.message}`);
 }
 

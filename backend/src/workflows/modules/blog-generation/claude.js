@@ -52,7 +52,6 @@ export async function generateOptimizedOutline(mainKeyword, serpModel, theme, to
 
   const subtopicsText = serpModel.dominantSubtopics.map((t, i) => `${i + 1}. ${t}`).join('\n');
   const entitiesText  = serpModel.recurringEntities.join(', ') || 'aucune';
-  const faqNote       = serpModel.hasFaq ? 'Inclure une section FAQ.' : '';
   const targetWordsToUse = targetWords ?? Math.round(serpModel.avgWordCount * 1.1);
 
   console.log(`[Claude] generateOptimizedOutline — mainKeyword: "${mainKeyword}", theme: "${theme}", targetWords: ${targetWordsToUse}, sous-thèmes: ${subtopicsText}, `);
@@ -98,8 +97,7 @@ Tu dois respecter STRICTEMENT la longueur cible (~${targetWordsToUse} mots).
 - Donne uniquement le plan (H1, H2, H3)
 - Pas de contenu
 - Structure optimisée SEO + lisibilité
-
-${faqNote}
+- NE PAS inclure de section FAQ dans le plan — elle sera générée séparément
 
 Retourne UNIQUEMENT le plan en format texte, avec des H2 (## Titre) et H3 (### Titre) :
 - H2 avec une phrase d'accroche en italique
@@ -777,8 +775,19 @@ Avant de terminer l'article, compte et vérifie :
  * Second focused call: generate FAQ HTML + 3 visual schemas.
  * Separated from the main article generation to avoid token exhaustion.
  */
-export async function generateFaqAndSchemas({ mainKeyword, bodyContent, faqQuestions = [], tone }) {
+export async function generateFaqAndSchemas({ mainKeyword, bodyContent, faqQuestions = [], tone, styleGuide = {} }) {
   const client = getClient();
+
+  const primary      = styleGuide.primaryColor   ?? '#2563eb';
+  const secondary    = styleGuide.secondaryColor ?? '#f9fafb';
+  const textPrimary  = styleGuide.textPrimary    ?? '#111827';
+  const textSecond   = styleGuide.textSecondary  ?? '#374151';
+  const textAlt      = styleGuide.textAlternate  ?? '#6b7280';
+  const radiusPx     = styleGuide.borderRadiusPx ?? styleGuide.borderRadius?.replace('px','') ?? '8';
+  const radius       = `${radiusPx}px`;
+  const shadow    = (styleGuide.shadow && styleGuide.shadow !== 'none')
+    ? `;box-shadow:${styleGuide.shadow}`
+    : '';
 
   const faqQuestionsBlock = faqQuestions.length > 0
     ? `Traite en priorité ces questions :\n${faqQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}`
@@ -800,14 +809,18 @@ Règles :
 - 8 à 10 questions/réponses riches en mots-clés, optimisées GEO
 - Code HTML UNIQUEMENT avec attributs style="..." inline
 - INTERDIT : class=, id=, <style>, feuilles CSS
+- INTERDIT : emojis dans le contenu
+- Style sobre et professionnel, pas de dégradés ni d'effets visuels excessifs
+- Couleur d'accent : ${primary} | Fond : ${secondary} | Border-radius : ${radius}
+- Texte : primaire ${textPrimary} | secondaire ${textSecond} | alternatif ${textAlt}
 - Format exact (accordéon) :
 
 \`\`\`html
 <div style="font-family:sans-serif;max-width:800px;margin:0 auto;padding:24px 0">
-  <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:16px">Questions fréquentes</h2>
-  <div style="border:1px solid #e5e7eb;border-radius:8px;margin-bottom:8px;overflow:hidden">
-    <button onclick="var p=this.nextElementSibling;p.style.display=p.style.display==='none'?'block':'none'" style="width:100%;text-align:left;padding:16px 20px;font-weight:600;font-size:0.95rem;background:#f9fafb;border:none;cursor:pointer">Question ?</button>
-    <div style="padding:16px 20px;display:none;font-size:0.9rem;line-height:1.6;color:#374151">Réponse.</div>
+  <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:16px;color:${textPrimary}">Questions fréquentes</h2>
+  <div style="border:1px solid #e5e7eb;border-radius:${radius};margin-bottom:8px;overflow:hidden${shadow}">
+    <button onclick="var p=this.nextElementSibling;p.style.display=p.style.display==='none'?'block':'none'" style="width:100%;text-align:left;padding:16px 20px;font-weight:600;font-size:0.95rem;color:${textPrimary};background:${secondary};border:none;cursor:pointer">Question ?</button>
+    <div style="padding:16px 20px;display:none;font-size:0.9rem;line-height:1.6;color:${textSecond}">Réponse.</div>
   </div>
 </div>
 \`\`\`
@@ -850,7 +863,12 @@ Génère exactement 3 schémas adaptés au contenu :
 Règles absolues :
 - UNIQUEMENT attributs style="..." inline
 - INTERDIT : class=, id=, <style>, CSS externe
-- Responsive (max-width, flexbox inline)
+- INTERDIT : emojis (ni dans les icônes, ni dans le texte)
+- INTERDIT : dégradés (gradient), animations, effets visuels "IA"
+- Style sobre, éditorial, professionnel — données réelles tirées de l'article
+- Couleur d'accent : ${primary} | Fond : ${secondary} | Border-radius : ${radius}${shadow ? ` | Shadow : ${styleGuide.shadow}` : ''}
+- Texte : primaire ${textPrimary} | secondaire ${textSecond} | alternatif ${textAlt}
+- Responsive (max-width sur chaque div racine)
 
 Format exact :
 📌 SCHEMA 1 - À insérer après : [H2/H3 concerné]
@@ -943,8 +961,19 @@ Format exact :
  * @param {string} params.tone
  * @returns {Promise<Array<{ position: string, type: string, code: string }>>}
  */
-export async function generateTableSchemas({ mainKeyword, bodyContent, tone = 'expert et pédagogique' }) {
+export async function generateTableSchemas({ mainKeyword, bodyContent, tone = 'expert et pédagogique', styleGuide = {} }) {
   const client = getClient();
+
+  const primary      = styleGuide.primaryColor   ?? '#2563eb';
+  const secondary    = styleGuide.secondaryColor ?? '#f9fafb';
+  const textPrimary  = styleGuide.textPrimary    ?? '#111827';
+  const textSecond   = styleGuide.textSecondary  ?? '#374151';
+  const textAlt      = styleGuide.textAlternate  ?? '#6b7280';
+  const radiusPx     = styleGuide.borderRadiusPx ?? styleGuide.borderRadius?.replace('px','') ?? '8';
+  const radius       = `${radiusPx}px`;
+  const shadowCss = (styleGuide.shadow && styleGuide.shadow !== 'none')
+    ? `;box-shadow:${styleGuide.shadow}`
+    : '';
 
   const excerpt = bodyContent.slice(0, 2500);
 
@@ -959,9 +988,14 @@ ${excerpt}
 
 ## RÈGLES ABSOLUES
 - Styles inline style="..." UNIQUEMENT — INTERDIT : class=, id=, <style>, CSS externe
+- INTERDIT : emojis (ni comme icônes, ni dans le texte)
+- INTERDIT : dégradés (background: linear-gradient ou similar), animations, effets "IA"
+- Style sobre, éditorial, professionnel — aucun effet visuel excessif
 - Données RÉELLES tirées du contenu de l'article (pas de placeholders génériques)
 - max-width sur chaque div racine (responsive)
-- Couleurs : fond #f9fafb, texte #111827, accent #2563eb, bordures #e5e7eb
+- Palette : accent ${primary} | fond ${secondary} | bordures #e5e7eb
+- Texte : primaire ${textPrimary} | secondaire ${textSecond} | alternatif ${textAlt}
+- Border-radius : ${radius}${shadowCss ? ` | box-shadow : ${styleGuide.shadow}` : ''}
 
 ---
 
@@ -988,14 +1022,14 @@ Génère exactement 2 schémas avec ce format :
 <div style="font-family:sans-serif;max-width:800px;margin:24px auto;overflow-x:auto">
   <table style="width:100%;border-collapse:collapse;font-size:0.9rem">
     <thead>
-      <tr style="background:#2563eb;color:#fff">
+      <tr style="background:${primary};color:#fff">
         <th style="padding:12px 16px;text-align:left;font-weight:600">Critère</th>
         <th style="padding:12px 16px;text-align:left;font-weight:600">Option A</th>
         <th style="padding:12px 16px;text-align:left;font-weight:600">Option B</th>
       </tr>
     </thead>
     <tbody>
-      <tr><td style="padding:10px 16px;border-bottom:1px solid #e5e7eb;font-weight:600;background:#f9fafb">Critère 1</td><td style="padding:10px 16px;border-bottom:1px solid #e5e7eb;background:#f9fafb">Valeur A</td><td style="padding:10px 16px;border-bottom:1px solid #e5e7eb;background:#f9fafb">Valeur B</td></tr>
+      <tr><td style="padding:10px 16px;border-bottom:1px solid #e5e7eb;font-weight:600;color:${textPrimary};background:${secondary}">Critère 1</td><td style="padding:10px 16px;border-bottom:1px solid #e5e7eb;color:${textSecond};background:${secondary}">Valeur A</td><td style="padding:10px 16px;border-bottom:1px solid #e5e7eb;color:${textSecond};background:${secondary}">Valeur B</td></tr>
     </tbody>
   </table>
 </div>
@@ -1005,18 +1039,18 @@ Génère exactement 2 schémas avec ce format :
 \`\`\`html
 <div style="font-family:sans-serif;max-width:700px;margin:24px auto">
   <div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:12px">
-    <div style="min-width:32px;height:32px;border-radius:50%;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;flex-shrink:0">1</div>
-    <div style="padding-top:4px"><strong style="color:#111827;display:block;margin-bottom:2px">Titre de l'étape</strong><span style="color:#374151;font-size:0.875rem">Description.</span></div>
+    <div style="min-width:32px;height:32px;border-radius:${radius};background:${primary};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;flex-shrink:0">1</div>
+    <div style="padding-top:4px"><strong style="color:${textPrimary};display:block;margin-bottom:2px">Titre de l'étape</strong><span style="color:${textSecond};font-size:0.875rem">Description.</span></div>
   </div>
 </div>
 \`\`\`
 
-**Checklist :**
+**Checklist (utilise des tirets, pas d'emojis) :**
 \`\`\`html
-<div style="font-family:sans-serif;max-width:680px;margin:24px auto;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px 24px">
-  <p style="margin:0 0 12px;font-weight:700;color:#166534">Points essentiels</p>
+<div style="font-family:sans-serif;max-width:680px;margin:24px auto;background:${secondary};border:1px solid #e5e7eb;border-radius:${radius};padding:20px 24px${shadowCss}">
+  <p style="margin:0 0 12px;font-weight:700;color:${textPrimary}">Points essentiels</p>
   <ul style="margin:0;padding:0;list-style:none">
-    <li style="display:flex;gap:10px;margin-bottom:8px;font-size:0.9rem;color:#374151"><span style="color:#16a34a;font-weight:700;flex-shrink:0">✓</span>Point 1</li>
+    <li style="display:flex;gap:10px;margin-bottom:8px;font-size:0.9rem;color:${textSecond}"><span style="color:${textAlt};font-weight:700;flex-shrink:0;font-size:1rem">—</span>Point 1</li>
   </ul>
 </div>
 \`\`\`

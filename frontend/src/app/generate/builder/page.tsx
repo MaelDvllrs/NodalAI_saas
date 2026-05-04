@@ -176,8 +176,9 @@ function BuilderPageContent() {
 
   async function handleSave(blocks: CanvasBlock[], edges: SavedEdge[]) {
     if (!workflowId) return;
+    setSaveError(false);
     const steps = blocks.map((b) => ({ instanceId: b.instanceId, type: b.type, config: b.config ?? {}, position: b.position }));
-    await fetch(`${API_URL}/workflows/${workflowId}`, {
+    const res = await fetch(`${API_URL}/workflows/${workflowId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -185,6 +186,10 @@ function BuilderPageContent() {
       },
       body: JSON.stringify({ name: workflow?.name, workflowJson: { steps, edges } }),
     });
+    if (!res.ok) {
+      setSaveError(true);
+      setTimeout(() => setSaveError(false), 3000);
+    }
   }
 
   async function handleRun(blocks: CanvasBlock[], edges: SavedEdge[]) {
@@ -308,6 +313,7 @@ function BuilderPageContent() {
   }
 
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const isWorkflowLoading = !!workflowId && workflowLoading;
   const editorActionsRef = useRef<WorkflowEditorActions | null>(null);
@@ -422,9 +428,9 @@ function BuilderPageContent() {
                   </button>
                 )}
                 {workflowId && !isLoading && (
-                  <button type="button" onClick={handleSaveClick} disabled={isSaving} className="btn-secondary gap-2 text-xs disabled:opacity-40">
+                  <button type="button" onClick={handleSaveClick} disabled={isSaving} className={cn('btn-secondary gap-2 text-xs disabled:opacity-40', saveError && 'border-red-500/50 text-red-400')}>
                     {isSaving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                    Sauvegarder
+                    {saveError ? 'Erreur' : 'Sauvegarder'}
                   </button>
                 )}
                 {!isLoading ? (
