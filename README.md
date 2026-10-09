@@ -1,362 +1,92 @@
-# 📝 Automatisation Blog - SaaS de Génération de Contenu SEO
+# Nodal AI
 
-<div align="center">
+**An agentic SEO content generation platform designed to automate content workflows from keyword research to publication.**
 
-**Générez des articles de blog SEO optimisés en 2 minutes avec l'IA**
+Nodal AI is an AI-powered platform built to streamline SEO content production through specialized agents, data-driven research, and automated workflows.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
-[![Next.js](https://img.shields.io/badge/Next.js-14+-black.svg)](https://nextjs.org/)
+Rather than relying on a single prompt to generate articles, Nodal AI orchestrates multiple steps, combining keyword research, search data analysis, AI-powered writing, and image generation to produce structured content aligned with search intent.
 
-</div>
+## Overview
 
----
+Creating high-quality SEO content requires more than generating text. It involves understanding search intent, analyzing relevant keywords, structuring articles, and producing content that meets both user expectations and search engine requirements.
 
-## 🎯 Qu'est-ce que c'est ?
+Nodal AI brings these steps together into an agentic workflow, reducing manual work while maintaining control over the content creation process.
 
-Une plateforme SaaS automatisée qui génère des articles de blog optimisés pour le référencement naturel (SEO) et les publie automatiquement sur vos sites Webflow. 
+## Key Features
 
-Le système utilise l'intelligence artificielle pour créer du contenu de qualité professionnelle en **2-3 minutes**, là où un rédacteur humain prendrait **3-4 heures**.
+* **Keyword Research** — Identify relevant keywords and search opportunities using DataForSEO.
+* **SEO Research** — Use search data to inform content structure, topical coverage, and search intent.
+* **Agentic Content Generation** — Orchestrate multi-step AI workflows to transform research into structured articles.
+* **AI-Powered Writing** — Generate long-form content using Anthropic's Claude models.
+* **AI Image Generation** — Generate visual assets using Google's Gemini models.
+* **Structured Content Workflows** — Separate research, analysis, writing, and visual generation into distinct stages.
+* **Automated Content Production** — Streamline repetitive SEO content tasks through coordinated AI agents.
+* **Scalable Infrastructure** — Run backend services on a dedicated server using PM2 and Nginx.
 
----
-
-## ✨ Fonctionnalités Principales
-
-### 🤖 Génération Automatique d'Articles
-- **Recherche de mots-clés** automatique (DataForSEO)
-- **Rédaction** par IA (Claude/Anthropic)
-- **Génération d'images** professionnelles (Gemini)
-- **Publication** automatique sur Webflow
-- **Optimisation SEO** complète
-
-### 🎨 Création d'Images IA
-- Génération par Gemini (Google)
-- Format optimisé 1200x630 (16:9)
-- Conversion automatique en AVIF
-- Hébergement CDN (Supabase Storage)
-
-### 📊 Multi-Sites & Analytics
-- Gérez plusieurs sites Webflow
-- Trackez les performances (vues, clics, position Google)
-- Analysez les patterns de succès
-- Améliorations continues basées sur les données
-
-### 💾 Cache Intelligent
-- Mots-clés réutilisés automatiquement
-- Pages crawlées sauvegardées
-- Économie de tokens API
-- Performance optimisée
-
-### 🔒 Sécurité & Isolation
-- Authentification sécurisée (Supabase Auth)
-- Row Level Security (RLS)
-- Chaque utilisateur a ses propres données
-- Protection des clés API
-
----
-
-## 🚀 Démarrage Rapide
-
-### 📖 Pour Comprendre le Fonctionnement
-Vous voulez savoir comment fonctionne le SaaS sans entrer dans la technique ? Continuez à lire ce README.
-
-### 🚀 Pour Déployer en Production
-Vous êtes prêt à mettre le SaaS en ligne ?
-
-→ **[START-HERE.md](START-HERE.md)** - Guide de démarrage complet
-
-### 👨‍💻 Pour Développer Localement
-Vous voulez développer de nouvelles fonctionnalités ?
-
-→ **[backend/README.md](backend/README.md)** - Installation et développement
-
----
-
-## 📚 Documentation
-
-| Document | Description |
-|----------|-------------|
-| **[START-HERE.md](START-HERE.md)** | 🎯 **Commencez ici** - Vue d'ensemble et parcours de déploiement |
-| [DEPLOYMENT.md](DEPLOYMENT.md) | Guide complet de déploiement manuel (VPS + Vercel) |
-| [CI-CD.md](CI-CD.md) | Configuration du déploiement automatique (GitHub Actions) |
-| [GITHUB.md](GITHUB.md) | Guide pour publier le code sur GitHub en sécurité |
-| [CHECKLIST.md](CHECKLIST.md) | Liste de vérification complète pour le déploiement |
-| [frontend/NO-INDEX.md](frontend/NO-INDEX.md) | Protection contre l'indexation Google |
-| [backend/README.md](backend/README.md) | Documentation technique du backend |
-| [backend/ARCHITECTURE.md](backend/ARCHITECTURE.md) | Architecture détaillée du système |
-
----
-
-## 🌟 Fonctionnement Global
-
-### 1️⃣ **Vous Créez un Compte**
-Inscrivez-vous sur la plateforme avec votre email et mot de passe. Chaque utilisateur dispose de son propre espace sécurisé.
-
-### 2️⃣ **Vous Ajoutez Vos Sites**
-Connectez un ou plusieurs sites Webflow avec leurs clés API. Tous vos paramètres sont sauvegardés et réutilisables.
-
-### 3️⃣ **Vous Choisissez un Sujet**
-- **Le thème** : sur quoi doit porter l'article
-- **Le ton** : style d'écriture (professionnel, pédagogique, conversationnel...)
-- **Le statut** : brouillon ou publication immédiate
-
-### 4️⃣ **L'IA Fait le Travail** ⚡
-
-Le système exécute automatiquement :
-
-#### A. Recherche de Mots-Clés 🔍
-- Identifie le mot-clé principal optimal
-- Génère des mots-clés secondaires pertinents
-- Analyse volumes de recherche et difficulté SEO
-
-#### B. Analyse de Votre Site 🌐
-- Crawle les pages existantes
-- Identifie les opportunités de liens internes
-- Évite les doublons de contenu
-
-#### C. Génération du Contenu ✍️
-- Titre optimisé SEO (Title Tag)
-- Titre principal accrocheur (H1)
-- Méta-description convaincante
-- Introduction captivante
-- Corps d'article structuré (H2, H3)
-- Liens internes automatiques
-- Call-to-action en conclusion
-
-#### D. Création de l'Image 🎨
-- Génération automatique par IA (Gemini)
-- Format 1200x630 px optimisé
-- Conversion en AVIF (léger et rapide)
-- Upload sur CDN pour chargement ultra-rapide
-
-#### E. Publication sur Webflow 🚀
-- Création automatique dans votre collection
-- Publication immédiate ou sauvegarde en brouillon
-- Article prêt à être consulté
-
-### 5️⃣ **Suivi des Performances** 📊
-- Vues et clics
-- Position Google
-- Taux de clic (CTR)
-- Métriques SEO
-
-### 6️⃣ **Amélioration Continue** 🎯
-Le système apprend de vos meilleurs articles et améliore les futures générations.
-
----
-
-## 💡 Avantages Clés
-
-### ⚡ Gain de Temps Massif
-| Tâche | Manuel | Automatisé |
-|-------|--------|------------|
-| Recherche SEO | 1-2h | Automatique |
-| Rédaction | 3-4h | 2-3 min |
-| Image | 30 min | Automatique |
-| Publication | 15-20 min | 1 clic |
-| **TOTAL** | **5-7h** | **2-3 min** |
-
-### 💰 Économie Intelligente
-- Cache des mots-clés déjà recherchés
-- Réutilisation des pages crawlées
-- Optimisation des coûts API
-
-### 🎯 Qualité SEO Professionnelle
-- Recherche de mots-clés professionnelle (DataForSEO)
-- Rédaction IA de dernière génération (Claude)
-- Structure HTML parfaite
-- Maillage interne automatique
-
-### 🔒 Sécurité
-- Chaque utilisateur isolé
-- Authentification sécurisée
-- Protection des clés API
-- Row Level Security (RLS)
-
----
-
-## 🏗️ Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                  FRONTEND (Next.js)                      │
-│              Dashboard + Génération d'articles           │
-│                  Hébergé sur Vercel                      │
-└───────────────────────────┬─────────────────────────────┘
-                            │ HTTPS/API
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│                  BACKEND (Express.js)                    │
-│          • Authentification (JWT)                        │
-│          • Génération d'articles                         │
-│          • Intégration APIs externes                     │
-│                  Hébergé sur VPS                         │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-        ┌───────────────────┼───────────────────┐
-        ▼                   ▼                   ▼
-┌──────────────┐   ┌──────────────┐   ┌──────────────┐
-│   Supabase   │   │  APIs IA     │   │   Webflow    │
-│  (Database)  │   │ Claude+Gemini│   │    CMS       │
-│   Storage    │   │ DataForSEO   │   │              │
-└──────────────┘   └──────────────┘   └──────────────┘
-```
-
----
-
-## 🛠️ Technologies Utilisées
-
-### Backend
-- **Express.js** - API REST
-- **Supabase** - Database PostgreSQL + Storage
-- **PM2** - Process manager
-- **Nginx** - Reverse proxy
+## Tech Stack
 
 ### Frontend
-- **Next.js 14** - React framework
-- **TailwindCSS** - Styling
-- **TypeScript** - Type safety
 
-### Intelligence Artificielle
-- **Claude (Anthropic)** - Rédaction de contenu
-- **Gemini (Google)** - Génération d'images
-- **DataForSEO** - Recherche de mots-clés
+| Technology   | Purpose                    |
+| ------------ | -------------------------- |
+| Next.js 14   | React framework            |
+| TypeScript   | Type safety                |
+| Tailwind CSS | Styling and UI development |
 
-### Déploiement
-- **Vercel** - Hébergement frontend
-- **VPS** - Hébergement backend
-- **GitHub Actions** - CI/CD automatisé
+### Backend
 
----
+| Technology | Purpose                              |
+| ---------- | ------------------------------------ |
+| Express.js | REST API                             |
+| Supabase   | PostgreSQL database and file storage |
+| PM2        | Process management                   |
+| Nginx      | Reverse proxy                        |
 
-## 💰 Coûts Estimés
+### AI & SEO
 
-### Infrastructure (Mensuel)
-- **VPS Backend** : 4-7€/mois (Hetzner/OVH)
-- **Vercel Frontend** : Gratuit (plan Hobby)
-- **Supabase Database** : Gratuit (plan Free) ou 25$/mois (Pro)
-- **Domaine** : ~1€/mois
+| Technology         | Purpose                                 |
+| ------------------ | --------------------------------------- |
+| Claude (Anthropic) | AI-powered content writing and analysis |
+| Gemini (Google)    | AI image generation                     |
+| DataForSEO         | Keyword research and SEO data           |
 
-### APIs (Pay-as-you-go)
-- **Claude API** : ~0.50-1€ par article
-- **Gemini API** : ~0.10-0.20€ par image
-- **DataForSEO** : ~0.30€ par recherche de mot-clé
+## How It Works
 
-**Total mensuel minimum** : ~5-10€ + coûts API selon l'utilisation
+Nodal AI structures SEO content creation into a sequence of specialized steps.
 
----
+1. **Research** — Collect keyword data and SEO insights using DataForSEO.
+2. **Analyze** — Process research findings to identify search intent, relevant topics, and article structure.
+3. **Generate** — Use Claude to create structured, context-aware SEO content.
+4. **Enrich** — Generate relevant visual assets using Gemini.
+5. **Prepare for Publication** — Organize the generated content for review and integration into publishing workflows.
 
-## 🚀 Déploiement
+Each stage contributes to the final output, creating a more structured and controllable process than single-step AI text generation.
 
-### Option 1 : Déploiement Manuel
+## Architecture
 
-**Pour qui** : Premiers déploiements, tests
-**Temps** : 2-3 heures
+Nodal AI uses a Next.js frontend connected to an Express.js REST API. Supabase provides PostgreSQL persistence and storage, while the backend runs behind Nginx and is managed with PM2.
 
-→ Suivez [DEPLOYMENT.md](DEPLOYMENT.md)
+External AI and SEO services are integrated into the content pipeline, allowing the platform to combine search data, language models, and image generation within a unified workflow.
 
-### Option 2 : Déploiement Automatique
+## Technical Highlights
 
-**Pour qui** : Production, équipes
-**Temps** : 3-4h (config initiale) puis automatique
+* Multi-step AI orchestration for SEO content production.
+* Integration of multiple AI providers for specialized tasks.
+* Data-driven content generation based on keyword research.
+* Separation of frontend, backend, data storage, and AI services.
+* Self-hosted backend infrastructure using Nginx and PM2.
+* Modular workflows designed to make content generation more structured and repeatable.
 
-→ Suivez [CI-CD.md](CI-CD.md)
+## Project Vision
 
-**Avantage** : Chaque `git push origin main` déploie automatiquement ! 🤖
+Nodal AI aims to move beyond generic AI writing tools by treating SEO content creation as an orchestrated process rather than a single generation request.
 
----
+By combining SEO data, specialized AI models, and modular workflows, the platform aims to make content production more systematic, scalable, and aligned with search intent.
 
-## 🎓 Cas d'Usage
+## Project Status
 
-### 🏢 Agences de Marketing Digital
-- Produire rapidement du contenu pour plusieurs clients
-- Maintenir une qualité constante
-- Scaler la production sans embaucher
-
-### 👨‍💼 Entrepreneurs Solo
-- Alimenter régulièrement son blog
-- Améliorer son SEO sans expertise technique
-- Se concentrer sur son business
-
-### 🏭 Entreprises
-- Publier du contenu sur plusieurs thématiques
-- Maintenir plusieurs sites corporate
-- Optimiser les coûts de rédaction
-
-### ✍️ Blogueurs Professionnels
-- Multiplier sa production
-- Tester différentes niches rapidement
-- Monétiser plus de contenu
+Nodal AI is a proprietary project. The source code and internal implementation are not publicly available.
 
 ---
 
-## 🔐 Sécurité
-
-### Protections Mises en Place
-- ✅ Authentification JWT sécurisée
-- ✅ Row Level Security (RLS) sur Supabase
-- ✅ Variables d'environnement pour les secrets
-- ✅ HTTPS/SSL sur tous les endpoints
-- ✅ CORS configuré strictement
-- ✅ Rate limiting sur les API
-- ✅ Frontend non-indexé par défaut
-
-### Bonnes Pratiques
-- Ne jamais commiter les fichiers `.env`
-- Régénérer les secrets régulièrement
-- Limiter les permissions des clés API
-- Monitorer les logs d'accès
-
----
-
-## 🤝 Contribution
-
-Ce projet est un SaaS privé. Pour toute modification :
-
-1. Créez une branche : `git checkout -b feature/ma-fonctionnalite`
-2. Committez : `git commit -m "feat: description"`
-3. Pushez : `git push origin feature/ma-fonctionnalite`
-4. Créez une Pull Request
-
----
-
-## 📞 Support
-
-### Documentation
-- [START-HERE.md](START-HERE.md) - Guide de démarrage
-- [DEPLOYMENT.md](DEPLOYMENT.md) - Déploiement manuel
-- [CI-CD.md](CI-CD.md) - Déploiement automatique
-- [backend/ARCHITECTURE.md](backend/ARCHITECTURE.md) - Architecture technique
-
-### Dépannage
-- Problèmes de déploiement → [DEPLOYMENT.md - Troubleshooting](DEPLOYMENT.md#troubleshooting)
-- Problèmes CI/CD → [CI-CD.md - Dépannage](CI-CD.md#dépannage)
-- Secrets exposés → [GITHUB.md - Sécurité](GITHUB.md#si-vous-avez-accidentellement-commité-un-secret)
-
----
-
-## 📄 Licence
-
-Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
-
----
-
-## 🎉 Philosophie du Projet
-
-Ce SaaS a été conçu avec trois principes :
-
-1. **Simplicité** - Pas besoin d'être un expert SEO ou technique
-2. **Efficacité** - Résultat professionnel en quelques minutes
-3. **Évolutivité** - Le système apprend et s'améliore avec le temps
-
-L'objectif est de **démocratiser la création de contenu SEO** en permettant à quiconque de produire des articles de qualité professionnelle sans compétences techniques ni temps important.
-
----
-
-<div align="center">
-
-**Made with ❤️ pour simplifier la création de contenu SEO**
-
-[⭐ Star sur GitHub](https://github.com/votre-repo) • [📖 Documentation](START-HERE.md) • [🚀 Déployer](DEPLOYMENT.md)
-
-</div>
+**Built with Next.js, TypeScript, Express.js, Supabase, Claude, Gemini, and DataForSEO.**
